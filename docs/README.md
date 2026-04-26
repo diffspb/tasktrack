@@ -1,4 +1,4 @@
-# Таск-трекер с поддержкой мульти-исполнителей — продуктовая документация
+# Таск-трекер с поддержкой мульти-исполнителей — документация
 
 ## О продукте
 
@@ -8,73 +8,78 @@
 
 ---
 
-## Структура документации
-
-| Файл | Что внутри | Для кого |
-|------|------------|----------|
-| [00-context.md](./00-context.md) | Контекст, целевая аудитория, главный user journey, границы и out of scope | Старт чтения |
-| [glossary.md](./glossary.md) | Единый словарь терминов — источник правды | Сверяться при любом вопросе по термину |
-| [01-needs.md](./01-needs.md) | Потребности, которые закрывает трекер | Понять «зачем» |
-| [02-roles.md](./02-roles.md) | Роли пользователей | Основа для историй и прав |
-| [03-user-stories.md](./03-user-stories.md) | Индекс user stories: описание групп, ссылки на файлы в `stories/` | Навигация по историям |
-| [stories/core.md](./stories/core.md) | Истории: Auth, Projects, Tasks, Assignment, Workflow, Resolutions (домены A,B,C,F,G,H) | Ядро системы |
-| [stories/collaboration.md](./stories/collaboration.md) | Истории: Comments, Notifications, History, Time tracking (домены I,N,M,L) | Коммуникация |
-| [stories/planning.md](./stories/planning.md) | Истории: Epics, Labels, Search, Boards, Analytics, Integrations (домены D,E,J,K,Q,O) | Планирование |
-| [stories/access.md](./stories/access.md) | Истории: Permissions, Groups & Visibility, Project Links (домены P,R,S) | Доступ |
-| [stories/decision-process.md](./stories/decision-process.md) | Истории: Decision Process + мульти-исполнители (домен T + из 04) | Ключевая фича |
-| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: механика и продуктовые решения, роли (lead/reviewer/consultant) | Углублённое чтение по ключевой фиче |
-| [05-often-missed.md](./05-often-missed.md) | Решения по часто упускаемым вещам (soft-delete, i18n, email и др.) | Чек-лист при проектировании |
-| [07-decision-process.md](./07-decision-process.md) | Decision Process: жизненный цикл, Solution, DecisionCriteria, состояния, revision | Ключевой механизм продукта |
-| [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) | Scope первой версии |
-| [10-nfr.md](./10-nfr.md) | NFR: масштаб, SLA, аутентификация, деплой, API | Нефункциональные требования |
-| [11-analyst-tasks.md](./11-analyst-tasks.md) | **Задачи для системного аналитика** (рефакторинг историй, AC, ERD, диаграммы, API, права) | Рабочий план аналитика |
-| [12-data-model.md](./12-data-model.md) | ERD (Mermaid), описание схемы данных, схема воркфлоу, нетривиальные решения | Модель данных |
-| [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие, AssigneeRole × действие, правила комбинирования | Права доступа |
-| [14-diagrams.md](./14-diagrams.md) | State-диаграммы задачи и Solution, sequence-диаграмма S2, таблица уведомлений | Диаграммы |
-| [15-api.md](./15-api.md) | REST API контракты для 5 MVP-сценариев: эндпоинты, схемы запросов/ответов, ошибки | API-контракты |
-| [16-arch-review.md](./16-arch-review.md) | Архитектурное ревью: противоречия, риски, валидация API, стратегии реализации, открытые вопросы | Завершение аналитического этапа |
-| [06-next-steps.md](./06-next-steps.md) | Историческая roadmap-зарисовка | Не актуален как план |
-| [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию со всеми принятыми решениями | Лог решений |
-
----
-
-## Рекомендуемый порядок чтения (для системного аналитика)
-
-1. **[00-context.md](./00-context.md)** — что строим, для кого, в каком окружении, что точно не делаем.
-2. **[glossary.md](./glossary.md)** — прочитать один раз, держать открытым при чтении остальных файлов.
-3. **[09-mvp.md](./09-mvp.md)** — 5 сценариев MVP и приоритизация: понять scope до погружения в детали.
-4. **[02-roles.md](./02-roles.md)** — роли пользователей.
-5. **[03-user-stories.md](./03-user-stories.md)** — основной массив историй (читать вместе с приоритизацией из шага 3).
-6. **[07-decision-process.md](./07-decision-process.md)** — ключевой механизм: Decision Process от начала до конца.
-7. **[04-multi-assignee.md](./04-multi-assignee.md)** — продуктовые решения по мульти-исполнителям и роли внутри задачи.
-8. **[05-often-missed.md](./05-often-missed.md)** — решения по техническим деталям первой версии.
-9. **[10-nfr.md](./10-nfr.md)** — нефункциональные требования и ограничения.
-10. **[01-needs.md](./01-needs.md)** — исходные потребности (контекст «зачем», можно читать в любой момент).
-
----
-
-## Чек-лист готовности к проектированию
-
-- [x] Контекст и границы продукта (`00-context.md`)
-- [x] Out of scope зафиксирован (`00-context.md`)
-- [x] Единый словарь терминов (`glossary.md`)
-- [x] Роли пользователей (`02-roles.md`)
-- [x] User stories по доменам A–T с AC для 🟢-историй (`docs/stories/`)
-- [x] Мульти-исполнители: все продуктовые вопросы закрыты (`04-multi-assignee.md`)
-- [x] Decision Process описан полностью: Solution, DecisionCriteria, состояния, revision, SLA (`07-decision-process.md`)
-- [x] MVP-сценарии (5 штук) и приоритизация историй (`09-mvp.md`)
-- [x] NFR: масштаб, SLA, аутентификация, деплой, API (`10-nfr.md`)
-- [x] Решения по часто упускаемым деталям (`05-often-missed.md`)
-- [x] Видимость проектов и группы пользователей (`stories/access.md`)
-- [x] Связи между проектами (`stories/access.md`)
-- [x] Модель данных: ERD, схема воркфлоу (`12-data-model.md`)
-- [x] Матрица прав доступа (`13-permissions.md`)
-- [x] State-диаграммы, sequence-диаграмма S2, схема уведомлений (`14-diagrams.md`)
-- [x] REST API контракты для MVP-сценариев (`15-api.md`)
-- [x] Архитектурное ревью: противоречия, риски реализуемости, валидация API, стратегии (`16-arch-review.md`)
-
----
-
 ## Статус
 
-✅ Продуктовая часть готова. Аналитический пакет (AC, ERD, права, диаграммы, API) сформирован. Архитектурное ревью завершено (`16-arch-review.md`).
+🟡 **Пакет условно готов к разработке.**
+
+Что сделано: продуктовые требования, user stories с AC, ERD, матрица прав, state-диаграммы, REST API контракты, архитектурное ревью.
+
+Что остаётся перед стартом:
+- [ ] Выбрать стек фронтенда
+- [ ] Выбрать стек мониторинга и логов
+- [ ] Дополнить API эндпоинтами дашборда, профиля и управления воркфлоу (см. `16-arch-review.md` п. 3.1)
+
+Актуальное состояние и открытые вопросы → **[16-arch-review.md, раздел 6](./16-arch-review.md#6-итоговая-оценка-готовности)**.
+
+---
+
+## Структура документации
+
+### Для разработчика / аналитика
+
+| Файл | Что внутри |
+|------|------------|
+| [00-context.md](./00-context.md) | Контекст, целевая аудитория, границы и out of scope |
+| [glossary.md](./glossary.md) | Единый словарь терминов — источник правды |
+| [16-arch-review.md](./16-arch-review.md) | **Актуальное состояние:** противоречия, риски, валидация API, стек, открытые вопросы |
+| [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) |
+| [02-roles.md](./02-roles.md) | Роли пользователей |
+| [03-user-stories.md](./03-user-stories.md) | Индекс user stories → `stories/` |
+| [stories/core.md](./stories/core.md) | Auth, Projects, Tasks, Assignment, Workflow, Resolutions |
+| [stories/collaboration.md](./stories/collaboration.md) | Comments, Notifications, History, Time tracking |
+| [stories/planning.md](./stories/planning.md) | Epics, Labels, Search, Boards, Analytics, Integrations |
+| [stories/access.md](./stories/access.md) | Permissions, Groups & Visibility, Project Links |
+| [stories/decision-process.md](./stories/decision-process.md) | Decision Process + мульти-исполнители (с AC для 🟢) |
+| [07-decision-process.md](./07-decision-process.md) | Decision Process: механика, состояния, Solution, revision |
+| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: механика, роли lead/reviewer/consultant |
+| [12-data-model.md](./12-data-model.md) | ERD (Mermaid), схема воркфлоу, нетривиальные решения |
+| [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие, AssigneeRole × действие |
+| [14-diagrams.md](./14-diagrams.md) | State-диаграммы задачи и Solution, sequence S2, уведомления |
+| [15-api.md](./15-api.md) | REST API контракты для MVP-сценариев |
+| [10-nfr.md](./10-nfr.md) | NFR: масштаб, стек, инфра, Keycloak, деплой |
+| [05-often-missed.md](./05-often-missed.md) | Решения по часто упускаемым техническим деталям |
+
+### Лог решений
+
+| Файл | Что внутри |
+|------|------------|
+| [decisions/](./decisions/) | ADR-каталог: все ключевые архитектурные и продуктовые решения |
+| [decisions/ADR-001](./decisions/ADR-001-decision-process.md) | Decision Process как механизм закрытия |
+| [decisions/ADR-002](./decisions/ADR-002-tech-stack.md) | Технологический стек и инфраструктура |
+| [decisions/ADR-003](./decisions/ADR-003-notifications.md) | Уведомления: отказ от email |
+| [decisions/ADR-004](./decisions/ADR-004-data-model.md) | Ключевые решения по модели данных |
+| [decisions/ADR-005](./decisions/ADR-005-product.md) | Сборник продуктовых решений |
+
+### Исторические файлы (не актуальны как планы)
+
+| Файл | Что внутри |
+|------|------------|
+| [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию — все блоки закрыты |
+| [11-analyst-tasks.md](./11-analyst-tasks.md) | Задачи аналитика — все выполнены |
+| [01-needs.md](./01-needs.md) | Исходные потребности («зачем») |
+| [06-next-steps.md](./06-next-steps.md) | Устаревший roadmap → редирект |
+
+---
+
+## Рекомендуемый порядок чтения
+
+1. **[00-context.md](./00-context.md)** — что строим, для кого, что точно не делаем.
+2. **[glossary.md](./glossary.md)** — прочитать один раз, держать открытым.
+3. **[16-arch-review.md](./16-arch-review.md)** — текущее состояние пакета, риски, открытые вопросы.
+4. **[09-mvp.md](./09-mvp.md)** — scope и приоритизация до погружения в детали.
+5. **[07-decision-process.md](./07-decision-process.md)** — ключевой механизм продукта.
+6. **[03-user-stories.md](./03-user-stories.md)** → **[stories/decision-process.md](./stories/decision-process.md)** — истории с AC.
+7. **[12-data-model.md](./12-data-model.md)** — ERD и схема воркфлоу.
+8. **[13-permissions.md](./13-permissions.md)** — матрица прав.
+9. **[15-api.md](./15-api.md)** — API контракты.
+10. **[10-nfr.md](./10-nfr.md)** — инфраструктура и ограничения.
