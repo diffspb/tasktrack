@@ -16,13 +16,22 @@
 | [glossary.md](./glossary.md) | Единый словарь терминов — источник правды | Сверяться при любом вопросе по термину |
 | [01-needs.md](./01-needs.md) | Потребности, которые закрывает трекер | Понять «зачем» |
 | [02-roles.md](./02-roles.md) | Роли пользователей | Основа для историй и прав |
-| [03-user-stories.md](./03-user-stories.md) | User stories по доменам A–T (~87 историй) | Основной массив требований |
-| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: продуктовые решения, роли (lead/reviewer/consultant) | Углублённое чтение по ключевой фиче |
+| [03-user-stories.md](./03-user-stories.md) | Индекс user stories: описание групп, ссылки на файлы в `stories/` | Навигация по историям |
+| [stories/core.md](./stories/core.md) | Истории: Auth, Projects, Tasks, Assignment, Workflow, Resolutions (домены A,B,C,F,G,H) | Ядро системы |
+| [stories/collaboration.md](./stories/collaboration.md) | Истории: Comments, Notifications, History, Time tracking (домены I,N,M,L) | Коммуникация |
+| [stories/planning.md](./stories/planning.md) | Истории: Epics, Labels, Search, Boards, Analytics, Integrations (домены D,E,J,K,Q,O) | Планирование |
+| [stories/access.md](./stories/access.md) | Истории: Permissions, Groups & Visibility, Project Links (домены P,R,S) | Доступ |
+| [stories/decision-process.md](./stories/decision-process.md) | Истории: Decision Process + мульти-исполнители (домен T + из 04) | Ключевая фича |
+| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: механика и продуктовые решения, роли (lead/reviewer/consultant) | Углублённое чтение по ключевой фиче |
 | [05-often-missed.md](./05-often-missed.md) | Решения по часто упускаемым вещам (soft-delete, i18n, email и др.) | Чек-лист при проектировании |
 | [07-decision-process.md](./07-decision-process.md) | Decision Process: жизненный цикл, Solution, DecisionCriteria, состояния, revision | Ключевой механизм продукта |
 | [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) | Scope первой версии |
 | [10-nfr.md](./10-nfr.md) | NFR: масштаб, SLA, аутентификация, деплой, API | Нефункциональные требования |
 | [11-analyst-tasks.md](./11-analyst-tasks.md) | **Задачи для системного аналитика** (рефакторинг историй, AC, ERD, диаграммы, API, права) | Рабочий план аналитика |
+| [12-data-model.md](./12-data-model.md) | ERD (Mermaid), описание схемы данных, схема воркфлоу, нетривиальные решения | Модель данных |
+| [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие, AssigneeRole × действие, правила комбинирования | Права доступа |
+| [14-diagrams.md](./14-diagrams.md) | State-диаграммы задачи и Solution, sequence-диаграмма S2, таблица уведомлений | Диаграммы |
+| [15-api.md](./15-api.md) | REST API контракты для 5 MVP-сценариев: эндпоинты, схемы запросов/ответов, ошибки | API-контракты |
 | [06-next-steps.md](./06-next-steps.md) | Историческая roadmap-зарисовка | Не актуален как план |
 | [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию со всеми принятыми решениями | Лог решений |
 
@@ -49,17 +58,21 @@
 - [x] Out of scope зафиксирован (`00-context.md`)
 - [x] Единый словарь терминов (`glossary.md`)
 - [x] Роли пользователей (`02-roles.md`)
-- [x] User stories (~87 штук по доменам A–T, `03-user-stories.md`)
+- [x] User stories по доменам A–T с AC для 🟢-историй (`docs/stories/`)
 - [x] Мульти-исполнители: все продуктовые вопросы закрыты (`04-multi-assignee.md`)
 - [x] Decision Process описан полностью: Solution, DecisionCriteria, состояния, revision, SLA (`07-decision-process.md`)
 - [x] MVP-сценарии (5 штук) и приоритизация историй (`09-mvp.md`)
 - [x] NFR: масштаб, SLA, аутентификация, деплой, API (`10-nfr.md`)
 - [x] Решения по часто упускаемым деталям (`05-often-missed.md`)
-- [x] Видимость проектов и группы пользователей (`03-user-stories.md`, раздел R)
-- [x] Связи между проектами (`03-user-stories.md`, раздел S)
+- [x] Видимость проектов и группы пользователей (`stories/access.md`)
+- [x] Связи между проектами (`stories/access.md`)
+- [x] Модель данных: ERD, схема воркфлоу (`12-data-model.md`)
+- [x] Матрица прав доступа (`13-permissions.md`)
+- [x] State-диаграммы, sequence-диаграмма S2, схема уведомлений (`14-diagrams.md`)
+- [x] REST API контракты для MVP-сценариев (`15-api.md`)
 
 ---
 
 ## Статус
 
-✅ Продуктовая часть готова к передаче системному аналитику.
+✅ Продуктовая часть готова. Аналитический пакет (AC, ERD, права, диаграммы, API) сформирован.
