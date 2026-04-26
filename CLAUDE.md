@@ -4,10 +4,10 @@
 
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
-Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose.  
-Текущий этап: документация и проектирование завершены, разработка не начата.
+Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
+Текущий этап: **реализация MVP, Этап 0 (фундамент)**.
 
-Актуальное состояние → `docs/README.md`. Открытые вопросы → `docs/16-arch-review.md` раздел 6.
+Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
 ---
 
@@ -79,6 +79,49 @@ docs/
 - Не дублировать истории между `stories/` и `04-multi-assignee.md` — `stories/` первичен.
 - Не оставлять файлы с пометкой «черновик» без плана, когда они будут доработаны.
 - Не писать «открытые вопросы» в файлах без явного владельца и срока — либо закрыть, либо завести ADR с меткой «На рассмотрении».
+
+---
+
+## Реализация
+
+Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
+
+**Текущий этап:** 0 — фундамент
+
+### Правила разработки
+
+- Тест пишется **до или вместе** с кодом сервиса, никогда после
+- `make test` обязателен перед каждым коммитом
+- Каждый этап — один коммит + тег `impl-phase-N` (или `s1-complete`, `s23-complete`, `mvp-research-launch`)
+- **Миграции:** `metadata.create_all` в lifespan до Этапа 8, затем переключение на Alembic
+
+### Быстрый старт (бэкенд)
+
+```bash
+cd backend
+cp .env.dev.example .env.dev   # параметры подключения к БД
+make db-start                  # запустить postgres (docker run)
+make install                   # pip install -e ".[dev]"
+make reset                     # drop_all + create_all + seed
+make dev                       # uvicorn --reload на :8000
+make test                      # pytest с testcontainers
+```
+
+### Быстрый старт (фронтенд, с Этапа 4)
+
+```bash
+cd frontend
+npm install
+npm run dev                    # Vite на :5173 (proxy /api → :8000)
+```
+
+### DB параметры (dev)
+
+Описаны в `backend/.env.dev.example`. Дефолт:
+```
+DATABASE_URL=postgresql+asyncpg://tasktrack:tasktrack@localhost:5432/tasktrack
+AUTH_STUB=true
+```
 
 ---
 
