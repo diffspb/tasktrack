@@ -22,6 +22,7 @@
 | [07-decision-process.md](./07-decision-process.md) | Decision Process: жизненный цикл, Solution, DecisionCriteria, состояния, revision | Ключевой механизм продукта |
 | [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) | Scope первой версии |
 | [10-nfr.md](./10-nfr.md) | NFR: масштаб, SLA, аутентификация, деплой, API | Нефункциональные требования |
+| [11-analyst-tasks.md](./11-analyst-tasks.md) | **Задачи для системного аналитика** (рефакторинг историй, AC, ERD, диаграммы, API, права) | Рабочий план аналитика |
 | [06-next-steps.md](./06-next-steps.md) | Историческая roadmap-зарисовка | Не актуален как план |
 | [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию со всеми принятыми решениями | Лог решений |
 
