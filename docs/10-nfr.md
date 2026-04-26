@@ -19,7 +19,7 @@
 
 - **Бэкенд:** Python, FastAPI.
 - **База данных:** PostgreSQL 16.
-- **Фронтенд:** решение не принято.
+- **Фронтенд:** React 19 + TypeScript, сборщик Vite, SPA. UI — shadcn/ui + Tailwind CSS v4, светлая/тёмная тема через CSS-переменные. Состояние сервера — TanStack Query. Формы — React Hook Form + Zod.
 - **Очередь / кэш:** отсутствует в MVP. Redis и Celery не нужны:
   - Email отсутствует полностью — очередь для него не нужна.
   - Сессии управляются Keycloak — Redis для сессий не нужен.

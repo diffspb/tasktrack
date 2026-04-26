@@ -351,7 +351,7 @@ ProjectRole × AssigneeRole × `decision_maker_id` — три источника
 
 ### Открытые (требуют решения перед разработкой)
 
-1. **Фронтенд:** стек не выбран. Влияет на структуру проекта и способ раздачи статики через Traefik.
+1. ~~**Фронтенд**~~ — закрыто. React 19 + TypeScript + Vite (SPA). UI: shadcn/ui + Tailwind CSS v4, тёмная/светлая тема. TanStack Query + React Hook Form + Zod.
 
 2. ~~**SMTP-провайдер**~~ — Email убран полностью. В v2: мессенджер-интеграция, канал TBD.
 
