@@ -22,7 +22,7 @@ stateDiagram-v2
 
     awaiting_decision --> decided : Decision-maker\nвынес Decision
 
-    decided --> closed : Автоматически\n(или менеджер)
+    decided --> closed : Явное действие:\ndecision-maker или менеджер\nзакрывают задачу
 
     %% Принудительное закрытие менеджером
     in_progress --> closed : Принудительное закрытие\nменеджером (с резолюцией)
@@ -30,8 +30,8 @@ stateDiagram-v2
     in_revision --> closed : Принудительное закрытие\nменеджером
 
     %% Переоткрытие
-    closed --> open : Переоткрытие менеджером\n(менеджер выбирает,\nчья часть переоткрывается)
-    decided --> in_progress : Переоткрытие менеджером
+    closed --> open : Переоткрытие менеджером\nили автором задачи\n(выбирается, чья часть переоткрывается)
+    decided --> in_progress : Переоткрытие менеджером\nили автором задачи
 
     %% Граничный случай: один исполнитель
     note right of awaiting_decision
@@ -186,13 +186,14 @@ sequenceDiagram
 | 6 | Пользователь упомянут через @ | Упомянутый пользователь | in-app |
 | 7 | Задача переходит в `awaiting_decision` | Decision-maker | in-app + email |
 | 8 | Solution отправлен на доработку (revision_requested) | Исполнитель, чей Solution отправлен | in-app + email |
-| 9 | Decision вынесен | Все lead-исполнители; все Watcher'ы | in-app + email (lead'ы); in-app (прочие) |
+| 9 | Decision вынесен | Lead-исполнители — email + in-app; прочие Watcher'ы — только in-app | in-app + email (только lead'ы); in-app (прочие Watcher'ы) |
 | 10 | Задача переоткрыта | Все Watcher'ы | in-app |
 | 11 | Задача принудительно закрыта менеджером | Все исполнители с незавершёнными Assignment | in-app |
 | 12 | Вложение добавлено к задаче | Все Watcher'ы | in-app |
 | 13 | Due date наступает завтра | Все lead-исполнители | in-app |
 | 14 | Роль исполнителя в задаче изменена | Исполнитель, чья роль изменена | in-app |
 | 15 | Новый исполнитель добавлен в задачу в `awaiting_decision` (задача возвращается в in_progress) | Decision-maker; все lead-исполнители | in-app |
+| 16 | Статус задачи/Assignment сброшен из-за изменения воркфлоу | Все участники затронутых задач (исполнители, автор, decision-maker) | in-app |
 
 ### Правила подписки (auto-watchers)
 
