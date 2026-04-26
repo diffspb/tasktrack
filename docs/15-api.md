@@ -2,7 +2,7 @@
 
 Внутренний API для фронтенда. Базовый URL: `/api/v1`. Формат: JSON. Аутентификация: HTTP-only cookie (session). Пагинация: offset-based, параметры `?limit=50&offset=0`.
 
-Документ покрывает все эндпоинты, необходимые для прохождения 5 MVP-сценариев из `09-mvp.md`.
+Документ покрывает все эндпоинты, необходимые для прохождения MVP-сценариев из `09-mvp.md`.
 
 ---
 
@@ -209,8 +209,7 @@
 ```
 
 **Ошибки:**
-- `403 Forbidden` — нет доступа к проекту
-- `404 Not Found` — проект не найден
+- `404 Not Found` — проект не найден, soft-deleted, или `restricted`/`private` без доступа (возвращается `404`, а не `403`, чтобы не раскрывать факт существования проекта)
 
 ---
 
@@ -279,7 +278,8 @@
 **Ошибки:**
 - `400 Bad Request` — указаны и user_id, и group_id одновременно
 - `403 Forbidden` — нет прав (нужен Manager или Admin)
-- `409 Conflict` — участник уже добавлен
+
+Если пользователь уже добавлен напрямую — обновляется его индивидуальная роль, возвращается `200 OK` (не `409`). Если пользователь был добавлен только через группу — создаётся отдельная индивидуальная запись с указанной ролью, которая перекрывает групповую роль. Групповая запись остаётся без изменений.
 
 ---
 
@@ -366,6 +366,74 @@
 ```
 
 **Ответ 201:** (созданный объект воркфлоу)
+
+---
+
+#### GET /projects/{project_id}/workflows/{workflow_id}
+Детали воркфлоу: полный список статусов и переходов.
+
+**Ответ 200:**
+```json
+{
+  "id": "uuid",
+  "name": "Default",
+  "is_default": true,
+  "statuses": [
+    {
+      "id": "uuid",
+      "name": "To Do",
+      "category": "open",
+      "color": "#CCCCCC",
+      "position": 1,
+      "is_initial": true,
+      "is_final": false
+    },
+    {
+      "id": "uuid",
+      "name": "In Progress",
+      "category": "in_progress",
+      "color": "#0099FF",
+      "position": 2,
+      "is_initial": false,
+      "is_final": false
+    },
+    {
+      "id": "uuid",
+      "name": "Done",
+      "category": "done",
+      "color": "#00CC66",
+      "position": 3,
+      "is_initial": false,
+      "is_final": true
+    }
+  ],
+  "transitions": [
+    { "id": "uuid", "from_status_id": "uuid1", "to_status_id": "uuid2", "allowed_roles": [] },
+    { "id": "uuid", "from_status_id": "uuid2", "to_status_id": "uuid3", "allowed_roles": [] }
+  ]
+}
+```
+
+**Ошибки:**
+- `404 Not Found` — воркфлоу не найден
+
+---
+
+#### PATCH /projects/{project_id}/workflows/{workflow_id}
+Переименовать воркфлоу или сменить дефолтный.
+
+**Тело запроса:**
+```json
+{
+  "name": "Новое название",
+  "is_default": true
+}
+```
+
+**Ответ 200:** (обновлённый объект воркфлоу)
+
+**Ошибки:**
+- `403 Forbidden` — нет прав (нужен Manager или Admin)
 
 ---
 
@@ -520,10 +588,13 @@
 }
 ```
 
+**Ошибки:**
+- `404 Not Found` — задача не найдена, soft-deleted, или принадлежит проекту `restricted`/`private`, к которому у пользователя нет доступа (в обоих случаях возвращается `404`, а не `403` или `410` — чтобы не раскрывать факт существования ресурса)
+
 ---
 
 #### PATCH /tasks/{task_id}
-Обновить задачу (частичное обновление). Поддерживает `version` для оптимистичной блокировки.
+Обновить задачу (частичное обновление). Поле `version` обязательно для оптимистичной блокировки.
 
 **Тело запроса:**
 ```json
@@ -538,8 +609,20 @@
 **Ответ 200:** (обновлённый объект задачи с новым `version`)
 
 **Ошибки:**
-- `409 Conflict` — конфликт версий (version в запросе не совпадает с version в БД)
+- `400 Bad Request` — поле `version` отсутствует в теле запроса (код `VERSION_REQUIRED`)
 - `403 Forbidden` — нет прав на редактирование
+- `409 Conflict` — `version` в запросе устарел; тело ответа содержит `current_version`:
+```json
+{
+  "error": {
+    "code": "VERSION_CONFLICT",
+    "message": "Задача была изменена другим пользователем",
+    "details": {
+      "current_version": 5
+    }
+  }
+}
+```
 
 ---
 
@@ -620,7 +703,7 @@ Soft-delete задачи.
 **Ответ 200:** (обновлённый Assignment)
 
 **Ошибки:**
-- `400 Bad Request` — смена роли заблокирована (Solution уже подан)
+- `400 Bad Request` — смена роли заблокирована (Solution уже подан); код `ROLE_CHANGE_NOT_ALLOWED`
 - `403 Forbidden` — нет прав (только менеджер или Admin)
 
 ---
@@ -632,7 +715,7 @@ Soft-delete задачи.
 
 **Ошибки:**
 - `403 Forbidden` — нет прав (нужен Manager)
-- `400 Bad Request` — нельзя удалить исполнителя с принятым Solution
+- `400 Bad Request` — нельзя удалить исполнителя с поданным Solution (код `ASSIGNMENT_HAS_SUBMITTED_SOLUTION`). Solution исполнителя остаётся в истории задачи. Для удаления необходимо сначала отозвать Solution (если это разрешено).
 
 ---
 
@@ -761,8 +844,8 @@ Soft-delete задачи.
 ```
 
 **Ошибки:**
-- `413 Payload Too Large` — файл больше 20 МБ
-- `400 Bad Request` — превышен лимит проекта (500 МБ)
+- `413 Payload Too Large` — файл больше 20 МБ (код `FILE_TOO_LARGE`)
+- `400 Bad Request` — превышен лимит хранилища проекта 500 МБ (код `PROJECT_STORAGE_EXCEEDED`)
 
 ---
 
@@ -788,6 +871,9 @@ Soft-delete задачи.
   "link_type": "blocks"
 }
 ```
+
+**Ошибки:**
+- `403 Forbidden` — при cross-project связи: у текущего пользователя нет read-доступа к проекту целевой задачи (код `PROJECT_ACCESS_DENIED`)
 
 ---
 
@@ -983,7 +1069,7 @@ Soft-delete задачи.
 ---
 
 #### POST /solutions/{solution_id}/submit
-Подать Solution (draft → submitted).
+Подать Solution (draft → submitted). Также допускается повторная подача после отзыва (`withdraw`): Solution возвращается в `submitted`.
 
 **Тело запроса:** (пустое, `{}`)
 
@@ -999,14 +1085,26 @@ Soft-delete задачи.
 
 `task_transitioned_to` = `"awaiting_decision"` если это был последний lead-Solution; `null` иначе.
 
+Если задача уже перешла в `awaiting_decision` (другой lead успел подать раньше) — Solution помечается как `submitted`, переход задачи не происходит повторно, ответ содержит `task_transitioned_to: null` и код `400` с описанием:
+
+```json
+{
+  "error": {
+    "code": "TASK_ALREADY_AWAITING_DECISION",
+    "message": "Задача уже ожидает решения. Solution принят как submitted."
+  }
+}
+```
+
 **Ошибки:**
-- `400 Bad Request` — Solution не в статусе draft
+- `400 Bad Request` — Solution не в статусе `draft` (код `SOLUTION_ALREADY_SUBMITTED`)
+- `400 Bad Request` — задача уже в статусе `awaiting_decision` (код `TASK_ALREADY_AWAITING_DECISION`); Solution принимается, но без повторного перехода задачи
 - `403 Forbidden` — нет прав (только lead-исполнитель)
 
 ---
 
 #### POST /solutions/{solution_id}/withdraw
-Отозвать поданный Solution (submitted → draft).
+Отозвать поданный Solution (submitted → draft). После отзыва Solution можно доработать и подать повторно.
 
 **Тело запроса:** (пустое, `{}`)
 
@@ -1020,7 +1118,8 @@ Soft-delete задачи.
 ```
 
 **Ошибки:**
-- `400 Bad Request` — Solution не в статусе submitted; decision-maker уже начал рассмотрение
+- `400 Bad Request` — Solution не в статусе `submitted`; decision-maker уже начал рассмотрение
+- `400 Bad Request` — Solution находится в статусе `revision_requested` (код `SOLUTION_IN_REVISION`); нельзя отозвать — нужно доработать и подать повторно
 - `403 Forbidden` — нет прав (только автор Solution)
 
 ---
@@ -1283,8 +1382,46 @@ Soft-delete задачи.
 
 ### Профиль пользователя и дашборд
 
+#### GET /users/me/tasks
+Задачи текущего пользователя, где он является исполнителем, автором (reporter) или watcher'ом.
+
+**Query-параметры:** `?role=assignee|reporter|watcher&status=open|in_progress|awaiting_decision|in_revision|decided|closed&project_id=uuid&page=1&page_size=50`
+
+- `role` — фильтр по роли пользователя относительно задачи. По умолчанию — все роли.
+- `status` — фильтр по `global_status` задачи.
+- `project_id` — ограничить конкретным проектом.
+- `page` / `page_size` — пагинация; по умолчанию page=1, page_size=50.
+
+**Ответ 200:**
+```json
+{
+  "total": 15,
+  "page": 1,
+  "page_size": 50,
+  "items": [
+    {
+      "id": "uuid",
+      "key": "BACK-42",
+      "title": "Реализовать авторизацию",
+      "global_status": "in_progress",
+      "project": { "id": "uuid", "key": "BACK", "name": "Backend" },
+      "personal_status": { "id": "uuid", "name": "In Progress" },
+      "my_role": "lead",
+      "due_date": "2026-05-15"
+    }
+  ]
+}
+```
+
+`personal_status` возвращается только если пользователь является исполнителем задачи (`my_role = "lead"`, `"reviewer"` или `"consultant"`); для reporter и watcher поле равно `null`.
+
+**Ошибки:**
+- `400 Bad Request` — невалидное значение `role` или `status`
+
+---
+
 #### GET /users/me/dashboard
-Задачи текущего пользователя: где он исполнитель, автор или watcher.
+Агрегированный дашборд текущего пользователя: задачи где он исполнитель, автор или watcher.
 
 **Query-параметры:** `?status_id=uuid&global_status=in_progress&project_id=uuid&limit=50&offset=0`
 
@@ -1310,13 +1447,12 @@ Soft-delete задачи.
 ---
 
 #### PATCH /users/me
-Обновить профиль текущего пользователя.
+Обновить профиль текущего пользователя (name, timezone). Аватар обновляется отдельным эндпоинтом.
 
 **Тело запроса:**
 ```json
 {
   "display_name": "Иван Иванов",
-  "avatar_url": "https://...",
   "timezone": "Europe/Moscow"
 }
 ```
@@ -1324,7 +1460,35 @@ Soft-delete задачи.
 **Ответ 200:** (обновлённый профиль пользователя)
 
 **Ошибки:**
-- `400 Bad Request` — невалидный timezone; avatar_url недоступен
+- `400 Bad Request` — невалидный timezone
+
+---
+
+#### POST /users/me/avatar
+Загрузить или заменить аватар текущего пользователя.
+
+**Content-Type:** `multipart/form-data`
+
+**Поля формы:**
+- `file` — изображение (до 2 МБ); допустимые форматы: JPEG, PNG, WEBP.
+
+**Ответ 200:**
+```json
+{
+  "avatar_url": "https://storage.example.com/avatars/uuid.jpg"
+}
+```
+
+**Ошибки:**
+- `400 Bad Request` — неподдерживаемый формат файла
+- `413 Payload Too Large` — файл превышает 2 МБ (код `FILE_TOO_LARGE`)
+
+---
+
+#### DELETE /users/me/avatar
+Удалить аватар текущего пользователя. После удаления поле `avatar_url` возвращает `null`.
+
+**Ответ 204:** (нет тела)
 
 ---
 
@@ -1374,9 +1538,13 @@ Callback после авторизации через Google. Обрабатыв
 ```json
 {
   "name": "Cannot Reproduce",
+  "description": "Не удалось воспроизвести проблему",
+  "is_default": false,
   "position": 5
 }
 ```
+
+`is_default` — если `true`, данная резолюция будет выбрана по умолчанию при переходе в финальный статус. Только одна резолюция может быть `is_default = true` для проекта.
 
 **Ответ 201:** (созданная резолюция)
 
@@ -1386,12 +1554,14 @@ Callback после авторизации через Google. Обрабатыв
 ---
 
 #### PATCH /resolutions/{resolution_id}
-Обновить резолюцию (переименовать, изменить позицию, деактивировать).
+Обновить резолюцию (переименовать, изменить описание, позицию, деактивировать или задать дефолтную).
 
 **Тело запроса:**
 ```json
 {
   "name": "Не воспроизводится",
+  "description": "Не удалось воспроизвести проблему",
+  "is_default": true,
   "is_active": false
 }
 ```
@@ -1410,7 +1580,7 @@ Callback после авторизации через Google. Обрабатыв
 
 **Ошибки:**
 - `403 Forbidden` — нет прав
-- `409 Conflict` — резолюция используется в существующих Assignment'ах; следует деактивировать (`is_active = false`)
+- `409 Conflict` — резолюция используется в существующих Assignment'ах (код `RESOLUTION_IN_USE`); следует деактивировать (`is_active = false`)
 
 ---
 
@@ -1490,35 +1660,80 @@ Callback после авторизации через Google. Обрабатыв
 ### Управление воркфлоу
 
 #### PATCH /projects/{project_id}/workflows/{workflow_id}/statuses/{status_id}
-Переименовать статус в воркфлоу (или изменить цвет, позицию).
+Обновить статус воркфлоу: переименовать, изменить цвет, позицию, тип (initial/intermediate/final) или сделать дефолтным.
 
 **Тело запроса:**
 ```json
 {
   "name": "В рассмотрении",
-  "color": "#FFA500"
+  "color": "#FFA500",
+  "category": "in_progress",
+  "is_initial": false,
+  "is_final": false,
+  "is_default": false
 }
 ```
+
+`is_default` — отметить статус как дефолтный (начальный для новых Assignment'ов). Смена дефолтного статуса допускается только если нет активных Assignment'ов в текущем дефолтном статусе.
 
 **Ответ 200:** (обновлённый статус)
 
 **Ошибки:**
 - `403 Forbidden` — нет прав (нужен Manager или Admin)
+- `409 Conflict` — смена дефолтного статуса заблокирована: есть активные Assignment'ы в текущем дефолтном статусе
 
 ---
 
 #### DELETE /projects/{project_id}/workflows/{workflow_id}/statuses/{status_id}
 Удалить статус из воркфлоу.
 
-Если в этом статусе есть активные Assignment'ы — возвращает `409 Conflict` с описанием последствий. Если подтверждение получено (через параметр `?force=true`) — статус удаляется, все Assignment'ы в нём откатываются к дефолтному статусу воркфлоу, участники получают уведомление.
-
-**Query-параметры:** `?force=true` — подтвердить удаление при наличии активных Assignment'ов.
+Если в этом статусе есть активные Assignment'ы — возвращает `409 Conflict` с информацией о затронутых Assignment'ах. Перед удалением нужно выполнить миграцию через `POST .../statuses/{status_id}/migrate`.
 
 **Ответ 204:** (нет тела)
 
 **Ошибки:**
-- `403 Forbidden` — нет прав (нужен Manager или Admin)
-- `409 Conflict` — в статусе есть активные Assignment'ы; тело ответа содержит количество затронутых задач и описание что произойдёт при `force=true`
+- `403 Forbidden` — нет прав (удаление статуса — только Admin)
+- `409 Conflict` — в статусе есть активные Assignment'ы (код `STATUS_IN_USE`):
+```json
+{
+  "error": {
+    "code": "STATUS_IN_USE",
+    "message": "Статус используется активными Assignment'ами",
+    "details": {
+      "affected_assignments_count": 5,
+      "default_status_id": "uuid"
+    }
+  }
+}
+```
+Клиент должен явно вызвать миграцию (см. следующий эндпоинт), после чего повторить удаление.
+
+---
+
+#### POST /projects/{project_id}/workflows/{workflow_id}/statuses/{status_id}/migrate
+Принудительная миграция Assignment'ов из удаляемого статуса в целевой. Вызывается перед удалением статуса при наличии активных Assignment'ов. После успешной миграции статус можно удалить без конфликта.
+
+**Тело запроса:**
+```json
+{
+  "target_status_id": "uuid"
+}
+```
+
+**Ответ 200:**
+```json
+{
+  "migrated_assignments_count": 5,
+  "target_status_id": "uuid"
+}
+```
+
+После миграции затронутые пользователи получают in-app уведомление; событие логируется в `AuditLog`.
+
+**Ошибки:**
+- `400 Bad Request` — `target_status_id` не принадлежит тому же воркфлоу
+- `403 Forbidden` — нет прав (нужен Admin)
+- `404 Not Found` — исходный или целевой статус не найден
 
 ---
 
@@ -1609,7 +1824,10 @@ Callback после авторизации через Google. Обрабатыв
 #### GET /search
 Полнотекстовый поиск по задачам.
 
-**Query-параметры:** `?q=авторизация&project_id=uuid&limit=50&offset=0`
+**Query-параметры:** `?q=авторизация&project_id=uuid&limit=50&offset=0&include_deleted=false`
+
+- Soft-deleted задачи не включаются в результаты по умолчанию.
+- Параметр `?include_deleted=true` доступен только пользователям с ProjectRole = Admin. Для остальных параметр игнорируется.
 
 **Ответ 200:**
 ```json
@@ -1660,50 +1878,136 @@ Callback после авторизации через Google. Обрабатыв
 
 ### Consultant и чужие Solution
 
-- Пользователь с AssigneeRole = `consultant` не видит Solution'ы других исполнителей до вынесения Decision. Проверка выполняется на уровне приложения: `GET /assignments/{id}/solution` и `GET /tasks/{id}/solutions` возвращают `403 Forbidden` для consultant'а, если `TaskDecision` ещё не создан. Это не только правило проекта — проверяется для каждого запроса независимо.
+- Пользователь с AssigneeRole = `consultant` не видит Solution'ы других исполнителей до вынесения Decision. Проверка выполняется на уровне приложения: `GET /assignments/{id}/solution` и `GET /tasks/{id}/solutions` возвращают `403 Forbidden` для consultant'а, если `TaskDecision` ещё не создан. Прямое обращение `GET /solutions/{id}` выполняет ту же проверку и не обходится через `assignment_id`.
+
+### GET /tasks/{id}/decisions
+
+Доступен всем участникам задачи и всем участникам проекта с ProjectRole ≥ Viewer. Decision публичен после вынесения — возвращает `404 Not Found` если Decision ещё не вынесен.
 
 ---
 
 ## Edge cases
 
+### GET /tasks/{id} для soft-deleted задачи
+
+Возвращает `404 Not Found` (не `410 Gone`). Soft-deleted задачи не отличаются от несуществующих с точки зрения API. Admin может получить soft-deleted задачу через `?include_deleted=true`.
+
+### GET /tasks/{id} для задачи из restricted/private проекта без доступа
+
+Возвращает `404 Not Found` (не `403 Forbidden`). Это предотвращает раскрытие факта существования ресурса через статус-код.
+
 ### PATCH /tasks/{id} без поля version
 
 Если тело запроса не содержит поля `version` — возвращается `400 Bad Request` с кодом `VERSION_REQUIRED` и сообщением «version required for optimistic locking».
+
+### PATCH /tasks/{id} с устаревшим version
+
+Если `version` в запросе не совпадает с текущим значением в БД — `409 Conflict` с кодом `VERSION_CONFLICT`. Тело ответа содержит `current_version` для того, чтобы клиент мог получить свежую версию задачи и повторить редактирование.
 
 ### POST /solutions/{id}/submit при конкурентной подаче
 
 Если два lead-исполнителя подают Solution почти одновременно, оба запроса обрабатываются транзакционно с `SELECT FOR UPDATE` на строке задачи. Второй запрос ожидает завершения первого. Гонки данных нет при правильной реализации — оба получают корректный ответ последовательно.
 
+### POST /solutions/{id}/submit когда задача уже в awaiting_decision
+
+Если задача уже перешла в `awaiting_decision` (другой lead успел подать Solution раньше) — возвращается `400 Bad Request` с кодом `TASK_ALREADY_AWAITING_DECISION`. При этом данный Solution всё равно помечается как `submitted` и участвует в Decision Process. Повторный переход задачи не происходит.
+
+### POST /solutions/{id}/submit после отзыва (withdraw)
+
+Допускается. После отзыва Solution возвращается в `draft`. Исполнитель может доработать его и подать повторно — Solution переходит в `submitted`.
+
+### POST /solutions/{id}/withdraw для Solution в статусе revision_requested
+
+Возвращает `400 Bad Request` с кодом `SOLUTION_IN_REVISION`. Нельзя отозвать Solution, отправленный на доработку: исполнитель должен внести правки и подать его повторно.
+
 ### DELETE /assignments/{id} для lead с submitted Solution
 
-Возвращает `400 Bad Request` с кодом `SOLUTION_ALREADY_SUBMITTED`. Solution исполнителя остаётся в истории задачи. Для удаления исполнителя с поданным Solution необходимо сначала отозвать Solution (если это разрешено).
+Возвращает `400 Bad Request` с кодом `ASSIGNMENT_HAS_SUBMITTED_SOLUTION`. Solution исполнителя остаётся в истории задачи. Для удаления исполнителя с поданным Solution необходимо сначала отозвать Solution (если это разрешено).
+
+### POST /projects/{id}/members для пользователя, уже добавленного через группу
+
+Если пользователь уже состоит в проекте только через членство в группе — создаётся индивидуальная запись `ProjectMember` с указанной ролью, которая перекрывает групповую. Возвращается `200 OK` (не `409 Conflict`). Если пользователь уже добавлен напрямую — обновляется его существующая запись (`200 OK`). Групповая роль остаётся без изменений.
+
+### GET /search — soft-deleted задачи
+
+Soft-deleted задачи не включаются в результаты поиска. Параметр `?include_deleted=true` доступен только пользователям с ProjectRole = Admin. Для остальных параметр игнорируется.
 
 ### POST /tasks/{task_id}/links (cross-project)
 
-При создании связи между задачами из разных проектов проверяется read-доступ текущего пользователя к проекту целевой задачи. Если доступа нет — `403 Forbidden` (не `404`, чтобы явно указать на проблему с правами, а не на отсутствие ресурса).
+При создании связи между задачами из разных проектов проверяется read-доступ текущего пользователя к проекту целевой задачи. Если доступа нет — `403 Forbidden` с кодом `PROJECT_ACCESS_DENIED` (не `404`, чтобы явно указать на проблему с правами, а не на отсутствие ресурса).
 
 ---
 
-## Справочник error codes
+## Приложение: справочник error codes
 
 Все ошибки возвращаются в формате `{ "error": { "code": "...", "message": "...", "details": {} } }`.
 
+### Not Found (404)
+
 | Код | Описание |
 |-----|---------|
-| `TASK_NOT_FOUND` | Задача не найдена или soft-deleted |
+| `TASK_NOT_FOUND` | Задача не найдена, soft-deleted или недоступна (restricted/private проект) |
 | `PROJECT_NOT_FOUND` | Проект не найден, недоступен или soft-deleted |
 | `ASSIGNMENT_NOT_FOUND` | Assignment не найден |
 | `SOLUTION_NOT_FOUND` | Solution не найден или ещё не создан |
 | `DECISION_NOT_FOUND` | Decision по задаче ещё не вынесен |
-| `VERSION_CONFLICT` | Конфликт версий при оптимистичной блокировке (409) |
-| `VERSION_REQUIRED` | Поле `version` обязательно для этого запроса (400) |
-| `INVALID_STATUS_TRANSITION` | Переход между статусами недопустим воркфлоу (400) |
-| `RESOLUTION_REQUIRED` | Резолюция обязательна при переходе в финальный статус (400) |
-| `SOLUTION_ALREADY_SUBMITTED` | Solution уже подан; действие недоступно (400) |
-| `CANNOT_MODIFY_CLOSED_TASK` | Задача закрыта; редактирование недоступно (400) |
-| `WORKFLOW_IN_USE` | Воркфлоу используется активными Assignment'ами; изменение заблокировано (409) |
-| `ACCESS_DENIED` | Недостаточно прав для выполнения действия (403) |
-| `INVALID_ROLE_CHANGE` | Смена роли исполнителя заблокирована (Solution уже подан) (400) |
+| `WORKFLOW_NOT_FOUND` | Воркфлоу не найден |
+| `STATUS_NOT_FOUND` | Статус воркфлоу не найден |
+| `RESOLUTION_NOT_FOUND` | Резолюция не найдена |
+| `USER_NOT_FOUND` | Пользователь не найден или деактивирован |
+
+### Оптимистичные блокировки (400/409)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `VERSION_REQUIRED` | 400 | Поле `version` обязательно для этого запроса |
+| `VERSION_CONFLICT` | 409 | Конфликт версий при оптимистичной блокировке; `details.current_version` содержит актуальное значение |
+
+### Воркфлоу и статусы (400/409)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `INVALID_STATUS_TRANSITION` | 400 | Переход между статусами недопустим воркфлоу |
+| `RESOLUTION_REQUIRED` | 400 | Резолюция обязательна при переходе в финальный статус |
+| `WORKFLOW_TRANSITION_NOT_ALLOWED` | 403 | Нет права на данный переход (роль не включена в `allowed_roles`) |
+
+### Solution и Decision Process (400/409)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `SOLUTION_ALREADY_SUBMITTED` | 400 | Solution уже подан; действие недоступно |
+| `SOLUTION_IN_REVISION` | 400 | Попытка отозвать Solution в статусе `revision_requested` — нужно доработать и подать повторно |
+| `TASK_ALREADY_AWAITING_DECISION` | 400 | Задача уже в статусе `awaiting_decision`; Solution принят, но переход задачи не повторяется |
+| `CANNOT_MODIFY_DECIDED_TASK` | 400 | Изменение задачи после вынесения Decision недоступно |
+
+### Assignment (400)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `ASSIGNMENT_HAS_SUBMITTED_SOLUTION` | 400 | Попытка удалить Assignment с поданным Solution; Solution остаётся в истории |
+| `ROLE_CHANGE_NOT_ALLOWED` | 400 | Смена роли исполнителя заблокирована (Solution уже подан) |
+
+### Ресурсы в использовании (409)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `WORKFLOW_IN_USE` | 409 | Попытка удалить воркфлоу с активными задачами |
+| `STATUS_IN_USE` | 409 | Попытка удалить статус с активными Assignment'ами; `details.affected_assignments_count` и `details.default_status_id` |
+| `RESOLUTION_IN_USE` | 409 | Попытка удалить резолюцию, уже использованную в Assignment'ах; следует деактивировать |
+
+### Доступ (403)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `ACCESS_DENIED` | 403 | Общий отказ в доступе; может содержать `details.action_required` |
+| `PROJECT_ACCESS_DENIED` | 403 | Нет доступа к проекту при cross-project операциях |
+
+### Файлы (400/413)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `FILE_TOO_LARGE` | 413 | Превышен лимит размера файла: 20 МБ для вложений задачи, 2 МБ для аватара |
+| `PROJECT_STORAGE_EXCEEDED` | 400 | Превышен лимит хранилища проекта (500 МБ) |
 
 ---
 
