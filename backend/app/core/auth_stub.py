@@ -1,16 +1,23 @@
 import uuid
-from dataclasses import dataclass, field
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+STUB_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-@dataclass
-class StubUser:
-    id: uuid.UUID = field(
-        default_factory=lambda: uuid.UUID("00000000-0000-0000-0000-000000000001")
-    )
-    email: str = "dev@localhost"
-    display_name: str = "Dev User"
-    is_active: bool = True
-    keycloak_id: str = "00000000-0000-0000-0000-000000000001"
+async def get_or_create_stub_user(session: AsyncSession):
+    from app.models.user import User
 
-
-STUB_USER = StubUser()
+    user = await session.get(User, STUB_USER_ID)
+    if not user:
+        user = User(
+            id=STUB_USER_ID,
+            email="dev@localhost",
+            display_name="Dev User",
+            keycloak_id=str(STUB_USER_ID),
+            is_active=True,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    return user
