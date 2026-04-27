@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -272,6 +272,10 @@ async def _unset_default_status(session: AsyncSession, workflow_id: uuid.UUID) -
 
 
 async def _count_active_assignments(session: AsyncSession, status_id: uuid.UUID) -> int:
-    """Phase 3+ will query Assignment.current_status_id here. Returns 0 until Phase 3."""
-    # TODO(phase-3): from app.models.task import Assignment; query count
-    return 0
+    from app.models.task import Assignment
+    count = await session.scalar(
+        select(func.count()).select_from(Assignment).where(
+            Assignment.current_status_id == status_id
+        )
+    )
+    return count or 0
