@@ -1,9 +1,12 @@
+import re
 import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.project import ProjectMemberRole, ProjectVisibility
+
+_KEY_RE = re.compile(r'^[A-Z0-9][A-Z0-9\-]{0,8}[A-Z0-9]$|^[A-Z0-9]$')
 
 
 class ProjectCreate(BaseModel):
@@ -15,7 +18,10 @@ class ProjectCreate(BaseModel):
     @field_validator("key")
     @classmethod
     def normalize_key(cls, v: str) -> str:
-        return v.upper().strip()
+        v = v.upper().strip()
+        if not _KEY_RE.match(v):
+            raise ValueError("Project key must be 1-10 uppercase alphanumeric characters or hyphens")
+        return v
 
 
 class ProjectUpdate(BaseModel):

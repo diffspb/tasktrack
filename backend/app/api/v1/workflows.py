@@ -18,15 +18,14 @@ from app.schemas.workflow import (
 )
 from app.services import workflow_service
 
-router = APIRouter(tags=["workflows"])
+router = APIRouter()
 
-
-# Workflows
 
 @router.post(
     "/projects/{project_id}/workflows",
     response_model=WorkflowResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["workflows"],
 )
 async def create_workflow(
     project_id: uuid.UUID,
@@ -37,7 +36,7 @@ async def create_workflow(
     return await workflow_service.create_workflow(session, project_id, data, user)
 
 
-@router.get("/projects/{project_id}/workflows", response_model=list[WorkflowResponse])
+@router.get("/projects/{project_id}/workflows", response_model=list[WorkflowResponse], tags=["workflows"])
 async def list_workflows(
     project_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
@@ -46,7 +45,7 @@ async def list_workflows(
     return await workflow_service.list_workflows(session, project_id, user)
 
 
-@router.get("/workflows/{workflow_id}", response_model=WorkflowResponse)
+@router.get("/workflows/{workflow_id}", response_model=WorkflowResponse, tags=["workflows"])
 async def get_workflow(
     workflow_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
@@ -55,7 +54,7 @@ async def get_workflow(
     return await workflow_service.get_workflow(session, workflow_id, user)
 
 
-@router.patch("/workflows/{workflow_id}", response_model=WorkflowResponse)
+@router.patch("/workflows/{workflow_id}", response_model=WorkflowResponse, tags=["workflows"])
 async def update_workflow(
     workflow_id: uuid.UUID,
     data: WorkflowUpdate,
@@ -65,7 +64,7 @@ async def update_workflow(
     return await workflow_service.update_workflow(session, workflow_id, data, user)
 
 
-@router.delete("/workflows/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/workflows/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["workflows"])
 async def delete_workflow(
     workflow_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
@@ -74,12 +73,11 @@ async def delete_workflow(
     await workflow_service.delete_workflow(session, workflow_id, user)
 
 
-# Statuses
-
 @router.post(
     "/workflows/{workflow_id}/statuses",
     response_model=StatusResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["statuses"],
 )
 async def create_status(
     workflow_id: uuid.UUID,
@@ -90,7 +88,7 @@ async def create_status(
     return await workflow_service.create_status(session, workflow_id, data, user)
 
 
-@router.patch("/statuses/{status_id}", response_model=StatusResponse)
+@router.patch("/statuses/{status_id}", response_model=StatusResponse, tags=["statuses"])
 async def update_status(
     status_id: uuid.UUID,
     data: StatusUpdate,
@@ -100,7 +98,7 @@ async def update_status(
     return await workflow_service.update_status(session, status_id, data, user)
 
 
-@router.delete("/statuses/{status_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/statuses/{status_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["statuses"])
 async def delete_status(
     status_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
@@ -109,7 +107,7 @@ async def delete_status(
     await workflow_service.delete_status(session, status_id, user)
 
 
-@router.post("/statuses/{status_id}/migrate", status_code=status.HTTP_200_OK)
+@router.post("/statuses/{status_id}/migrate", status_code=status.HTTP_200_OK, tags=["statuses"])
 async def migrate_status(
     status_id: uuid.UUID,
     data: MigrateStatus,
@@ -120,12 +118,11 @@ async def migrate_status(
     return {"status": "migrated"}
 
 
-# Transitions
-
 @router.post(
     "/workflows/{workflow_id}/transitions",
     response_model=TransitionResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["transitions"],
 )
 async def create_transition(
     workflow_id: uuid.UUID,
@@ -136,7 +133,7 @@ async def create_transition(
     return await workflow_service.create_transition(session, workflow_id, data, user)
 
 
-@router.delete("/transitions/{transition_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/transitions/{transition_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["transitions"])
 async def delete_transition(
     transition_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),

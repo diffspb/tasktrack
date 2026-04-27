@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -25,6 +26,7 @@ class StatusCreate(BaseModel):
 class StatusUpdate(BaseModel):
     name: str | None = None
     position: int | None = None
+    is_default: bool | None = None
 
 
 class MigrateStatus(BaseModel):
@@ -37,18 +39,6 @@ class TransitionCreate(BaseModel):
     required_role: str | None = None
 
 
-class ResolutionCreate(BaseModel):
-    name: str
-    is_default: bool = False
-
-
-class ResolutionUpdate(BaseModel):
-    name: str | None = None
-    is_default: bool | None = None
-
-
-# --- Response schemas ---
-
 class StatusResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,6 +48,8 @@ class StatusResponse(BaseModel):
     category: StatusCategory
     is_default: bool
     position: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class TransitionResponse(BaseModel):
@@ -68,6 +60,8 @@ class TransitionResponse(BaseModel):
     from_status_id: uuid.UUID
     to_status_id: uuid.UUID
     required_role: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class WorkflowResponse(BaseModel):
@@ -77,14 +71,7 @@ class WorkflowResponse(BaseModel):
     project_id: uuid.UUID
     name: str
     is_default: bool
+    created_at: datetime
+    updated_at: datetime
     statuses: list[StatusResponse] = []
     transitions: list[TransitionResponse] = []
-
-
-class ResolutionResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    project_id: uuid.UUID
-    name: str
-    is_default: bool

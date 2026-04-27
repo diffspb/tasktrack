@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
 from app.models.user import User
-from app.schemas.workflow import ResolutionCreate, ResolutionResponse, ResolutionUpdate
-from app.services import workflow_service
+from app.schemas.resolution import ResolutionCreate, ResolutionResponse, ResolutionUpdate
+from app.services import resolution_service
 
 router = APIRouter(tags=["resolutions"])
 
@@ -17,7 +17,7 @@ async def list_resolutions(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    return await workflow_service.list_resolutions(session, project_id, user)
+    return await resolution_service.list_resolutions(session, project_id, user)
 
 
 @router.post(
@@ -31,7 +31,7 @@ async def create_resolution(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    return await workflow_service.create_resolution(session, project_id, data, user)
+    return await resolution_service.create_resolution(session, project_id, data, user)
 
 
 @router.patch("/resolutions/{resolution_id}", response_model=ResolutionResponse)
@@ -41,7 +41,7 @@ async def update_resolution(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    return await workflow_service.update_resolution(session, resolution_id, data, user)
+    return await resolution_service.update_resolution(session, resolution_id, data, user)
 
 
 @router.delete("/resolutions/{resolution_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -50,4 +50,4 @@ async def delete_resolution(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    await workflow_service.delete_resolution(session, resolution_id, user)
+    await resolution_service.delete_resolution(session, resolution_id, user)

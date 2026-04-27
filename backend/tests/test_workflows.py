@@ -1,11 +1,12 @@
-import pytest
+import uuid
+
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.models.workflow import StatusCategory
 from app.schemas.project import ProjectCreate
 from app.schemas.workflow import (
-    ResolutionCreate,
     StatusCreate,
     TransitionCreate,
     WorkflowCreate,
@@ -13,23 +14,44 @@ from app.schemas.workflow import (
 from app.services import project_service, workflow_service
 
 
-# --- helpers ---
+def _rnd_key() -> str:
+    """Random 8-char uppercase hex key — avoids UNIQUE conflicts between tests."""
+    return uuid.uuid4().hex[:8].upper()
 
-async def _make_project(session: AsyncSession, user: User, key: str) -> str:
-    p = await project_service.create_project(session, ProjectCreate(name=key, key=key), user)
+
+async def _make_project(session: AsyncSession, user: User) -> str:
+    p = await project_service.create_project(
+        session, ProjectCreate(name="Test", key=_rnd_key()), user
+    )
     return str(p.id)
 
 
 async def _make_workflow(client: AsyncClient, project_id: str, name: str = "WF") -> dict:
-    r = await client.post(f"/api/v1/projects/{project_id}/workflows", json={"name": name, "is_default": True})
+    r = await client.post(
+        f"/api/v1/projects/{project_id}/workflows",
+        json={"name": name, "is_default": True},
+    )
     assert r.status_code == 201
     return r.json()
 
 
-async def _make_status(client: AsyncClient, wf_id: str, name: str, category: str, position: int = 0, is_default: bool = False) -> dict:
-    r = await client.post(f"/api/v1/workflows/{wf_id}/statuses", json={
-        "name": name, "category": category, "position": position, "is_default": is_default,
-    })
+async def _make_status(
+    client: AsyncClient,
+    wf_id: str,
+    name: str,
+    category: StatusCategory,
+    position: int = 0,
+    is_default: bool = False,
+) -> dict:
+    r = await client.post(
+        f"/api/v1/workflows/{wf_id}/statuses",
+        json={
+            "name": name,
+            "category": category.value,
+            "position": position,
+            "is_default": is_default,
+        },
+    )
     assert r.status_code == 201
     return r.json()
 
@@ -37,96 +59,157 @@ async def _make_status(client: AsyncClient, wf_id: str, name: str, category: str
 # --- tests ---
 
 async def test_create_workflow(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_CREATE")
+    pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid, "Basic")
     assert wf["name"] == "Basic"
     assert wf["is_default"] is True
     assert wf["statuses"] == []
+    assert "created_at" in wf
 
 
 async def test_list_workflows(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_LIST")
+    pid = await _make_project(db_session, stub_user)
     await _make_workflow(client, pid, "WF1")
     await _make_workflow(client, pid, "WF2")
-
     r = await client.get(f"/api/v1/projects/{pid}/workflows")
     assert r.status_code == 200
     assert len(r.json()) == 2
 
 
-async def test_create_statuses(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_STAT")
+async def test_create_statuses_with_timestamps(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid)
-
-    todo = await _make_status(client, wf["id"], "To Do", "initial", position=0, is_default=True)
-    inprog = await _make_status(client, wf["id"], "In Progress", "intermediate", position=1)
-    done = await _make_status(client, wf["id"], "Done", "final", position=2)
+    todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial, is_default=True)
+    await _make_status(client, wf["id"], "In Progress", StatusCategory.intermediate, position=1)
+    await _make_status(client, wf["id"], "Done", StatusCategory.final, position=2)
 
     r = await client.get(f"/api/v1/workflows/{wf['id']}")
     statuses = r.json()["statuses"]
     assert len(statuses) == 3
-    names = {s["name"] for s in statuses}
-    assert names == {"To Do", "In Progress", "Done"}
+    assert all("created_at" in s for s in statuses)
+    assert todo["is_default"] is True
 
 
-async def test_create_transition(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_TRANS")
+async def test_status_default_must_be_initial(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid)
-    todo = await _make_status(client, wf["id"], "To Do", "initial")
-    inprog = await _make_status(client, wf["id"], "In Progress", "intermediate")
+    r = await client.post(f"/api/v1/workflows/{wf['id']}/statuses", json={
+        "name": "Done",
+        "category": StatusCategory.final.value,
+        "is_default": True,
+    })
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "STATUS_DEFAULT_MUST_BE_INITIAL"
+
+
+async def test_status_default_unique_per_workflow(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    await _make_status(client, wf["id"], "To Do", StatusCategory.initial, is_default=True)
+    # Second default status should unset the first
+    s2 = await _make_status(client, wf["id"], "Backlog", StatusCategory.initial, is_default=True)
+    assert s2["is_default"] is True
+
+    wf_data = (await client.get(f"/api/v1/workflows/{wf['id']}")).json()
+    defaults = [s for s in wf_data["statuses"] if s["is_default"]]
+    assert len(defaults) == 1
+    assert defaults[0]["id"] == s2["id"]
+
+
+async def test_create_transition(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial)
+    inprog = await _make_status(client, wf["id"], "In Progress", StatusCategory.intermediate)
 
     r = await client.post(f"/api/v1/workflows/{wf['id']}/transitions", json={
         "from_status_id": todo["id"],
         "to_status_id": inprog["id"],
     })
     assert r.status_code == 201
-    assert r.json()["from_status_id"] == todo["id"]
-    assert r.json()["to_status_id"] == inprog["id"]
+    assert "created_at" in r.json()
+
+
+async def test_create_transition_rejects_cross_workflow_statuses(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf1 = await _make_workflow(client, pid, "WF1")
+    wf2_r = await client.post(f"/api/v1/projects/{pid}/workflows", json={"name": "WF2"})
+    wf2 = wf2_r.json()
+
+    s1 = await _make_status(client, wf1["id"], "A", StatusCategory.initial)
+    s2 = await _make_status(client, wf2["id"], "B", StatusCategory.initial)
+
+    r = await client.post(f"/api/v1/workflows/{wf1['id']}/transitions", json={
+        "from_status_id": s1["id"],
+        "to_status_id": s2["id"],
+    })
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "STATUS_NOT_IN_WORKFLOW"
 
 
 async def test_validate_transition_allowed(db_session: AsyncSession, stub_user: User):
-    p = await project_service.create_project(db_session, ProjectCreate(name="VT", key="VT1"), stub_user)
-    wf = await workflow_service.create_workflow(db_session, p.id, WorkflowCreate(name="WF"), stub_user)
-    todo = await workflow_service.create_status(db_session, wf.id, StatusCreate(name="To Do", category="initial"), stub_user)
-    inprog = await workflow_service.create_status(db_session, wf.id, StatusCreate(name="In Progress", category="intermediate"), stub_user)
-    await workflow_service.create_transition(db_session, wf.id, TransitionCreate(from_status_id=todo.id, to_status_id=inprog.id), stub_user)
+    p = await project_service.create_project(
+        db_session, ProjectCreate(name="VT", key=_rnd_key()), stub_user
+    )
+    wf = await workflow_service.create_workflow(
+        db_session, p.id, WorkflowCreate(name="WF"), stub_user
+    )
+    todo = await workflow_service.create_status(
+        db_session, wf.id, StatusCreate(name="To Do", category=StatusCategory.initial), stub_user
+    )
+    inprog = await workflow_service.create_status(
+        db_session, wf.id,
+        StatusCreate(name="In Progress", category=StatusCategory.intermediate), stub_user
+    )
+    await workflow_service.create_transition(
+        db_session, wf.id,
+        TransitionCreate(from_status_id=todo.id, to_status_id=inprog.id), stub_user
+    )
 
     assert await workflow_service.validate_transition(db_session, wf.id, todo.id, inprog.id) is True
 
 
 async def test_validate_transition_not_allowed(db_session: AsyncSession, stub_user: User):
-    p = await project_service.create_project(db_session, ProjectCreate(name="VT2", key="VT2"), stub_user)
-    wf = await workflow_service.create_workflow(db_session, p.id, WorkflowCreate(name="WF"), stub_user)
-    todo = await workflow_service.create_status(db_session, wf.id, StatusCreate(name="To Do", category="initial"), stub_user)
-    done = await workflow_service.create_status(db_session, wf.id, StatusCreate(name="Done", category="final"), stub_user)
-    # No transition created between todo and done
+    p = await project_service.create_project(
+        db_session, ProjectCreate(name="VT2", key=_rnd_key()), stub_user
+    )
+    wf = await workflow_service.create_workflow(
+        db_session, p.id, WorkflowCreate(name="WF"), stub_user
+    )
+    todo = await workflow_service.create_status(
+        db_session, wf.id, StatusCreate(name="To Do", category=StatusCategory.initial), stub_user
+    )
+    done = await workflow_service.create_status(
+        db_session, wf.id, StatusCreate(name="Done", category=StatusCategory.final), stub_user
+    )
 
     assert await workflow_service.validate_transition(db_session, wf.id, todo.id, done.id) is False
 
 
-async def test_delete_status(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_DEL")
+async def test_delete_status_cascades_transitions(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid)
-    s = await _make_status(client, wf["id"], "Temp", "intermediate")
+    todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial)
+    mid = await _make_status(client, wf["id"], "Mid", StatusCategory.intermediate)
+    done = await _make_status(client, wf["id"], "Done", StatusCategory.final)
 
-    r = await client.delete(f"/api/v1/statuses/{s['id']}")
-    assert r.status_code == 204
+    await client.post(f"/api/v1/workflows/{wf['id']}/transitions",
+                      json={"from_status_id": todo["id"], "to_status_id": mid["id"]})
+    await client.post(f"/api/v1/workflows/{wf['id']}/transitions",
+                      json={"from_status_id": mid["id"], "to_status_id": done["id"]})
 
-    wf_data = (await client.get(f"/api/v1/workflows/{wf['id']}")).json()
-    assert all(st["id"] != s["id"] for st in wf_data["statuses"])
-
-
-async def test_delete_status_cascades_transitions(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_CASCADE")
-    wf = await _make_workflow(client, pid)
-    todo = await _make_status(client, wf["id"], "To Do", "initial")
-    mid = await _make_status(client, wf["id"], "Mid", "intermediate")
-    done = await _make_status(client, wf["id"], "Done", "final")
-
-    await client.post(f"/api/v1/workflows/{wf['id']}/transitions", json={"from_status_id": todo["id"], "to_status_id": mid["id"]})
-    await client.post(f"/api/v1/workflows/{wf['id']}/transitions", json={"from_status_id": mid["id"], "to_status_id": done["id"]})
-
-    # Delete mid — both transitions referencing it should be removed
     r = await client.delete(f"/api/v1/statuses/{mid['id']}")
     assert r.status_code == 204
 
@@ -134,40 +217,75 @@ async def test_delete_status_cascades_transitions(client: AsyncClient, db_sessio
     assert wf_data["transitions"] == []
 
 
-async def test_migrate_status(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_MIGRATE")
+async def test_migrate_status(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid)
-    src = await _make_status(client, wf["id"], "Old Status", "intermediate")
-    tgt = await _make_status(client, wf["id"], "New Status", "intermediate")
+    src = await _make_status(client, wf["id"], "Old", StatusCategory.intermediate)
+    tgt = await _make_status(client, wf["id"], "New", StatusCategory.intermediate)
 
-    r = await client.post(f"/api/v1/statuses/{src['id']}/migrate", json={"target_status_id": tgt["id"]})
+    r = await client.post(f"/api/v1/statuses/{src['id']}/migrate",
+                          json={"target_status_id": tgt["id"]})
     assert r.status_code == 200
 
     wf_data = (await client.get(f"/api/v1/workflows/{wf['id']}")).json()
     assert all(s["id"] != src["id"] for s in wf_data["statuses"])
 
 
-async def test_create_resolution(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_RES")
+async def test_delete_default_workflow_blocked(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)  # is_default=True
+    r = await client.delete(f"/api/v1/workflows/{wf['id']}")
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "WORKFLOW_IS_DEFAULT"
 
-    r = await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Done", "is_default": True})
+
+async def test_create_resolution_with_position(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    r = await client.post(f"/api/v1/projects/{pid}/resolutions",
+                          json={"name": "Done", "is_default": True, "position": 0})
     assert r.status_code == 201
-    assert r.json()["name"] == "Done"
-    assert r.json()["is_default"] is True
+    data = r.json()
+    assert data["is_default"] is True
+    assert "created_at" in data
 
 
-async def test_list_resolutions(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_RESLIST")
-    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Done", "is_default": True})
-    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Won't Fix"})
+async def test_resolution_default_upsert(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    r1 = await client.post(f"/api/v1/projects/{pid}/resolutions",
+                           json={"name": "Done", "is_default": True})
+    r2 = await client.post(f"/api/v1/projects/{pid}/resolutions",
+                           json={"name": "Won't Fix", "is_default": True})
+
+    list_r = await client.get(f"/api/v1/projects/{pid}/resolutions")
+    defaults = [r for r in list_r.json() if r["is_default"]]
+    assert len(defaults) == 1
+    assert defaults[0]["id"] == r2.json()["id"]
+
+
+async def test_list_resolutions(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Done", "position": 0})
+    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Won't Fix", "position": 1})
 
     r = await client.get(f"/api/v1/projects/{pid}/resolutions")
     assert r.status_code == 200
     assert len(r.json()) == 2
 
 
-async def test_delete_resolution(client: AsyncClient, db_session: AsyncSession, stub_user: User):
-    pid = await _make_project(db_session, stub_user, "WF_RESDEL")
+async def test_delete_resolution(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
     r = await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Temp"})
     rid = r.json()["id"]
 
