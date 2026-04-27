@@ -24,6 +24,18 @@ async def test_create_project(client: AsyncClient):
     assert data["members"][0]["role"] == "admin"
 
 
+async def test_create_project_duplicate_key(client: AsyncClient):
+    await client.post("/api/v1/projects", json={"name": "First", "key": "DUPKEY1"})
+    response = await client.post("/api/v1/projects", json={"name": "Second", "key": "DUPKEY1"})
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "DUPLICATE_PROJECT_KEY"
+
+
+async def test_create_project_invalid_key(client: AsyncClient):
+    response = await client.post("/api/v1/projects", json={"name": "Bad", "key": "??!!"})
+    assert response.status_code == 422
+
+
 async def test_create_project_key_uppercase(client: AsyncClient):
     response = await client.post("/api/v1/projects", json={
         "name": "Test",

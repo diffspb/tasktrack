@@ -1,25 +1,21 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.project import ProjectMemberRole
-from app.models.resolution import Resolution
-from app.models.user import User
 from app.models.workflow import Status, StatusCategory, Transition, Workflow
+from app.models.user import User
 from app.schemas.workflow import (
     MigrateStatus,
-    ResolutionCreate,
-    ResolutionUpdate,
     StatusCreate,
     StatusUpdate,
     TransitionCreate,
     WorkflowCreate,
     WorkflowUpdate,
 )
-from app.services.project_service import _get_member
+from app.services.permissions import require_manager, require_project_access
 
 
 # --- Workflow ---
@@ -27,7 +23,7 @@ from app.services.project_service import _get_member
 async def create_workflow(
     session: AsyncSession, project_id: uuid.UUID, data: WorkflowCreate, user: User
 ) -> Workflow:
-    await _require_manager(session, project_id, user)
+    await require_manager(session, project_id, user)  # also validates project exists
     wf = Workflow(project_id=project_id, name=data.name, is_default=data.is_default)
     session.add(wf)
     await session.commit()
@@ -37,7 +33,7 @@ async def create_workflow(
 async def list_workflows(
     session: AsyncSession, project_id: uuid.UUID, user: User
 ) -> list[Workflow]:
-    await _require_member(session, project_id, user)
+    await require_project_access(session, project_id, user)
     result = await session.scalars(
         select(Workflow)
         .options(selectinload(Workflow.statuses), selectinload(Workflow.transitions))
@@ -52,15 +48,15 @@ async def get_workflow(
     wf = await _load_workflow(session, workflow_id)
     if not wf:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "WORKFLOW_NOT_FOUND"})
-    await _require_member(session, wf.project_id, user)
+    await require_project_access(session, wf.project_id, user)
     return wf
 
 
 async def update_workflow(
     session: AsyncSession, workflow_id: uuid.UUID, data: WorkflowUpdate, user: User
 ) -> Workflow:
-    wf = await get_workflow(session, workflow_id, user)
-    await _require_manager(session, wf.project_id, user)
+    wf = await _get_workflow_or_404(session, workflow_id)
+    await require_manager(session, wf.project_id, user)
     if data.name is not None:
         wf.name = data.name
     if data.is_default is not None:
@@ -72,8 +68,16 @@ async def update_workflow(
 async def delete_workflow(
     session: AsyncSession, workflow_id: uuid.UUID, user: User
 ) -> None:
-    wf = await get_workflow(session, workflow_id, user)
-    await _require_manager(session, wf.project_id, user)
+    wf = await _get_workflow_or_404(session, workflow_id)
+    await require_manager(session, wf.project_id, user)
+
+    if wf.is_default:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "WORKFLOW_IS_DEFAULT", "detail": "Cannot delete the default workflow"},
+        )
+    # Phase 3+: check that no active tasks reference this workflow before deleting
+
     await session.delete(wf)
     await session.commit()
 
@@ -84,7 +88,16 @@ async def create_status(
     session: AsyncSession, workflow_id: uuid.UUID, data: StatusCreate, user: User
 ) -> Status:
     wf = await _get_workflow_or_404(session, workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
+
+    if data.is_default:
+        if data.category != StatusCategory.initial:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                {"code": "STATUS_DEFAULT_MUST_BE_INITIAL"},
+            )
+        await _unset_default_status(session, workflow_id)
+
     s = Status(
         workflow_id=workflow_id,
         name=data.name,
@@ -103,11 +116,22 @@ async def update_status(
 ) -> Status:
     s = await _get_status_or_404(session, status_id)
     wf = await _get_workflow_or_404(session, s.workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
+
+    if data.is_default is not None:
+        if data.is_default and s.category != StatusCategory.initial:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                {"code": "STATUS_DEFAULT_MUST_BE_INITIAL"},
+            )
+        if data.is_default:
+            await _unset_default_status(session, s.workflow_id)
+        s.is_default = data.is_default
     if data.name is not None:
         s.name = data.name
     if data.position is not None:
         s.position = data.position
+
     await session.commit()
     await session.refresh(s)
     return s
@@ -118,7 +142,7 @@ async def delete_status(
 ) -> None:
     s = await _get_status_or_404(session, status_id)
     wf = await _get_workflow_or_404(session, s.workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
 
     if await _count_active_assignments(session, status_id) > 0:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "STATUS_HAS_ACTIVE_ASSIGNMENTS"})
@@ -131,16 +155,17 @@ async def migrate_status(
 ) -> None:
     s = await _get_status_or_404(session, status_id)
     wf = await _get_workflow_or_404(session, s.workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
 
     target = await _get_status_or_404(session, data.target_status_id)
     if target.workflow_id != s.workflow_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "STATUS_WORKFLOW_MISMATCH"})
 
-    # Phase 3+: reassign active assignments to target_status_id
+    # Phase 3+: migrate active Assignment.current_status_id → data.target_status_id
+    # from sqlalchemy import update as sa_update
     # from app.models.task import Assignment
     # await session.execute(
-    #     update(Assignment)
+    #     sa_update(Assignment)
     #     .where(Assignment.current_status_id == status_id)
     #     .values(current_status_id=data.target_status_id)
     # )
@@ -154,7 +179,15 @@ async def create_transition(
     session: AsyncSession, workflow_id: uuid.UUID, data: TransitionCreate, user: User
 ) -> Transition:
     wf = await _get_workflow_or_404(session, workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
+
+    for sid in (data.from_status_id, data.to_status_id):
+        s = await session.get(Status, sid)
+        if not s or s.workflow_id != workflow_id:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                {"code": "STATUS_NOT_IN_WORKFLOW"},
+            )
 
     t = Transition(
         workflow_id=workflow_id,
@@ -175,7 +208,7 @@ async def delete_transition(
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TRANSITION_NOT_FOUND"})
     wf = await _get_workflow_or_404(session, t.workflow_id)
-    await _require_manager(session, wf.project_id, user)
+    await require_manager(session, wf.project_id, user)
     await session.delete(t)
     await session.commit()
 
@@ -186,7 +219,6 @@ async def validate_transition(
     from_status_id: uuid.UUID,
     to_status_id: uuid.UUID,
 ) -> bool:
-    """Returns True if the transition is allowed by the workflow definition."""
     result = await session.scalar(
         select(Transition).where(
             Transition.workflow_id == workflow_id,
@@ -197,53 +229,7 @@ async def validate_transition(
     return result is not None
 
 
-# --- Resolution ---
-
-async def list_resolutions(
-    session: AsyncSession, project_id: uuid.UUID, user: User
-) -> list[Resolution]:
-    await _require_member(session, project_id, user)
-    result = await session.scalars(
-        select(Resolution).where(Resolution.project_id == project_id)
-    )
-    return list(result.all())
-
-
-async def create_resolution(
-    session: AsyncSession, project_id: uuid.UUID, data: ResolutionCreate, user: User
-) -> Resolution:
-    await _require_manager(session, project_id, user)
-    r = Resolution(project_id=project_id, name=data.name, is_default=data.is_default)
-    session.add(r)
-    await session.commit()
-    await session.refresh(r)
-    return r
-
-
-async def update_resolution(
-    session: AsyncSession, resolution_id: uuid.UUID, data: ResolutionUpdate, user: User
-) -> Resolution:
-    r = await _get_resolution_or_404(session, resolution_id)
-    await _require_manager(session, r.project_id, user)
-    if data.name is not None:
-        r.name = data.name
-    if data.is_default is not None:
-        r.is_default = data.is_default
-    await session.commit()
-    await session.refresh(r)
-    return r
-
-
-async def delete_resolution(
-    session: AsyncSession, resolution_id: uuid.UUID, user: User
-) -> None:
-    r = await _get_resolution_or_404(session, resolution_id)
-    await _require_manager(session, r.project_id, user)
-    await session.delete(r)
-    await session.commit()
-
-
-# --- Helpers ---
+# --- Internal helpers ---
 
 async def _load_workflow(session: AsyncSession, workflow_id: uuid.UUID) -> Workflow | None:
     return await session.scalar(
@@ -267,13 +253,6 @@ async def _get_status_or_404(session: AsyncSession, status_id: uuid.UUID) -> Sta
     return s
 
 
-async def _get_resolution_or_404(session: AsyncSession, resolution_id: uuid.UUID) -> Resolution:
-    r = await session.get(Resolution, resolution_id)
-    if not r:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "RESOLUTION_NOT_FOUND"})
-    return r
-
-
 async def _delete_status_with_transitions(session: AsyncSession, s: Status) -> None:
     await session.execute(
         delete(Transition).where(
@@ -284,31 +263,15 @@ async def _delete_status_with_transitions(session: AsyncSession, s: Status) -> N
     await session.commit()
 
 
+async def _unset_default_status(session: AsyncSession, workflow_id: uuid.UUID) -> None:
+    await session.execute(
+        update(Status)
+        .where(Status.workflow_id == workflow_id, Status.is_default == True)  # noqa: E712
+        .values(is_default=False)
+    )
+
+
 async def _count_active_assignments(session: AsyncSession, status_id: uuid.UUID) -> int:
-    """Phase 3+ will query Assignment table here. Returns 0 until Phase 3."""
-    try:
-        from app.models.task import Assignment
-        from sqlalchemy import func
-        count = await session.scalar(
-            select(func.count()).select_from(Assignment).where(
-                Assignment.current_status_id == status_id
-            )
-        )
-        return count or 0
-    except ImportError:
-        return 0
-
-
-async def _require_member(
-    session: AsyncSession, project_id: uuid.UUID, user: User
-) -> None:
-    from app.services.project_service import get_project
-    await get_project(session, project_id, user)
-
-
-async def _require_manager(
-    session: AsyncSession, project_id: uuid.UUID, user: User
-) -> None:
-    member = await _get_member(session, project_id, user.id)
-    if not member or member.role not in (ProjectMemberRole.admin, ProjectMemberRole.manager):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
+    """Phase 3+ will query Assignment.current_status_id here. Returns 0 until Phase 3."""
+    # TODO(phase-3): from app.models.task import Assignment; query count
+    return 0

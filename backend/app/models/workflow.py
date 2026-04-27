@@ -16,7 +16,9 @@ class StatusCategory(str, enum.Enum):
 class Workflow(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "workflows"
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -28,10 +30,12 @@ class Workflow(Base, UUIDMixin, TimestampMixin):
     )
 
 
-class Status(Base, UUIDMixin):
+class Status(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "statuses"
 
-    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), nullable=False)
+    workflow_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[StatusCategory] = mapped_column(
         SQLEnum(StatusCategory, native_enum=False, length=20), nullable=False
@@ -42,12 +46,18 @@ class Status(Base, UUIDMixin):
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="statuses")
 
 
-class Transition(Base, UUIDMixin):
+class Transition(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "transitions"
 
-    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflows.id"), nullable=False)
-    from_status_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("statuses.id"), nullable=False)
-    to_status_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("statuses.id"), nullable=False)
+    workflow_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    from_status_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("statuses.id", ondelete="CASCADE"), nullable=False
+    )
+    to_status_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("statuses.id", ondelete="CASCADE"), nullable=False
+    )
     required_role: Mapped[str | None] = mapped_column(String(50))
 
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="transitions")

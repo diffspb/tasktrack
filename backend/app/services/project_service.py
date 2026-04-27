@@ -1,7 +1,9 @@
+import re
 import uuid
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,15 +20,14 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
         visibility=data.visibility,
         owner_id=owner.id,
     )
-    session.add(project)
-    await session.flush()
-
-    session.add(ProjectMember(
-        project_id=project.id,
-        user_id=owner.id,
-        role=ProjectMemberRole.admin,
-    ))
-    await session.commit()
+    try:
+        session.add(project)
+        await session.flush()
+        session.add(ProjectMember(project_id=project.id, user_id=owner.id, role=ProjectMemberRole.admin))
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "DUPLICATE_PROJECT_KEY"})
 
     return await _load_project(session, project.id)
 
@@ -36,11 +37,11 @@ async def get_project(
 ) -> Project:
     project = await _load_project(session, project_id)
     if not project or project.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "PROJECT_NOT_FOUND"})
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_NOT_FOUND"})
 
     if project.visibility == ProjectVisibility.restricted:
-        if not await _get_member(session, project_id, user.id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "PROJECT_NOT_FOUND"})
+        if not await get_member(session, project_id, user.id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_NOT_FOUND"})
 
     return project
 
@@ -64,12 +65,12 @@ async def update_project(
 ) -> Project:
     project = await get_project(session, project_id, user)
 
-    member = await _get_member(session, project_id, user.id)
+    member = await get_member(session, project_id, user.id)
     if not member or member.role not in (ProjectMemberRole.admin, ProjectMemberRole.manager):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "PERMISSION_DENIED"})
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
     if data.version != project.version:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": "VERSION_CONFLICT"})
+        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VERSION_CONFLICT"})
 
     if data.name is not None:
         project.name = data.name
@@ -86,9 +87,9 @@ async def archive_project(
 ) -> Project:
     project = await get_project(session, project_id, user)
 
-    member = await _get_member(session, project_id, user.id)
+    member = await get_member(session, project_id, user.id)
     if not member or member.role != ProjectMemberRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "PERMISSION_DENIED"})
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
     project.is_archived = True
     await session.commit()
@@ -100,12 +101,12 @@ async def add_member(
 ) -> ProjectMember:
     await get_project(session, project_id, user)
 
-    member = await _get_member(session, project_id, user.id)
+    member = await get_member(session, project_id, user.id)
     if not member or member.role not in (ProjectMemberRole.admin, ProjectMemberRole.manager):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "PERMISSION_DENIED"})
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
-    if await _get_member(session, project_id, data.user_id):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": "PROJECT_MEMBER_ALREADY_EXISTS"})
+    if await get_member(session, project_id, data.user_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "PROJECT_MEMBER_ALREADY_EXISTS"})
 
     new_member = ProjectMember(project_id=project_id, user_id=data.user_id, role=data.role)
     session.add(new_member)
@@ -119,13 +120,13 @@ async def remove_member(
 ) -> None:
     await get_project(session, project_id, user)
 
-    member = await _get_member(session, project_id, user.id)
+    member = await get_member(session, project_id, user.id)
     if not member or member.role not in (ProjectMemberRole.admin, ProjectMemberRole.manager):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "PERMISSION_DENIED"})
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
-    target = await _get_member(session, project_id, user_id)
+    target = await get_member(session, project_id, user_id)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "PROJECT_MEMBER_NOT_FOUND"})
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_MEMBER_NOT_FOUND"})
 
     await session.delete(target)
     await session.commit()
@@ -139,7 +140,7 @@ async def _load_project(session: AsyncSession, project_id: uuid.UUID) -> Project
     )
 
 
-async def _get_member(
+async def get_member(
     session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID
 ) -> ProjectMember | None:
     return await session.scalar(
