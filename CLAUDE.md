@@ -99,12 +99,14 @@ docs/
 
 ```bash
 cd backend
+python3 -m virtualenv .venv    # создать venv (использовать virtualenv, не venv)
+source .venv/bin/activate
 cp .env.dev.example .env.dev   # параметры подключения к БД
-make db-start                  # запустить postgres (docker run)
 make install                   # pip install -e ".[dev]"
+make db-start                  # sudo service postgresql start (локальный PG, не Docker)
 make reset                     # drop_all + create_all + seed
 make dev                       # uvicorn --reload на :8000
-make test                      # pytest с testcontainers
+make test                      # pytest (SQLite in-memory, без Docker)
 ```
 
 ### Быстрый старт (фронтенд, с Этапа 4)
