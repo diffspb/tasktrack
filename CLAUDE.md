@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 0 (фундамент)**.
+Текущий этап: **реализация MVP, Этап 2 (воркфлоу и резолюции)**.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -70,8 +70,7 @@ docs/
 
 - Коммитить по смысловым блокам, не сваливать всё в один коммит.
 - Сообщение коммита: тип(`scope`): описание на русском. Типы: `feat`, `fix`, `refactor`, `docs`.
-- Пушить в `main` напрямую (нет review-процесса, исследовательский проект).
-- Теги ставить на смысловые вехи: `pre-design-v1` и т.п.
+- Теги ставить на смысловые вехи: `impl-phase-N`, `s1-complete`, `s23-complete`, `mvp-research-launch`.
 
 ### Чего не делать
 
@@ -86,27 +85,41 @@ docs/
 
 Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** 0 — фундамент
+**Текущий этап:** 2 — воркфлоу и резолюции
+
+| Этап | Тег | Статус |
+|------|-----|--------|
+| 0. Фундамент | `impl-phase-0` | ✅ |
+| 1. Пользователи и проекты | `impl-phase-1` | ✅ |
+| 2. Воркфлоу и резолюции | `impl-phase-2` | 🔲 |
+| 3. Задачи и назначения | `impl-phase-3` | 🔲 |
+| 4. Frontend scaffold | `impl-phase-4` | 🔲 |
+| 5. Tasks UI + Kanban | `s1-complete` | 🔲 |
+| 6. Decision Process backend | `impl-phase-6` | 🔲 |
+| 7. Decision Process UI | `s23-complete` | 🔲 |
+| 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
 
 ### Правила разработки
 
 - Тест пишется **до или вместе** с кодом сервиса, никогда после
 - `make test` обязателен перед каждым коммитом
-- Каждый этап — один коммит + тег `impl-phase-N` (или `s1-complete`, `s23-complete`, `mvp-research-launch`)
+- Каждый этап — один коммит + тег `impl-phase-N`
 - **Миграции:** `metadata.create_all` в lifespan до Этапа 8, затем переключение на Alembic
+- **Тесты:** SQLite in-memory (`aiosqlite`), без Docker. Для Phase 6+ нужен локальный PostgreSQL
+- **SELECT FOR UPDATE** не поддерживается в SQLite — интеграционные тесты Decision Process пишутся против PostgreSQL
 
 ### Быстрый старт (бэкенд)
 
 ```bash
 cd backend
-python3 -m virtualenv .venv    # создать venv (использовать virtualenv, не venv)
+python3 -m virtualenv .venv    # использовать virtualenv, не python3 -m venv
 source .venv/bin/activate
-cp .env.dev.example .env.dev   # параметры подключения к БД
+cp .env.dev.example .env.dev
 make install                   # pip install -e ".[dev]"
 make db-start                  # sudo service postgresql start (локальный PG, не Docker)
 make reset                     # drop_all + create_all + seed
 make dev                       # uvicorn --reload на :8000
-make test                      # pytest (SQLite in-memory, без Docker)
+make test                      # pytest (SQLite in-memory)
 ```
 
 ### Быстрый старт (фронтенд, с Этапа 4)
@@ -129,7 +142,37 @@ AUTH_STUB=true
 
 ## Работа с агентами
 
-Проект активно использует фоновых агентов для аналитической работы. Агенты не могут запускать `git commit` / `git push` — это делает основной процесс после завершения агента.
-
 Рабочий каталог репозитория: `/home/sanek/projects/claudecode/tasktrack_project/tasktrack/`  
-Remote: `github.com:diffspb/tasktrack.git`, ветка `main`.
+Remote: `github.com:diffspb/tasktrack.git`
+
+### Git-права агентов
+
+Агенты **могут:**
+- Создавать ветки вида `feat/phase-N-описание` или `fix/описание`
+- Делать `git add`, `git commit` в фиче-ветках
+- Делать `git push origin feat/...` в фиче-ветки
+- Ставить теги на завершённые этапы
+
+Агенты **не могут:**
+- Пушить напрямую в `main` (`git push origin main` — запрещено)
+- Делать force push (`--force`)
+- Удалять ветки или теги
+- Делать `git reset --hard`
+
+### Именование веток
+
+```
+feat/phase-2-workflow     — реализация этапа
+feat/phase-3-tasks
+fix/health-endpoint       — исправление бага
+docs/update-readme        — обновление документации
+```
+
+### Процесс
+
+1. Агент создаёт ветку: `git checkout -b feat/phase-N-description`
+2. Делает работу, коммитит
+3. Пушит ветку: `git push origin feat/phase-N-description`
+4. Основной процесс (человек) проверяет и мержит в `main`, ставит тег
+
+> Исключение: мелкие правки документации (`docs/`) можно коммитить прямо в `main`.

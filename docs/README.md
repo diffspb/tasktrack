@@ -10,16 +10,22 @@
 
 ## Статус
 
-🔵 **В разработке. Этап 0 — фундамент.**
+🟢 **В разработке. Реализация MVP.**
 
-Что сделано: продуктовые требования, user stories с AC, ERD, матрица прав, state-диаграммы, REST API контракты, архитектурное ревью.
+| Этап | Тег | Статус |
+|------|-----|--------|
+| 0. Фундамент (health, scaffold, тесты) | `impl-phase-0` | ✅ |
+| 1. Пользователи и проекты | `impl-phase-1` | ✅ |
+| 2. Воркфлоу и резолюции | `impl-phase-2` | 🔲 в работе |
+| 3. Задачи и назначения (S1 через API) | `impl-phase-3` | 🔲 |
+| 4. Frontend scaffold + Projects UI | `impl-phase-4` | 🔲 |
+| 5. Tasks UI + Kanban | `s1-complete` | 🔲 |
+| 6. Decision Process backend | `impl-phase-6` | 🔲 |
+| 7. Decision Process UI | `s23-complete` | 🔲 |
+| 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
 
-Что остаётся перед стартом:
-- [x] ~~Выбрать стек фронтенда~~ — React 19 + Vite + shadcn/ui + TanStack Query
-- [x] ~~Выбрать стек мониторинга~~ — Netdata + Dozzle
-- [x] ~~Дополнить API~~ — дашборд, профиль, воркфлоу, резолюции добавлены в `15-api.md`
-
-Актуальное состояние и открытые вопросы → **[16-arch-review.md, раздел 6](./16-arch-review.md#6-итоговая-оценка-готовности)**.
+Инфра и окружение: без Docker (тесты на SQLite in-memory, dev — локальный PostgreSQL).  
+Актуальное состояние и архитектурные решения → **[16-arch-review.md](./16-arch-review.md)**.
 
 ---
 
