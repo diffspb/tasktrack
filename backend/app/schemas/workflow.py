@@ -21,12 +21,14 @@ class StatusCreate(BaseModel):
     category: StatusCategory
     is_default: bool = False
     position: int = 0
+    color: str | None = None
 
 
 class StatusUpdate(BaseModel):
     name: str | None = None
     position: int | None = None
     is_default: bool | None = None
+    color: str | None = None
 
 
 class MigrateStatus(BaseModel):
@@ -48,6 +50,7 @@ class StatusResponse(BaseModel):
     category: StatusCategory
     is_default: bool
     position: int
+    color: str | None
     created_at: datetime
     updated_at: datetime
 

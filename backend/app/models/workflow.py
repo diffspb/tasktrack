@@ -42,6 +42,7 @@ class Status(Base, UUIDMixin, TimestampMixin):
     )
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    color: Mapped[str | None] = mapped_column(String(7))  # hex color, e.g. "#3B82F6"
 
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="statuses")
 

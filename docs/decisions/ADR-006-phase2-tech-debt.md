@@ -9,19 +9,15 @@
 
 ---
 
-## Отложено до Этапа 3
+## ~~Отложено до Этапа 3~~ — Закрыто
 
-**migrate_status не выполняет миграцию Assignments.**  
-Функция удаляет статус, но не переносит `Assignment.current_status_id` на `target_status_id`. Заглушка с `# TODO(phase-3)` в `workflow_service.py`. Будет реализовано вместе с моделью `Assignment`.
+**✅ migrate_status** — реализует реальный UPDATE assignments, тест `test_migrate_status_reassigns_assignments`.
 
-**delete_workflow не проверяет наличие задач.**  
-Удаление воркфлоу не проверяет, есть ли Task, ссылающийся на него. Добавить проверку при появлении модели `Task` в Этапе 3.
+**✅ delete_workflow** — проверяет наличие задач, возвращает 409 WORKFLOW_HAS_TASKS, тест `test_delete_workflow_with_tasks_blocked`.
 
-**_count_active_assignments возвращает 0 до появления Task/Assignment.**  
-После появления модели `Assignment` в Этапе 3 — заменить заглушку реальным запросом.
+**✅ _count_active_assignments** — реальный SQL-запрос к таблице assignments.
 
-**Транзакционная изоляция тестов (savepoint-паттерн).**  
-Тесты используют общую SQLite in-memory БД в рамках сессии. Полная изоляция через savepoints требует PostgreSQL (SAVEPOINT не работает в SQLite с asyncpg). Реализовать при переходе на PG-тесты в Этапе 3.
+**✅ Транзакционная изоляция тестов** — PostgreSQL + testcontainers + `join_transaction_mode="create_savepoint"`.
 
 ---
 
@@ -47,8 +43,7 @@
 **Resolution: is_default вместо is_active + position.**  
 По `12-data-model.md` у Resolution должны быть `is_active` (архивирование без удаления) и `position`. Поле `position` добавлено. Поле `is_active` отложено: в MVP резолюции не архивируются, только удаляются. При необходимости — добавить `is_active: bool = True` и обновить API.
 
-**Status.color не реализован.**  
-По `12-data-model.md` у Status должно быть поле `color` для отображения столбцов Kanban. Сознательно опущено в MVP. Добавить в Этапе 5 (Kanban UI) или Этапе 8 (доводка).
+**✅ Status.color** — добавлен `String(7), nullable` в модель и схемы, возвращается в `StatusResponse`.
 
 **Status.is_default vs is_initial семантика.**  
 Текущее решение: `is_default=True` означает "начальный статус для новых задач" и принудительно требует `category=initial`. В будущем можно упростить до `category` без `is_default`, если инвариант "ровно один initial-статус как default" станет жёстким.

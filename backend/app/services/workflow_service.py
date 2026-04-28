@@ -76,7 +76,16 @@ async def delete_workflow(
             status.HTTP_409_CONFLICT,
             {"code": "WORKFLOW_IS_DEFAULT", "detail": "Cannot delete the default workflow"},
         )
-    # Phase 3+: check that no active tasks reference this workflow before deleting
+
+    from app.models.task import Task
+    task_count = await session.scalar(
+        select(func.count()).select_from(Task).where(Task.workflow_id == workflow_id)
+    )
+    if task_count:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "WORKFLOW_HAS_TASKS"},
+        )
 
     await session.delete(wf)
     await session.commit()
@@ -104,6 +113,7 @@ async def create_status(
         category=data.category,
         is_default=data.is_default,
         position=data.position,
+        color=data.color,
     )
     session.add(s)
     await session.commit()
@@ -118,6 +128,8 @@ async def update_status(
     wf = await _get_workflow_or_404(session, s.workflow_id)
     await require_manager(session, wf.project_id, user)
 
+    if data.color is not None:
+        s.color = data.color
     if data.is_default is not None:
         if data.is_default and s.category != StatusCategory.initial:
             raise HTTPException(
@@ -161,14 +173,12 @@ async def migrate_status(
     if target.workflow_id != s.workflow_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "STATUS_WORKFLOW_MISMATCH"})
 
-    # Phase 3+: migrate active Assignment.current_status_id → data.target_status_id
-    # from sqlalchemy import update as sa_update
-    # from app.models.task import Assignment
-    # await session.execute(
-    #     sa_update(Assignment)
-    #     .where(Assignment.current_status_id == status_id)
-    #     .values(current_status_id=data.target_status_id)
-    # )
+    from app.models.task import Assignment
+    await session.execute(
+        update(Assignment)
+        .where(Assignment.current_status_id == status_id)
+        .values(current_status_id=data.target_status_id)
+    )
 
     await _delete_status_with_transitions(session, s)
 

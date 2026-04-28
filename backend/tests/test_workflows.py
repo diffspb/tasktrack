@@ -294,3 +294,85 @@ async def test_delete_resolution(
 
     list_r = await client.get(f"/api/v1/projects/{pid}/resolutions")
     assert all(res["id"] != rid for res in list_r.json())
+
+
+async def test_status_color(client: AsyncClient, db_session: AsyncSession, stub_user: User):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    s = await _make_status(client, wf["id"], "To Do", StatusCategory.initial)
+
+    r = await client.patch(f"/api/v1/statuses/{s['id']}", json={"color": "#3B82F6"})
+    assert r.status_code == 200
+    assert r.json()["color"] == "#3B82F6"
+
+    wf_data = (await client.get(f"/api/v1/workflows/{wf['id']}")).json()
+    assert wf_data["statuses"][0]["color"] == "#3B82F6"
+
+
+async def test_migrate_status_reassigns_assignments(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    from app.schemas.project import ProjectCreate
+    from app.schemas.workflow import WorkflowCreate, StatusCreate
+    from app.schemas.task import AssignmentCreate
+    from app.services import task_service
+
+    project = await project_service.create_project(
+        db_session, ProjectCreate(name="Migrate", key=_rnd_key()), stub_user
+    )
+    wf = await workflow_service.create_workflow(
+        db_session, project.id, WorkflowCreate(name="WF"), stub_user
+    )
+    src = await workflow_service.create_status(
+        db_session, wf.id, StatusCreate(name="Old", category=StatusCategory.initial, is_default=True), stub_user
+    )
+    tgt = await workflow_service.create_status(
+        db_session, wf.id, StatusCreate(name="New", category=StatusCategory.intermediate), stub_user
+    )
+    await db_session.flush()
+
+    from app.schemas.task import TaskCreate
+    task = await task_service.create_task(
+        db_session, project.id,
+        TaskCreate(title="T", workflow_id=wf.id), stub_user
+    )
+    assignment = await task_service.assign_user(
+        db_session, task.id,
+        AssignmentCreate(user_id=stub_user.id), stub_user
+    )
+    assert assignment.current_status_id == src.id
+
+    r = await client.post(f"/api/v1/statuses/{src.id}/migrate",
+                          json={"target_status_id": str(tgt.id)})
+    assert r.status_code == 200
+
+    await db_session.refresh(assignment)
+    assert assignment.current_status_id == tgt.id
+
+
+async def test_delete_workflow_with_tasks_blocked(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    from app.schemas.project import ProjectCreate
+    from app.schemas.workflow import WorkflowCreate, StatusCreate
+    from app.schemas.task import TaskCreate
+    from app.services import task_service
+
+    project = await project_service.create_project(
+        db_session, ProjectCreate(name="WFDel", key=_rnd_key()), stub_user
+    )
+    wf_non_default = await workflow_service.create_workflow(
+        db_session, project.id, WorkflowCreate(name="Secondary", is_default=False), stub_user
+    )
+    await workflow_service.create_status(
+        db_session, wf_non_default.id,
+        StatusCreate(name="To Do", category=StatusCategory.initial, is_default=True), stub_user
+    )
+    await task_service.create_task(
+        db_session, project.id,
+        TaskCreate(title="T", workflow_id=wf_non_default.id), stub_user
+    )
+
+    r = await client.delete(f"/api/v1/workflows/{wf_non_default.id}")
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "WORKFLOW_HAS_TASKS"
