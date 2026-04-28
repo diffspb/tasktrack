@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskTrack — Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:              oklch(0.982 0.003 240);
+      --bg-card:         oklch(1.000 0.000 0);
+      --bg-muted:        oklch(0.960 0.004 240);
+      --bg-hover:        oklch(0.945 0.005 240);
+      --fg:              oklch(0.175 0.015 240);
+      --fg-muted:        oklch(0.480 0.010 240);
+      --fg-subtle:       oklch(0.640 0.007 240);
+      --border:          oklch(0.878 0.006 240);
+      --border-subtle:   oklch(0.930 0.004 240);
+      --border-focus:    oklch(0.700 0.010 240);
+      --primary:         oklch(0.520 0.160 252);
+      --primary-fg:      oklch(0.990 0.000 0);
+      --primary-hover:   oklch(0.470 0.160 252);
+      --sidebar-bg:      oklch(0.140 0.015 240);
+      --sidebar-fg:      oklch(0.600 0.010 240);
+      --sidebar-fg-active: oklch(0.970 0.005 240);
+      --sidebar-hover:   oklch(0.190 0.015 240);
+      --sidebar-active:  oklch(0.230 0.025 252);
+      --sidebar-border:  oklch(0.210 0.014 240);
+      --shadow-sm:       0 1px 2px oklch(0 0 0 / 0.05);
+      --shadow:          0 2px 8px oklch(0 0 0 / 0.09);
+      --shadow-lg:       0 8px 28px oklch(0 0 0 / 0.13);
+    }
+
+    [data-theme="dark"] {
+      --bg:              oklch(0.130 0.012 240);
+      --bg-card:         oklch(0.170 0.012 240);
+      --bg-muted:        oklch(0.200 0.012 240);
+      --bg-hover:        oklch(0.235 0.012 240);
+      --fg:              oklch(0.930 0.005 240);
+      --fg-muted:        oklch(0.590 0.010 240);
+      --fg-subtle:       oklch(0.430 0.008 240);
+      --border:          oklch(0.275 0.012 240);
+      --border-subtle:   oklch(0.230 0.010 240);
+      --border-focus:    oklch(0.420 0.012 240);
+      --primary:         oklch(0.600 0.150 252);
+      --primary-fg:      oklch(0.990 0.000 0);
+      --primary-hover:   oklch(0.650 0.150 252);
+      --sidebar-bg:      oklch(0.100 0.015 240);
+      --sidebar-fg:      oklch(0.560 0.010 240);
+      --sidebar-fg-active: oklch(0.950 0.005 240);
+      --sidebar-hover:   oklch(0.155 0.015 240);
+      --sidebar-active:  oklch(0.210 0.025 252);
+      --sidebar-border:  oklch(0.175 0.014 240);
+      --shadow-sm:       0 1px 2px oklch(0 0 0 / 0.25);
+      --shadow:          0 2px 8px oklch(0 0 0 / 0.35);
+      --shadow-lg:       0 8px 28px oklch(0 0 0 / 0.45);
+    }
+
+    html, body, #root {
+      height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button { font-family: inherit; }
+    textarea, input { font-family: inherit; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+    integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+    crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+    integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+    crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+    integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+    crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="tt-data.jsx"></script>
+  <script type="text/babel" src="tt-ui.jsx"></script>
+  <script type="text/babel" src="tt-kanban.jsx"></script>
+  <script type="text/babel" src="tt-detail.jsx"></script>
+  <script type="text/babel" src="tt-dashboard.jsx"></script>
+  <script type="text/babel" src="tt-backlog.jsx"></script>
+  <script type="text/babel" src="tt-projects.jsx"></script>
+  <script type="text/babel" src="tt-settings.jsx"></script>
+  <script type="text/babel" src="tt-create.jsx"></script>
+  <script type="text/babel" src="tt-app.jsx"></script>
+</body>
+</html>
