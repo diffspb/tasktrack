@@ -350,6 +350,31 @@ async def test_migrate_status_reassigns_assignments(
     assert assignment.current_status_id == tgt.id
 
 
+async def test_delete_status_with_active_assignment(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    from app.schemas.task import TaskCreate, AssignmentCreate
+    from app.services import task_service
+
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial, is_default=True)
+    await _make_status(client, wf["id"], "Done", StatusCategory.final, position=1)
+
+    task = await task_service.create_task(
+        db_session, uuid.UUID(pid),
+        TaskCreate(title="T", workflow_id=uuid.UUID(wf["id"])), stub_user
+    )
+    await task_service.assign_user(
+        db_session, task.id,
+        AssignmentCreate(user_id=stub_user.id), stub_user
+    )
+
+    r = await client.delete(f"/api/v1/statuses/{todo['id']}")
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "STATUS_HAS_ACTIVE_ASSIGNMENTS"
+
+
 async def test_delete_workflow_with_tasks_blocked(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):

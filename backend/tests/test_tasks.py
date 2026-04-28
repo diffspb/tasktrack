@@ -232,6 +232,7 @@ async def test_list_tasks_with_filter(
 async def test_multi_lead_sets_awaiting_decision(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
+    """Both leads complete their workflow → global_status must be awaiting_decision."""
     ctx = await _setup_project_and_workflow(db_session, stub_user)
 
     other = User(id=uuid.uuid4(), email="other2@test.com",
@@ -256,20 +257,116 @@ async def test_multi_lead_sets_awaiting_decision(
         "user_id": str(stub_user.id), "role": "lead",
     })
     from app.services import task_service as ts
-    from app.schemas.task import AssignmentCreate
+    from app.schemas.task import AssignmentCreate, AssignmentTransition
     a2 = await ts.assign_user(
         db_session, uuid.UUID(task_id),
         AssignmentCreate(user_id=other.id, role=AssigneeRole.lead), stub_user
     )
 
+    # lead1 (stub_user) completes via HTTP
     a1_id = a1.json()["id"]
     await client.patch(f"/api/v1/assignments/{a1_id}/status", json={"status_id": ctx["inprog_id"]})
     await client.patch(f"/api/v1/assignments/{a1_id}/status", json={
         "status_id": ctx["done_id"], "resolution_id": ctx["resolution_id"],
     })
 
+    # lead2 (other) completes via service layer (bypasses HTTP auth)
+    await ts.transition_assignment_status(
+        db_session, a2.id,
+        AssignmentTransition(status_id=uuid.UUID(ctx["inprog_id"])), other,
+    )
+    await ts.transition_assignment_status(
+        db_session, a2.id,
+        AssignmentTransition(
+            status_id=uuid.UUID(ctx["done_id"]),
+            resolution_id=uuid.UUID(ctx["resolution_id"]),
+        ), other,
+    )
+
     task = (await client.get(f"/api/v1/tasks/{task_id}")).json()
-    assert task["global_status"] in ("in_progress", "awaiting_decision")
+    assert task["global_status"] == "awaiting_decision"
+
+
+async def test_transition_other_user_assignment_forbidden(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    """stub_user cannot move an assignment that belongs to another user."""
+    ctx = await _setup_project_and_workflow(db_session, stub_user)
+
+    other = User(id=uuid.uuid4(), email="other3@test.com",
+                 display_name="Other3", keycloak_id="other3-kc", is_active=True)
+    db_session.add(other)
+    await db_session.flush()
+
+    from app.models.project import ProjectMember, ProjectMemberRole
+    db_session.add(ProjectMember(
+        project_id=uuid.UUID(ctx["project_id"]),
+        user_id=other.id,
+        role=ProjectMemberRole.member,
+    ))
+    await db_session.commit()
+
+    r = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
+        "title": "Other task", "workflow_id": ctx["workflow_id"],
+    })
+    task_id = r.json()["id"]
+
+    from app.services import task_service as ts
+    from app.schemas.task import AssignmentCreate
+    a = await ts.assign_user(
+        db_session, uuid.UUID(task_id),
+        AssignmentCreate(user_id=other.id, role=AssigneeRole.lead), stub_user
+    )
+
+    r = await client.patch(f"/api/v1/assignments/{a.id}/status", json={
+        "status_id": ctx["inprog_id"],
+    })
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "PERMISSION_DENIED"
+
+
+async def test_update_assignment_role(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    ctx = await _setup_project_and_workflow(db_session, stub_user)
+    r = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
+        "title": "Role test", "workflow_id": ctx["workflow_id"],
+    })
+    task_id = r.json()["id"]
+
+    a = await client.post(f"/api/v1/tasks/{task_id}/assignments", json={
+        "user_id": str(stub_user.id), "role": "lead",
+    })
+    assignment_id = a.json()["id"]
+
+    r = await client.patch(f"/api/v1/assignments/{assignment_id}/role", json={"role": "reviewer"})
+    assert r.status_code == 200
+    assert r.json()["role"] == "reviewer"
+
+
+async def test_remove_assignment_recalculates_to_open(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    """Removing the only lead assignment resets global_status to open."""
+    ctx = await _setup_project_and_workflow(db_session, stub_user)
+    r = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
+        "title": "Remove test", "workflow_id": ctx["workflow_id"],
+    })
+    task_id = r.json()["id"]
+
+    a = await client.post(f"/api/v1/tasks/{task_id}/assignments", json={
+        "user_id": str(stub_user.id), "role": "lead",
+    })
+    assignment_id = a.json()["id"]
+
+    task = (await client.get(f"/api/v1/tasks/{task_id}")).json()
+    assert task["global_status"] == "in_progress"
+
+    r = await client.delete(f"/api/v1/assignments/{assignment_id}")
+    assert r.status_code == 204
+
+    task = (await client.get(f"/api/v1/tasks/{task_id}")).json()
+    assert task["global_status"] == "open"
 
 
 async def test_my_tasks(

@@ -50,6 +50,29 @@
 
 ---
 
+## Непокрытые тесты — отложено после Этапа 4
+
+Закрыты P0/P1 перед Этапом 4 (2026-04-29). Оставшиеся кейсы не блокируют фронтенд-разработку.
+
+**Непокрытые error cases (отложено):**
+
+- `TASK_NOT_FOUND` при GET/PATCH/DELETE с несуществующим UUID задачи
+- `ASSIGNMENT_NOT_FOUND` при переходе статуса по несуществующему assignment_id
+- `WORKFLOW_NO_DEFAULT_STATUS` в `assign_user` (воркфлоу без дефолтного статуса)
+- `STATUS_WORKFLOW_MISMATCH` в `migrate_status` (target из другого воркфлоу)
+- `TRANSITION_NOT_FOUND` при `DELETE /transitions/{id}` с несуществующим ID
+- `STATUS_DEFAULT_MUST_BE_INITIAL` через `PATCH /statuses/{id}` (для update_status)
+
+**Непокрытые happy path:**
+
+- `PATCH /workflows/{id}` — update_workflow happy path
+- `update_status` happy path через PATCH
+
+**Известный баг (не блокирует MVP):**  
+`update_assignment_role` не вызывает `_recalculate_global_status`. При смене роли lead → reviewer глобальный статус задачи не пересчитывается. Исправить в Этапе 5 (Tasks UI), когда эта логика станет видимой пользователю.
+
+---
+
 ## Что закрыто в рамках фикса ревью
 
 - `permissions.py` — единая точка контроля доступа вместо импорта приватного `_get_member`
