@@ -1,8 +1,12 @@
-import uuid
-
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from testcontainers.postgres import PostgresContainer
 
 from app.api.deps import get_current_user, get_session
 from app.core.auth_stub import STUB_USER_ID
@@ -10,23 +14,51 @@ from app.main import app
 from app.models import Base
 from app.models.user import User
 
-_TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+# ---------------------------------------------------------------------------
+# Session-scoped: one PostgreSQL container + schema for the whole test run
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def postgres_container():
+    with PostgresContainer("postgres:16-alpine") as pg:
+        yield pg
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
-async def async_engine():
-    engine = create_async_engine(_TEST_DB_URL)
+async def async_engine(postgres_container):
+    host = postgres_container.get_container_host_ip()
+    port = postgres_container.get_exposed_port(5432)
+    url = (
+        f"postgresql+asyncpg://{postgres_container.username}"
+        f":{postgres_container.password}"
+        f"@{host}:{port}/{postgres_container.dbname}"
+    )
+    engine = create_async_engine(url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
 
 
+# ---------------------------------------------------------------------------
+# Function-scoped: each test wraps in a transaction rolled back after.
+# join_transaction_mode="create_savepoint" makes session.commit() issue a
+# SAVEPOINT instead of COMMIT, so the outer rollback undoes everything.
+# ---------------------------------------------------------------------------
+
 @pytest_asyncio.fixture
 async def db_session(async_engine) -> AsyncSession:
-    session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
-    async with session_maker() as session:
+    async with async_engine.connect() as conn:
+        await conn.begin()
+        session = AsyncSession(
+            bind=conn,
+            join_transaction_mode="create_savepoint",
+            expire_on_commit=False,
+        )
         yield session
+        await session.close()
+        await conn.rollback()
 
 
 @pytest_asyncio.fixture
@@ -41,8 +73,7 @@ async def stub_user(db_session: AsyncSession) -> User:
             is_active=True,
         )
         db_session.add(user)
-        await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.flush()
     return user
 
 

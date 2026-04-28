@@ -105,8 +105,8 @@ docs/
 - `make test` обязателен перед каждым коммитом
 - Каждый этап — один коммит + тег `impl-phase-N`
 - **Миграции:** `metadata.create_all` в lifespan до Этапа 8, затем переключение на Alembic
-- **Тесты:** SQLite in-memory (`aiosqlite`), без Docker. Для Phase 6+ нужен локальный PostgreSQL
-- **SELECT FOR UPDATE** не поддерживается в SQLite — интеграционные тесты Decision Process пишутся против PostgreSQL
+- **Тесты:** PostgreSQL через testcontainers (Docker обязателен), savepoint-изоляция между тестами
+- **SELECT FOR UPDATE** работает — тесты на реальном PostgreSQL
 
 ### Быстрый старт (бэкенд)
 
@@ -116,7 +116,7 @@ python3 -m virtualenv .venv    # использовать virtualenv, не pytho
 source .venv/bin/activate
 cp .env.dev.example .env.dev
 make install                   # pip install -e ".[dev]"
-make db-start                  # sudo service postgresql start (локальный PG, не Docker)
+make db-start                  # docker run postgres:16-alpine на :5432
 make reset                     # drop_all + create_all + seed
 make dev                       # uvicorn --reload на :8000
 make test                      # pytest (SQLite in-memory)

@@ -3,14 +3,17 @@
 install:
 	pip install -e ".[dev]"
 
-# Запустить локальный PostgreSQL (WSL)
+# Запустить dev-БД через Docker
 db-start:
-	sudo service postgresql start
+	docker run -d --name tasktrack-dev \
+	  -e POSTGRES_DB=tasktrack \
+	  -e POSTGRES_USER=tasktrack \
+	  -e POSTGRES_PASSWORD=tasktrack \
+	  -p 5432:5432 \
+	  postgres:16-alpine
 
-# Создать БД и пользователя (один раз после установки PostgreSQL)
-db-create:
-	sudo -u postgres psql -c "CREATE USER tasktrack WITH PASSWORD 'tasktrack';" || true
-	sudo -u postgres psql -c "CREATE DATABASE tasktrack OWNER tasktrack;" || true
+db-stop:
+	docker stop tasktrack-dev && docker rm tasktrack-dev
 
 reset:
 	python scripts/reset_db.py

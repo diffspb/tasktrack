@@ -65,6 +65,7 @@ async def test_list_projects_restricted_not_accessible(
         is_active=True,
     )
     db_session.add(other_user)
+    await db_session.flush()
 
     private = Project(
         name="Private",
@@ -92,6 +93,7 @@ async def test_list_projects_restricted_accessible_if_member(
         is_active=True,
     )
     db_session.add(other_user)
+    await db_session.flush()
 
     project = Project(
         name="Restricted but joined",
@@ -196,6 +198,7 @@ async def test_get_restricted_project_without_access(
 ):
     other = User(id=uuid.uuid4(), email="x@x.com", display_name="X", keycloak_id="x-kc")
     db_session.add(other)
+    await db_session.flush()
     project = Project(name="Secret", key="SECRET9", visibility=ProjectVisibility.restricted, owner_id=other.id)
     db_session.add(project)
     await db_session.commit()
