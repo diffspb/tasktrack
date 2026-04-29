@@ -27,7 +27,7 @@ function BoardSkeleton() {
 export function TaskBoard() {
   const { id: projectId } = useParams<{ id: string }>()
   const { user } = useAuth()
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
@@ -35,6 +35,8 @@ export function TaskBoard() {
 
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
+  // Derive from live query cache — always fresh after any mutation
+  const selectedTask = (tasks ?? []).find(t => t.id === selectedTaskId) ?? null
   const { data: resolutions = [] } = useProjectResolutions(projectId ?? '')
   const transition = useTransitionStatus(projectId ?? '')
 
@@ -67,7 +69,7 @@ export function TaskBoard() {
     } catch (err) {
       const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
       if (code === 'RESOLUTION_REQUIRED') {
-        setSelectedTask(task ?? null) // open detail so user can pick resolution
+        setSelectedTaskId(task?.id ?? null) // open detail so user can pick resolution
       } else if (code === 'WORKFLOW_TRANSITION_NOT_ALLOWED') {
         showError('That transition is not allowed in this workflow.')
       } else {
@@ -167,7 +169,7 @@ export function TaskBoard() {
                       myAssignment={task.assignments.find(a => a.user_id === user?.id)}
                       statusName={status.name}
                       isDragging={draggedId === task.id}
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => setSelectedTaskId(task.id)}
                       onDragStart={() => setDraggedId(task.id)}
                       onDragEnd={() => { setDraggedId(null); setDragOverCol(null) }}
                     />
@@ -191,7 +193,7 @@ export function TaskBoard() {
         resolutions={resolutions}
         projectId={projectId ?? ''}
         currentUserId={user?.id ?? ''}
-        onClose={() => setSelectedTask(null)}
+        onClose={() => setSelectedTaskId(null)}
       />
 
       <CreateTaskModal
