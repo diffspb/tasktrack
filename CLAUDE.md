@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 4 (Frontend scaffold + Projects UI)**.
+Текущий этап: **реализация MVP, Этап 5 (Tasks UI + Kanban)**.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -85,7 +85,7 @@ docs/
 
 Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** 4 — Frontend scaffold + Projects UI
+**Текущий этап:** 5 — Tasks UI + Kanban
 
 | Этап | Тег | Статус |
 |------|-----|--------|
@@ -93,7 +93,7 @@ docs/
 | 1. Пользователи и проекты | `impl-phase-1` | ✅ |
 | 2. Воркфлоу и резолюции | `impl-phase-2` | ✅ |
 | 3. Задачи и назначения | `impl-phase-3` | ✅ |
-| 4. Frontend scaffold | `impl-phase-4` | 🟡 в работе |
+| 4. Frontend scaffold | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | 🔲 |
 | 6. Decision Process backend | `impl-phase-6` | 🔲 |
 | 7. Decision Process UI | `s23-complete` | 🔲 |
@@ -124,16 +124,28 @@ make install                   # pip install -e ".[dev]"
 make db-start                  # docker run postgres:16-alpine на :5432
 make reset                     # drop_all + create_all + seed
 make dev                       # uvicorn --reload на :8000
-make test                      # pytest (SQLite in-memory)
+make test                      # pytest — PostgreSQL через testcontainers (Docker обязателен)
 ```
 
-### Быстрый старт (фронтенд, с Этапа 4)
+### Быстрый старт (фронтенд)
 
 ```bash
 cd frontend
 npm install
 npm run dev                    # Vite на :5173 (proxy /api → :8000)
+npm test                       # Vitest
 ```
+
+### Фронтенд — стек и структура
+
+- **Vite 8 + React 19 + TypeScript + Tailwind v4 + shadcn/ui**
+- Цветовые токены (oklch) из прототипа → `src/index.css`
+- Компоненты shadcn/ui в `src/components/ui/` — добавлять через `npx shadcn@latest add`
+- Роутинг: React Router v7, `src/app/router.tsx`
+- Серверный стейт: TanStack Query, хуки в `features/*/api.ts`
+- HTTP-клиент: axios, `src/shared/api/client.ts`
+- Тесты: Vitest + React Testing Library, файлы рядом с компонентом в `__tests__/`
+- `make gen-types` — генерировать TypeScript-типы из `/openapi.json` (бэкенд должен быть запущен)
 
 ### DB параметры (dev)
 

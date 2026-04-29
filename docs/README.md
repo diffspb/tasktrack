@@ -18,7 +18,7 @@
 | 1. Пользователи и проекты | `impl-phase-1` | ✅ |
 | 2. Воркфлоу и резолюции | `impl-phase-2` | ✅ |
 | 3. Задачи и назначения (S1 через API) | `impl-phase-3` | ✅ |
-| 4. Frontend scaffold + Projects UI | `impl-phase-4` | 🟡 в работе |
+| 4. Frontend scaffold + Projects UI | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | 🔲 |
 | 6. Decision Process backend | `impl-phase-6` | 🔲 |
 | 7. Decision Process UI | `s23-complete` | 🔲 |
