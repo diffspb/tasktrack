@@ -1,0 +1,41 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/shared/api/client'
+
+export interface ProjectMember {
+  user_id: string
+  role: string
+}
+
+export interface Project {
+  id: string
+  name: string
+  key: string
+  description: string | null
+  visibility: 'public' | 'restricted' | 'private'
+  is_archived: boolean
+  version: number
+  members: ProjectMember[]
+  created_at: string
+}
+
+export interface ProjectCreate {
+  name: string
+  key: string
+  description?: string
+  visibility?: 'public' | 'restricted' | 'private'
+}
+
+export function useProjects() {
+  return useQuery<Project[]>({
+    queryKey: ['projects'],
+    queryFn: () => api.get('/projects').then(r => r.data),
+  })
+}
+
+export function useCreateProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: ProjectCreate) => api.post('/projects', data).then(r => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  })
+}
