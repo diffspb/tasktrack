@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { AxiosError } from 'axios'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +15,7 @@ export function CreateProjectModal({ open, onClose }: Props) {
   const [name, setName] = useState('')
   const [key, setKey] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'restricted' | 'private'>('restricted')
+  const [error, setError] = useState<string | null>(null)
   const create = useCreateProject()
 
   function handleNameChange(v: string) {
@@ -28,15 +30,25 @@ export function CreateProjectModal({ open, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !key.trim()) return
-    await create.mutateAsync({ name: name.trim(), key: key.trim(), visibility })
-    setName('')
-    setKey('')
-    setVisibility('restricted')
-    onClose()
+    setError(null)
+    try {
+      await create.mutateAsync({ name: name.trim(), key: key.trim(), visibility })
+      setName('')
+      setKey('')
+      setVisibility('restricted')
+      onClose()
+    } catch (err) {
+      const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
+      if (code === 'DUPLICATE_PROJECT_KEY') {
+        setError(`Key "${key.trim()}" is already taken. Choose another.`)
+      } else {
+        setError('Something went wrong. Please try again.')
+      }
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+    <Dialog open={open} onOpenChange={v => { if (!v) { setError(null); onClose() } }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New project</DialogTitle>
@@ -82,6 +94,9 @@ export function CreateProjectModal({ open, onClose }: Props) {
               ))}
             </div>
           </div>
+          {error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={!name.trim() || !key.trim() || create.isPending}>
