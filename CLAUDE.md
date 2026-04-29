@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 3 (задачи и назначения)**.
+Текущий этап: **реализация MVP, Этап 4 (Frontend scaffold + Projects UI)**.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -85,15 +85,15 @@ docs/
 
 Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** 3 — задачи и назначения (завершён, ждёт мержа)
+**Текущий этап:** 4 — Frontend scaffold + Projects UI
 
 | Этап | Тег | Статус |
 |------|-----|--------|
 | 0. Фундамент | `impl-phase-0` | ✅ |
 | 1. Пользователи и проекты | `impl-phase-1` | ✅ |
 | 2. Воркфлоу и резолюции | `impl-phase-2` | ✅ |
-| 3. Задачи и назначения | `impl-phase-3` | ✅ (ожидает мержа) |
-| 4. Frontend scaffold | `impl-phase-4` | 🔲 |
+| 3. Задачи и назначения | `impl-phase-3` | ✅ |
+| 4. Frontend scaffold | `impl-phase-4` | 🟡 в работе |
 | 5. Tasks UI + Kanban | `s1-complete` | 🔲 |
 | 6. Decision Process backend | `impl-phase-6` | 🔲 |
 | 7. Decision Process UI | `s23-complete` | 🔲 |
