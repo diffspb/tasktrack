@@ -107,6 +107,15 @@ export function useCreateTask(projectId: string) {
   })
 }
 
+export function useAssignUser(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, userId, role }: { taskId: string; userId: string; role: string }) =>
+      api.post(`/tasks/${taskId}/assignments`, { user_id: userId, role }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+  })
+}
+
 export function useTransitionStatus(projectId: string) {
   const qc = useQueryClient()
   return useMutation({

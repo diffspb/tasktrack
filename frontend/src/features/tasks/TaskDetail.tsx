@@ -5,15 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { Task, Status, Resolution } from './api'
-import { useTransitionStatus } from './api'
+import { useTransitionStatus, useAssignUser } from './api'
 
 const GS_STYLES: Record<string, { cls: string; label: string }> = {
-  open:              { cls: 'bg-muted text-muted-foreground',                                 label: 'Open' },
-  in_progress:       { cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',   label: 'In Progress' },
+  open:              { cls: 'bg-muted text-muted-foreground',                                          label: 'Open' },
+  in_progress:       { cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',        label: 'In Progress' },
   awaiting_decision: { cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', label: 'Awaiting Decision' },
   in_revision:       { cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', label: 'In Revision' },
-  decided:           { cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',  label: 'Decided' },
-  closed:            { cls: 'bg-muted text-muted-foreground',                                 label: 'Closed' },
+  decided:           { cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',    label: 'Decided' },
+  closed:            { cls: 'bg-muted text-muted-foreground',                                          label: 'Closed' },
 }
 
 interface Props {
@@ -31,6 +31,7 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
   const [selectedRes, setSelectedRes] = useState<string>('')
   const [transitionError, setTransitionError] = useState<string | null>(null)
   const transition = useTransitionStatus(projectId)
+  const assignUser = useAssignUser(projectId)
 
   const myAssignment = task?.assignments.find(a => a.user_id === currentUserId)
   const currentStatus = statuses.find(s => s.id === myAssignment?.current_status_id)
@@ -59,6 +60,11 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
     }
   }
 
+  async function handleAssignMe() {
+    if (!task) return
+    await assignUser.mutateAsync({ taskId: task.id, userId: currentUserId, role: 'lead' })
+  }
+
   return (
     <Sheet open={!!task} onOpenChange={v => { if (!v) { setPendingStatusId(null); setTransitionError(null); onClose() } }}>
       <SheetContent className="w-[460px] sm:max-w-[460px] overflow-y-auto">
@@ -71,6 +77,19 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
               </div>
               <SheetTitle className="text-left text-base leading-snug">{task.title}</SheetTitle>
             </SheetHeader>
+
+            {/* Assign to me — shown when current user has no assignment */}
+            {!myAssignment && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                disabled={assignUser.isPending}
+                onClick={handleAssignMe}
+              >
+                {assignUser.isPending ? 'Assigning…' : 'Assign to me'}
+              </Button>
+            )}
 
             {/* My status & transitions */}
             {myAssignment && (
@@ -97,7 +116,7 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
               </div>
             )}
 
-            {/* Resolution picker (shown when final status requires it) */}
+            {/* Resolution picker */}
             {pendingStatusId && (
               <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 p-3 space-y-2.5">
                 <p className="text-sm font-medium">Choose a resolution to close this task</p>
