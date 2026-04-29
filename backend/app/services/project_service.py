@@ -33,16 +33,20 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
         session.add(wf)
         await session.flush()
 
-        todo   = Status(workflow_id=wf.id, name="To Do",       category=StatusCategory.initial,       is_default=True, position=0)
+        todo   = Status(workflow_id=wf.id, name="To Do",       category=StatusCategory.initial,       is_default=True,  position=0)
         inprog = Status(workflow_id=wf.id, name="In Progress", category=StatusCategory.intermediate,   is_default=False, position=1)
-        done   = Status(workflow_id=wf.id, name="Done",        category=StatusCategory.final,          is_default=False, position=2)
-        session.add_all([todo, inprog, done])
+        review = Status(workflow_id=wf.id, name="Review",      category=StatusCategory.intermediate,   is_default=False, position=2)
+        done   = Status(workflow_id=wf.id, name="Done",        category=StatusCategory.final,          is_default=False, position=3)
+        session.add_all([todo, inprog, review, done])
         await session.flush()
 
         session.add_all([
             Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=inprog.id),
-            Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=done.id),
+            Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=review.id),
+            Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=done.id),
             Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=done.id),
+            Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
+            Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
         ])
         session.add_all([
             Resolution(project_id=project.id, name="Done",     is_default=True,  position=0),

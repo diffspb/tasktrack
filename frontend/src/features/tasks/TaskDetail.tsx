@@ -63,7 +63,7 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
     <Sheet open={!!task} onOpenChange={v => { if (!v) { setPendingStatusId(null); setTransitionError(null); onClose() } }}>
       <SheetContent className="w-[460px] sm:max-w-[460px] overflow-y-auto">
         {task && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 p-6 pt-2">
             <SheetHeader>
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-mono text-xs font-semibold text-muted-foreground">{task.key}</span>
