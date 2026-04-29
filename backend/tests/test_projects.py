@@ -315,3 +315,26 @@ async def test_remove_member_as_member_forbidden(
     r = await client.delete(f"/api/v1/projects/{project_id}/members/{stub_user.id}")
     assert r.status_code == 403
     assert r.json()["detail"]["code"] == "PERMISSION_DENIED"
+
+
+async def test_create_project_auto_creates_workflow(client: AsyncClient):
+    r = await client.post("/api/v1/projects", json={"name": "Workflow Test", "key": "WFAUTO"})
+    assert r.status_code == 201
+    project_id = r.json()["id"]
+
+    wf_r = await client.get(f"/api/v1/projects/{project_id}/workflows")
+    assert wf_r.status_code == 200
+    workflows = wf_r.json()
+    assert len(workflows) == 1
+    wf = workflows[0]
+    assert wf["is_default"] is True
+    assert wf["name"] == "Basic"
+
+    status_names = [s["name"] for s in wf["statuses"]]
+    assert "To Do" in status_names
+    assert "In Progress" in status_names
+    assert "Done" in status_names
+
+    res_r = await client.get(f"/api/v1/projects/{project_id}/resolutions")
+    assert res_r.status_code == 200
+    assert len(res_r.json()) == 3

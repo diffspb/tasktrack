@@ -69,11 +69,14 @@ async def test_create_workflow(client: AsyncClient, db_session: AsyncSession, st
 
 async def test_list_workflows(client: AsyncClient, db_session: AsyncSession, stub_user: User):
     pid = await _make_project(db_session, stub_user)
+    # project auto-creates "Basic" workflow; add 2 more
     await _make_workflow(client, pid, "WF1")
     await _make_workflow(client, pid, "WF2")
     r = await client.get(f"/api/v1/projects/{pid}/workflows")
     assert r.status_code == 200
-    assert len(r.json()) == 2
+    names = [w["name"] for w in r.json()]
+    assert "WF1" in names
+    assert "WF2" in names
 
 
 async def test_create_statuses_with_timestamps(
@@ -274,12 +277,14 @@ async def test_list_resolutions(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
     pid = await _make_project(db_session, stub_user)
-    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Done", "position": 0})
-    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Won't Fix", "position": 1})
+    # project auto-creates 3 resolutions; add a custom one and verify it appears
+    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Custom", "position": 10})
 
     r = await client.get(f"/api/v1/projects/{pid}/resolutions")
     assert r.status_code == 200
-    assert len(r.json()) == 2
+    names = [res["name"] for res in r.json()]
+    assert "Custom" in names
+    assert "Done" in names
 
 
 async def test_delete_resolution(

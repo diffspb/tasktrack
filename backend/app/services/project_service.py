@@ -13,6 +13,9 @@ from app.schemas.project import ProjectCreate, ProjectMemberAdd, ProjectUpdate
 
 
 async def create_project(session: AsyncSession, data: ProjectCreate, owner: User) -> Project:
+    from app.models.workflow import Status, StatusCategory, Transition, Workflow
+    from app.models.resolution import Resolution
+
     project = Project(
         name=data.name,
         key=data.key,
@@ -24,6 +27,28 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
         session.add(project)
         await session.flush()
         session.add(ProjectMember(project_id=project.id, user_id=owner.id, role=ProjectMemberRole.admin))
+
+        # Auto-create a default workflow with standard statuses
+        wf = Workflow(project_id=project.id, name="Basic", is_default=True)
+        session.add(wf)
+        await session.flush()
+
+        todo   = Status(workflow_id=wf.id, name="To Do",       category=StatusCategory.initial,       is_default=True, position=0)
+        inprog = Status(workflow_id=wf.id, name="In Progress", category=StatusCategory.intermediate,   is_default=False, position=1)
+        done   = Status(workflow_id=wf.id, name="Done",        category=StatusCategory.final,          is_default=False, position=2)
+        session.add_all([todo, inprog, done])
+        await session.flush()
+
+        session.add_all([
+            Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=inprog.id),
+            Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=done.id),
+            Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=done.id),
+        ])
+        session.add_all([
+            Resolution(project_id=project.id, name="Done",     is_default=True,  position=0),
+            Resolution(project_id=project.id, name="Won't Fix",                  position=1),
+            Resolution(project_id=project.id, name="Duplicate",                  position=2),
+        ])
         await session.commit()
     except IntegrityError:
         await session.rollback()
