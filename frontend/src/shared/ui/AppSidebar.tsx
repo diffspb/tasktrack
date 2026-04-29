@@ -1,5 +1,5 @@
 import { Zap, LayoutDashboard, Kanban, List, Users, Settings } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -7,20 +7,22 @@ import {
 import { useAuth } from '@/features/auth/AuthProvider'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
-const NAV_ITEMS = [
+const TOP_NAV = [
   { to: '/projects', icon: List, label: 'All Projects' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
 ]
 
 const PROJECT_NAV = [
-  { icon: Kanban, label: 'Board', suffix: 'board' },
-  { icon: List, label: 'Backlog', suffix: 'backlog' },
-  { icon: Users, label: 'Members', suffix: 'members' },
+  { icon: Kanban, label: 'Board',    suffix: 'board' },
+  { icon: List,   label: 'Backlog',  suffix: 'backlog' },
+  { icon: Users,  label: 'Members',  suffix: 'members' },
   { icon: Settings, label: 'Settings', suffix: 'settings' },
 ]
 
 export function AppSidebar() {
   const { user } = useAuth()
+  const projectMatch = useMatch('/projects/:id/*')
+  const projectId = projectMatch?.params.id
 
   return (
     <Sidebar>
@@ -36,7 +38,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            {NAV_ITEMS.map(item => (
+            {TOP_NAV.map(item => (
               <SidebarMenuItem key={item.to}>
                 <NavLink to={item.to}>
                   {({ isActive }) => (
@@ -51,19 +53,25 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Project</SidebarGroupLabel>
-          <SidebarMenu>
-            {PROJECT_NAV.map(item => (
-              <SidebarMenuItem key={item.suffix}>
-                <SidebarMenuButton disabled className="text-muted-foreground/50">
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        {projectId && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Project</SidebarGroupLabel>
+            <SidebarMenu>
+              {PROJECT_NAV.map(item => (
+                <SidebarMenuItem key={item.suffix}>
+                  <NavLink to={`/projects/${projectId}/${item.suffix}`}>
+                    {({ isActive }) => (
+                      <SidebarMenuButton isActive={isActive}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    )}
+                  </NavLink>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>

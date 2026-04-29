@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -24,6 +25,7 @@ function VisibilityIcon({ v }: { v: Project['visibility'] }) {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const navigate = useNavigate()
   const color = projectColor(project.key)
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
@@ -57,7 +59,8 @@ function ProjectCard({ project }: { project: Project }) {
             <Users className="h-3.5 w-3.5" />
             {project.members.length} member{project.members.length !== 1 ? 's' : ''}
           </span>
-          <Button size="sm" variant="outline" className="h-7 text-xs">
+          <Button size="sm" variant="outline" className="h-7 text-xs"
+            onClick={() => navigate(`/projects/${project.id}/board`)}>
             Open
           </Button>
         </div>
