@@ -339,9 +339,13 @@ async def test_update_assignment_role(
     })
     assignment_id = a.json()["id"]
 
+    # lead → reviewer: role changes and global_status recalculates (no leads left → open)
     r = await client.patch(f"/api/v1/assignments/{assignment_id}/role", json={"role": "reviewer"})
     assert r.status_code == 200
     assert r.json()["role"] == "reviewer"
+
+    task = (await client.get(f"/api/v1/tasks/{task_id}")).json()
+    assert task["global_status"] == "open"
 
 
 async def test_remove_assignment_recalculates_to_open(

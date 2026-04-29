@@ -193,9 +193,10 @@ async def update_assignment_role(
     user: User,
 ) -> Assignment:
     assignment = await _get_assignment_or_404(session, assignment_id)
-    await get_task(session, assignment.task_id, user)
+    task = await get_task(session, assignment.task_id, user)
 
     assignment.role = data.role
+    await _recalculate_global_status(session, task)
     await session.commit()
     await session.refresh(assignment)
     return assignment

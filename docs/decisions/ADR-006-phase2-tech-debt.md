@@ -68,8 +68,7 @@
 - `PATCH /workflows/{id}` — update_workflow happy path
 - `update_status` happy path через PATCH
 
-**Известный баг (не блокирует MVP):**  
-`update_assignment_role` не вызывает `_recalculate_global_status`. При смене роли lead → reviewer глобальный статус задачи не пересчитывается. Исправить в Этапе 5 (Tasks UI), когда эта логика станет видимой пользователю.
+**✅ update_assignment_role** — добавлен вызов `_recalculate_global_status`, тест `test_update_assignment_role` проверяет lead → reviewer → global_status = open. Закрыто в Этапе 5.
 
 ---
 
