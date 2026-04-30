@@ -9,6 +9,7 @@ from app.schemas.project import (
     ProjectCreate,
     ProjectMemberAdd,
     ProjectMemberResponse,
+    ProjectMembersListResponse,
     ProjectResponse,
     ProjectUpdate,
 )
@@ -74,6 +75,16 @@ async def add_member(
     user: User = Depends(get_current_user),
 ):
     return await project_service.add_member(session, project_id, data, user)
+
+
+@router.get("/{project_id}/members", response_model=ProjectMembersListResponse)
+async def list_members(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    items = await project_service.list_members(session, project_id, user)
+    return {"items": items}
 
 
 @router.delete("/{project_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

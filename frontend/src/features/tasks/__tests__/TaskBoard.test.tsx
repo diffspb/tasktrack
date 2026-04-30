@@ -3,26 +3,32 @@ import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { AuthProvider } from '@/features/auth/AuthProvider'
 import { TaskBoard } from '../TaskBoard'
 import * as api from '../api'
 
 const PROJECT_ID = 'proj-1'
 const STUB_USER = '00000000-0000-0000-0000-000000000001'
 
+vi.mock('@/features/auth/AuthProvider', () => ({
+  useAuth: () => ({
+    user: { id: STUB_USER, email: 'admin@localhost', display_name: 'Admin' },
+    stubUsers: [],
+    switchStubUser: () => {},
+    isLoading: false,
+  }),
+}))
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
     <QueryClientProvider client={qc}>
-      <AuthProvider>
-        <TooltipProvider>
-          <MemoryRouter initialEntries={[`/projects/${PROJECT_ID}/board`]}>
-            <Routes>
-              <Route path="/projects/:id/board" element={children} />
-            </Routes>
-          </MemoryRouter>
-        </TooltipProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <MemoryRouter initialEntries={[`/projects/${PROJECT_ID}/board`]}>
+          <Routes>
+            <Route path="/projects/:id/board" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   )
 }
@@ -46,7 +52,7 @@ const makeTasks = (): api.Task[] => [
     key: 'P-1', title: 'My todo task', description: null,
     task_type: 'task', priority: 'medium', global_status: 'open',
     reporter_id: STUB_USER, decision_maker_id: null,
-    due_date: null, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
+    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
     assignments: [{ id: 'a1', task_id: 'task1', user_id: STUB_USER, role: 'lead', current_status_id: 's1', resolution_id: null, created_at: '2026-01-01' }],
   },
   {
@@ -54,7 +60,7 @@ const makeTasks = (): api.Task[] => [
     key: 'P-2', title: 'In progress task', description: null,
     task_type: 'task', priority: 'high', global_status: 'in_progress',
     reporter_id: STUB_USER, decision_maker_id: null,
-    due_date: null, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
+    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
     assignments: [{ id: 'a2', task_id: 'task2', user_id: STUB_USER, role: 'lead', current_status_id: 's2', resolution_id: null, created_at: '2026-01-01' }],
   },
   {
@@ -62,7 +68,7 @@ const makeTasks = (): api.Task[] => [
     key: 'P-3', title: 'Not assigned to me', description: null,
     task_type: 'task', priority: 'low', global_status: 'open',
     reporter_id: 'other', decision_maker_id: null,
-    due_date: null, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
+    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
     assignments: [{ id: 'a3', task_id: 'task3', user_id: 'other-user', role: 'lead', current_status_id: 's1', resolution_id: null, created_at: '2026-01-01' }],
   },
 ]

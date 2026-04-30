@@ -144,6 +144,19 @@ async def add_member(
     return new_member
 
 
+async def list_members(
+    session: AsyncSession, project_id: uuid.UUID, user: User,
+) -> list[dict]:
+    await get_project(session, project_id, user)
+    rows = await session.execute(
+        select(ProjectMember, User)
+        .join(User, ProjectMember.user_id == User.id)
+        .where(ProjectMember.project_id == project_id)
+        .order_by(User.display_name)
+    )
+    return [{"role": pm.role, "user": u} for pm, u in rows.all()]
+
+
 async def remove_member(
     session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, user: User
 ) -> None:
