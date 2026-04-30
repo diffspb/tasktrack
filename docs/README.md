@@ -25,7 +25,7 @@
 | 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
 
 Инфра: Docker обязателен. Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
-Актуальное состояние и архитектурные решения → **[16-arch-review.md](./16-arch-review.md)**.
+Архитектурные решения → **[decisions/](./decisions/)**.
 
 ---
 
@@ -37,7 +37,6 @@
 |------|------------|
 | [00-context.md](./00-context.md) | Контекст, целевая аудитория, границы и out of scope |
 | [glossary.md](./glossary.md) | Единый словарь терминов — источник правды |
-| [16-arch-review.md](./16-arch-review.md) | **Актуальное состояние:** противоречия, риски, валидация API, стек, открытые вопросы |
 | [17-architecture.md](./17-architecture.md) | Архитектура реализации: структура репозитория, бэкенд, фронтенд, интеграция с инфрой |
 | [18-implementation-plan.md](./18-implementation-plan.md) | **План реализации MVP:** 8 этапов с целями, составом работ и тегами |
 | [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) |
@@ -83,6 +82,7 @@
 |------|------------|
 | [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию — все блоки закрыты |
 | [11-analyst-tasks.md](./11-analyst-tasks.md) | Задачи аналитика — все выполнены |
+| [16-arch-review.md](./16-arch-review.md) | Архитектурное ревью от 2026-04-26 — закрыто, на смену готовится новое |
 | [01-needs.md](./01-needs.md) | Исходные потребности («зачем») |
 
 ---
@@ -91,7 +91,7 @@
 
 1. **[00-context.md](./00-context.md)** — что строим, для кого, что точно не делаем.
 2. **[glossary.md](./glossary.md)** — прочитать один раз, держать открытым.
-3. **[16-arch-review.md](./16-arch-review.md)** — текущее состояние пакета, риски, открытые вопросы.
+3. **[decisions/](./decisions/)** — пройти по ADR-001…007: ключевые архитектурные и продуктовые решения.
 4. **[09-mvp.md](./09-mvp.md)** — scope и приоритизация до погружения в детали.
 5. **[07-decision-process.md](./07-decision-process.md)** — ключевой механизм продукта.
 6. **[03-user-stories.md](./03-user-stories.md)** → **[stories/decision-process.md](./stories/decision-process.md)** — истории с AC.
