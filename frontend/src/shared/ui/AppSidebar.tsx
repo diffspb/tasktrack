@@ -20,7 +20,7 @@ const PROJECT_NAV = [
 ]
 
 export function AppSidebar() {
-  const { user } = useAuth()
+  const { user, stubUsers, switchStubUser } = useAuth()
   const projectMatch = useMatch('/projects/:id/*')
   const projectId = projectMatch?.params.id
 
@@ -89,6 +89,26 @@ export function AppSidebar() {
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {import.meta.env.DEV && stubUsers.length > 1 && (
+            <SidebarMenuItem>
+              <div className="px-2 pt-1">
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">
+                  View as (dev)
+                </label>
+                <select
+                  value={user?.email ?? ''}
+                  onChange={e => switchStubUser(e.target.value)}
+                  className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                >
+                  {stubUsers.map(u => (
+                    <option key={u.id} value={u.email}>
+                      {u.display_name} — {u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
