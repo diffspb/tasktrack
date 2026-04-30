@@ -7,13 +7,13 @@
 
 ---
 
-## Отложено до Этапа 6 (Decision Process backend)
+## Отложено до Этапа 8 (доводка + Alembic)
 
 **APScheduler стартует без задач.**
-`scheduler.start()` в lifespan — мёртвый код до Этапа 6. Структуру не убираем; задачи (напоминания decision-maker'у) добавляются в этом этапе.
+`scheduler.start()` в lifespan — мёртвый код. Структуру не убираем; задачи (напоминания decision-maker'у через 3 дня в `awaiting_decision`) — после реализации `Notification` в Этапе 8.
 
 **`get_current_user` / `core/auth.py` с JWT не подключены.**
-`PyJWKClient` в `auth.py` не используется — `AUTH_STUB=true` покрывает все этапы до 6. При подключении Keycloak в Этапе 6 — реализовать полный flow в `deps.py`.
+`PyJWKClient` в `auth.py` не используется — `AUTH_STUB=true` покрывает все этапы. Полный JWT flow в `deps.py` — при подключении Keycloak в Этапе 8 (рядом с продакшен-готовностью).
 
 ---
 

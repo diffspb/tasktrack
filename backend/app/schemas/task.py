@@ -14,6 +14,7 @@ class TaskCreate(BaseModel):
     workflow_id: uuid.UUID
     decision_maker_id: uuid.UUID | None = None
     due_date: date | None = None
+    allow_multi_accept: bool = False
 
 
 class TaskUpdate(BaseModel):
@@ -22,6 +23,7 @@ class TaskUpdate(BaseModel):
     priority: TaskPriority | None = None
     decision_maker_id: uuid.UUID | None = None
     due_date: date | None = None
+    allow_multi_accept: bool | None = None
     version: int
 
 
@@ -67,6 +69,7 @@ class TaskResponse(BaseModel):
     priority: TaskPriority
     global_status: GlobalStatus
     due_date: date | None
+    allow_multi_accept: bool
     version: int
     deleted_at: datetime | None
     created_at: datetime
