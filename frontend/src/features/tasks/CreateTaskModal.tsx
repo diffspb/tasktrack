@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateTask, type Priority } from './api'
+import { useCreateTask, useProjectMembers, type Priority } from './api'
 
 interface Props {
   open: boolean
@@ -19,8 +19,11 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [description, setDescription] = useState('')
+  const [decisionMakerId, setDecisionMakerId] = useState<string>('')
+  const [allowMultiAccept, setAllowMultiAccept] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const create = useCreateTask(projectId)
+  const { data: members } = useProjectMembers(projectId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -32,10 +35,14 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
         workflow_id: workflowId,
         priority,
         description: description.trim() || undefined,
+        decision_maker_id: decisionMakerId || undefined,
+        allow_multi_accept: allowMultiAccept,
       })
       setTitle('')
       setPriority('medium')
       setDescription('')
+      setDecisionMakerId('')
+      setAllowMultiAccept(false)
       onClose()
     } catch (err) {
       const detail = (err as AxiosError<{ detail: unknown }>)?.response?.data?.detail
@@ -94,6 +101,33 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring resize-none"
             />
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="task-dm">
+              Decision-maker <span className="text-muted-foreground font-normal">(optional, required for multi-lead)</span>
+            </Label>
+            <select
+              id="task-dm"
+              value={decisionMakerId}
+              onChange={e => setDecisionMakerId(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">— None —</option>
+              {members?.items.map(m => (
+                <option key={m.user.id} value={m.user.id}>{m.user.display_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allowMultiAccept}
+              onChange={e => setAllowMultiAccept(e.target.checked)}
+            />
+            Allow multiple accepted Solutions
+            <span className="text-xs text-muted-foreground">(experimental)</span>
+          </label>
 
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>

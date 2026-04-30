@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 7 (Decision Process UI)**.
+Текущий этап: **реализация MVP, Этап 8 (доводка + Alembic)**.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -87,7 +87,7 @@ docs/
 
 Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** 7 — Decision Process UI
+**Текущий этап:** 8 — доводка + Alembic
 
 | Этап | Тег | Статус |
 |------|-----|--------|
@@ -98,7 +98,7 @@ docs/
 | 4. Frontend scaffold | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
-| 7. Decision Process UI | `s23-complete` | 🔲 |
+| 7. Decision Process UI | `s23-complete` | ✅ |
 | 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
 
 ### Правила разработки

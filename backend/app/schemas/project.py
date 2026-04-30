@@ -44,6 +44,25 @@ class ProjectMemberResponse(BaseModel):
     created_at: datetime
 
 
+class _UserSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    display_name: str
+    email: str
+
+
+class ProjectMemberWithUser(BaseModel):
+    """Member row with inline user info — for UI pickers."""
+
+    user: _UserSummary
+    role: ProjectMemberRole
+
+
+class ProjectMembersListResponse(BaseModel):
+    items: list[ProjectMemberWithUser]
+
+
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
