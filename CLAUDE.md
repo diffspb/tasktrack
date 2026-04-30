@@ -28,6 +28,8 @@ docs/
   13-permissions.md          — матрица прав
   15-api.md                  — REST API контракты
   16-arch-review.md          — архитектурное ревью
+  tech-debt.md               — открытый бэкенд-долг
+  ux-debt.md                 — открытый UX-долг фронтенда
   ... (остальные файлы — см. docs/README.md)
 ```
 
@@ -47,6 +49,7 @@ docs/
 - Формат: контекст → решение → последствия. Шаблон в `docs/decisions/README.md`.
 - После создания ADR — добавить строку в таблицу `docs/decisions/README.md`.
 - **Не переписывать** существующие ADR задним числом. Если решение изменилось — создать новый ADR со ссылкой на предыдущий и статусом «Заменяет ADR-XXX».
+- **Не класть в ADR техдолг и UX-долг** — это не решения, а отложенная работа. Для них есть `docs/tech-debt.md` и `docs/ux-debt.md`. Закрытые пункты долга — удалять, история есть в git.
 
 ### Приоритизация историй
 
@@ -159,7 +162,7 @@ AUTH_STUB=true
 
 ## Работа с агентами
 
-Рабочий каталог репозитория: `/home/sanek/projects/claudecode/tasktrack_project/tasktrack/`  
+Рабочий каталог репозитория: `/home/sanek/projects/claudecode/tasktrack_project/`  
 Remote: `github.com:diffspb/tasktrack.git`
 
 ### Git-права агентов
