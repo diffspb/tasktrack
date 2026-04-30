@@ -67,6 +67,15 @@
 | [decisions/ADR-003](./decisions/ADR-003-notifications.md) | Уведомления: отказ от email |
 | [decisions/ADR-004](./decisions/ADR-004-data-model.md) | Ключевые решения по модели данных |
 | [decisions/ADR-005](./decisions/ADR-005-product.md) | Сборник продуктовых решений |
+| [decisions/ADR-006](./decisions/ADR-006-phase2-model-decisions.md) | Решения по модели, принятые в Этапе 2 |
+| [decisions/ADR-007](./decisions/ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, токены |
+
+### Открытые хвосты
+
+| Файл | Что внутри |
+|------|------------|
+| [tech-debt.md](./tech-debt.md) | Бэкенд-долг: что отложено и до какого этапа |
+| [ux-debt.md](./ux-debt.md) | UX-долг фронтенда: открытые проблемы интерфейса |
 
 ### Исторические файлы (не актуальны как планы)
 
