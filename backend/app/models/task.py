@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -69,6 +69,9 @@ class Task(Base, UUIDMixin, TimestampMixin):
         default=GlobalStatus.open, nullable=False,
     )
     due_date: Mapped[date | None] = mapped_column(Date)
+    allow_multi_accept: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
@@ -93,6 +96,9 @@ class Assignment(Base, UUIDMixin, TimestampMixin):
     resolution_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("resolutions.id"))
 
     task: Mapped["Task"] = relationship("Task", back_populates="assignments")
+    solution: Mapped["Solution | None"] = relationship(  # noqa: F821
+        "Solution", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class TaskLink(Base, UUIDMixin, TimestampMixin):

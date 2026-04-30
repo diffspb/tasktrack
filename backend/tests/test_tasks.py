@@ -229,10 +229,11 @@ async def test_list_tasks_with_filter(
     assert all(t["global_status"] == "open" for t in open_r.json())
 
 
-async def test_multi_lead_sets_awaiting_decision(
+async def test_multi_lead_final_status_does_not_trigger_awaiting_decision(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    """Both leads complete their workflow → global_status must be awaiting_decision."""
+    """Phase-6 semantics: workflow personal status alone doesn't move
+    a multi-lead task to awaiting_decision. Only Solution.submit does."""
     ctx = await _setup_project_and_workflow(db_session, stub_user)
 
     other = User(id=uuid.uuid4(), email="other2@test.com",
@@ -263,14 +264,12 @@ async def test_multi_lead_sets_awaiting_decision(
         AssignmentCreate(user_id=other.id, role=AssigneeRole.lead), stub_user
     )
 
-    # lead1 (stub_user) completes via HTTP
     a1_id = a1.json()["id"]
     await client.patch(f"/api/v1/assignments/{a1_id}/status", json={"status_id": ctx["inprog_id"]})
     await client.patch(f"/api/v1/assignments/{a1_id}/status", json={
         "status_id": ctx["done_id"], "resolution_id": ctx["resolution_id"],
     })
 
-    # lead2 (other) completes via service layer (bypasses HTTP auth)
     await ts.transition_assignment_status(
         db_session, a2.id,
         AssignmentTransition(status_id=uuid.UUID(ctx["inprog_id"])), other,
@@ -284,7 +283,7 @@ async def test_multi_lead_sets_awaiting_decision(
     )
 
     task = (await client.get(f"/api/v1/tasks/{task_id}")).json()
-    assert task["global_status"] == "awaiting_decision"
+    assert task["global_status"] == "in_progress"
 
 
 async def test_transition_other_user_assignment_forbidden(

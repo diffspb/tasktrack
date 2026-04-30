@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.decision import Solution, SolutionStatus, TaskDecision
 from app.models.task import Assignment, AssigneeRole, GlobalStatus, Task
 from app.models.user import User
 from app.models.workflow import Status, StatusCategory
@@ -44,6 +45,7 @@ async def create_task(
         priority=data.priority,
         global_status=GlobalStatus.open,
         due_date=data.due_date,
+        allow_multi_accept=data.allow_multi_accept,
     )
     session.add(task)
     await session.commit()
@@ -103,6 +105,8 @@ async def update_task(
         task.decision_maker_id = data.decision_maker_id
     if data.due_date is not None:
         task.due_date = data.due_date
+    if data.allow_multi_accept is not None:
+        task.allow_multi_accept = data.allow_multi_accept
     task.version += 1
 
     await session.commit()
@@ -232,7 +236,20 @@ async def _get_assignment_or_404(
 
 
 async def _recalculate_global_status(session: AsyncSession, task: Task) -> None:
-    # TODO(phase-6): add .with_for_update() when running on PostgreSQL
+    """
+    Single-lead path: personal-status-based (open → in_progress → closed).
+    Multi-lead path: Solution-based — workflow personal status alone never
+    moves the task to awaiting_decision; that transition is owned by
+    decision_service.submit_solution. Same for in_revision / decided.
+    """
+    decided = await session.scalar(
+        select(TaskDecision).where(TaskDecision.task_id == task.id)
+    )
+    if decided is not None and task.global_status in (
+        GlobalStatus.decided, GlobalStatus.closed,
+    ):
+        return
+
     leads = list((await session.scalars(
         select(Assignment).where(
             Assignment.task_id == task.id,
@@ -244,18 +261,42 @@ async def _recalculate_global_status(session: AsyncSession, task: Task) -> None:
         task.global_status = GlobalStatus.open
         return
 
-    final_ids = set((await session.scalars(
-        select(Status.id).where(
-            Status.workflow_id == task.workflow_id,
-            Status.category == StatusCategory.final,
+    if len(leads) == 1:
+        final_ids = set((await session.scalars(
+            select(Status.id).where(
+                Status.workflow_id == task.workflow_id,
+                Status.category == StatusCategory.final,
+            )
+        )).all())
+        lead = leads[0]
+        if lead.current_status_id in final_ids:
+            task.global_status = GlobalStatus.closed
+        else:
+            task.global_status = GlobalStatus.in_progress
+        return
+
+    # Multi-lead: Solution-based.
+    solutions = list((await session.scalars(
+        select(Solution).where(
+            Solution.assignment_id.in_([a.id for a in leads])
         )
     )).all())
+    by_assignment = {s.assignment_id: s for s in solutions}
 
-    all_final = all(a.current_status_id in final_ids for a in leads)
+    if any(
+        (s := by_assignment.get(a.id)) is not None
+        and s.status == SolutionStatus.revision_requested
+        for a in leads
+    ):
+        task.global_status = GlobalStatus.in_revision
+        return
 
-    if all_final:
-        task.global_status = (
-            GlobalStatus.awaiting_decision if len(leads) > 1 else GlobalStatus.closed
-        )
+    all_submitted = all(
+        (s := by_assignment.get(a.id)) is not None
+        and s.status == SolutionStatus.submitted
+        for a in leads
+    )
+    if all_submitted:
+        task.global_status = GlobalStatus.awaiting_decision
     else:
         task.global_status = GlobalStatus.in_progress

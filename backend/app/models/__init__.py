@@ -4,6 +4,7 @@ from app.models.project import Project, ProjectMember, ProjectMemberRole, Projec
 from app.models.workflow import Status, StatusCategory, Transition, Workflow
 from app.models.resolution import Resolution
 from app.models.task import Assignment, AssigneeRole, GlobalStatus, Task, TaskLink, TaskLinkType, TaskPriority, TaskType
+from app.models.decision import DecisionCriteria, Solution, SolutionStatus, TaskDecision
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -13,4 +14,5 @@ __all__ = [
     "Resolution",
     "Task", "Assignment", "TaskLink", "GlobalStatus", "TaskType", "TaskPriority",
     "AssigneeRole", "TaskLinkType",
+    "Solution", "SolutionStatus", "DecisionCriteria", "TaskDecision",
 ]

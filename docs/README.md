@@ -20,7 +20,7 @@
 | 3. Задачи и назначения (S1 через API) | `impl-phase-3` | ✅ |
 | 4. Frontend scaffold + Projects UI | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
-| 6. Decision Process backend | `impl-phase-6` | 🔲 |
+| 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | 🔲 |
 | 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
 
@@ -68,6 +68,7 @@
 | [decisions/ADR-005](./decisions/ADR-005-product.md) | Сборник продуктовых решений |
 | [decisions/ADR-006](./decisions/ADR-006-phase2-model-decisions.md) | Решения по модели, принятые в Этапе 2 |
 | [decisions/ADR-007](./decisions/ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, токены |
+| [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment |
 
 ### Открытые хвосты
 
