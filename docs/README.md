@@ -84,7 +84,6 @@
 | [08-pre-design-tasks.md](./08-pre-design-tasks.md) | Чек-лист подготовки к проектированию — все блоки закрыты |
 | [11-analyst-tasks.md](./11-analyst-tasks.md) | Задачи аналитика — все выполнены |
 | [01-needs.md](./01-needs.md) | Исходные потребности («зачем») |
-| [06-next-steps.md](./06-next-steps.md) | Устаревший roadmap → редирект |
 
 ---
 
