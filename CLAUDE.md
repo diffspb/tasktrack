@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 8 (доводка + Alembic)**.
+Текущий этап: **реализация MVP, Этап 8 (доводка)**. Alembic и Keycloak отложены на post-MVP — см. `docs/tech-debt.md`.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -99,14 +99,14 @@ docs/
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
+| 8. Доводка | `mvp-research-launch` | 🔲 |
 
 ### Правила разработки
 
 - Тест пишется **до или вместе** с кодом сервиса, никогда после
 - `make test` обязателен перед каждым коммитом
 - Каждый этап — один коммит + тег `impl-phase-N`
-- **Миграции:** `metadata.create_all` в lifespan до Этапа 8, затем переключение на Alembic
+- **Миграции:** `metadata.create_all` в lifespan; Alembic отложен на post-MVP (см. `docs/tech-debt.md`)
 
 ### Тесты
 
