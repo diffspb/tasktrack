@@ -387,3 +387,72 @@ async def test_my_tasks(
     my = await client.get("/api/v1/users/me/tasks")
     assert my.status_code == 200
     assert any(t["id"] == task_id for t in my.json())
+
+
+async def test_my_tasks_filters(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    ctx = await _setup_project_and_workflow(db_session, stub_user)
+
+    # Reporter without assignment
+    r1 = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
+        "title": "T1 reporter only", "workflow_id": ctx["workflow_id"],
+    })
+    rep_id = r1.json()["id"]
+
+    # Lead assignment
+    r2 = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
+        "title": "T2 assignee", "workflow_id": ctx["workflow_id"],
+    })
+    a2_id = r2.json()["id"]
+    await client.post(f"/api/v1/tasks/{a2_id}/assignments", json={
+        "user_id": str(stub_user.id), "role": "lead",
+    })
+
+    # DM only — assign reporter to be someone else via service
+    other = User(id=uuid.uuid4(), email=f"dm-{uuid.uuid4().hex[:6]}@test.com",
+                 display_name="Other", keycloak_id=str(uuid.uuid4()), is_active=True)
+    db_session.add(other)
+    await db_session.flush()
+    from app.models.project import ProjectMember, ProjectMemberRole
+    db_session.add(ProjectMember(
+        project_id=uuid.UUID(ctx["project_id"]), user_id=other.id,
+        role=ProjectMemberRole.member,
+    ))
+    await db_session.commit()
+
+    from app.schemas.task import TaskCreate
+    from app.services import task_service as ts
+    dm_task = await ts.create_task(
+        db_session, uuid.UUID(ctx["project_id"]),
+        TaskCreate(
+            title="T3 DM only", workflow_id=uuid.UUID(ctx["workflow_id"]),
+            decision_maker_id=stub_user.id,
+        ), other,
+    )
+
+    # Default — all three
+    all_r = await client.get("/api/v1/users/me/tasks")
+    ids = {t["id"] for t in all_r.json()}
+    assert rep_id in ids and a2_id in ids and str(dm_task.id) in ids
+
+    # role=reporter
+    rep_r = await client.get("/api/v1/users/me/tasks?role=reporter")
+    assert {t["id"] for t in rep_r.json()} >= {rep_id, a2_id}
+    assert str(dm_task.id) not in {t["id"] for t in rep_r.json()}
+
+    # role=assignee
+    asg_r = await client.get("/api/v1/users/me/tasks?role=assignee")
+    asg_ids = {t["id"] for t in asg_r.json()}
+    assert a2_id in asg_ids
+    assert rep_id not in asg_ids
+    assert str(dm_task.id) not in asg_ids
+
+    # role=dm
+    dm_r = await client.get("/api/v1/users/me/tasks?role=dm")
+    dm_ids = {t["id"] for t in dm_r.json()}
+    assert dm_ids == {str(dm_task.id)}
+
+    # global_status filter
+    open_r = await client.get("/api/v1/users/me/tasks?global_status=open")
+    assert all(t["global_status"] == "open" for t in open_r.json())
