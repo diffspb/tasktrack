@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    decisions, dev, health, notifications, projects, resolutions, solutions,
-    tasks, users, workflows,
+    decisions, dev, health, notifications, projects, resolutions, search,
+    solutions, tasks, users, workflows,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -15,4 +15,5 @@ router.include_router(users.router)
 router.include_router(solutions.router)
 router.include_router(decisions.router)
 router.include_router(notifications.router)
+router.include_router(search.router)
 router.include_router(dev.router)

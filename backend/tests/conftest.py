@@ -27,6 +27,10 @@ def postgres_container():
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def async_engine(postgres_container):
+    from sqlalchemy import text
+
+    from app.core.db import _FTS_DDL
+
     host = postgres_container.get_container_host_ip()
     port = postgres_container.get_exposed_port(5432)
     url = (
@@ -37,6 +41,8 @@ async def async_engine(postgres_container):
     engine = create_async_engine(url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        for stmt in _FTS_DDL:
+            await conn.execute(text(stmt))
     yield engine
     await engine.dispose()
 

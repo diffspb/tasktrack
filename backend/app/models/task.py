@@ -3,6 +3,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -74,6 +75,8 @@ class Task(Base, UUIDMixin, TimestampMixin):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Updated by a Postgres trigger; see app.core.db.create_tables.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
 
     assignments: Mapped[list["Assignment"]] = relationship(
         "Assignment", back_populates="task", cascade="all, delete-orphan"

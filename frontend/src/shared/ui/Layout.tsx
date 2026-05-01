@@ -4,6 +4,7 @@ import { AppSidebar } from './AppSidebar'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumbs } from './Breadcrumbs'
 import { NotificationBell } from '@/features/notifications/NotificationBell'
+import { SearchBar } from '@/features/search/SearchBar'
 
 export function Layout() {
   return (
@@ -15,6 +16,7 @@ export function Layout() {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumbs />
           <div className="flex-1" />
+          <SearchBar />
           <NotificationBell />
         </header>
         <main className="flex-1 overflow-auto">
