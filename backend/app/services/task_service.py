@@ -16,6 +16,7 @@ from app.schemas.task import (
     TaskCreate,
     TaskUpdate,
 )
+from app.services import notification_service
 from app.services.permissions import require_project_access
 from app.services.workflow_service import validate_transition
 
@@ -149,6 +150,11 @@ async def assign_user(
     await session.flush()
 
     await _recalculate_global_status(session, task)
+
+    # Don't notify yourself if you're self-assigning ("Assign to me").
+    if assignment.user_id != user.id:
+        await notification_service.notify_task_assigned(session, task, assignment)
+
     await session.commit()
     await session.refresh(assignment)
     return assignment

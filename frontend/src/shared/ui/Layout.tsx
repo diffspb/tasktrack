@@ -3,6 +3,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { AppSidebar } from './AppSidebar'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumbs } from './Breadcrumbs'
+import { NotificationBell } from '@/features/notifications/NotificationBell'
 
 export function Layout() {
   return (
@@ -13,6 +14,8 @@ export function Layout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumbs />
+          <div className="flex-1" />
+          <NotificationBell />
         </header>
         <main className="flex-1 overflow-auto">
           <Outlet />
