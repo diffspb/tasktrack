@@ -456,3 +456,61 @@ async def test_my_tasks_filters(
     # global_status filter
     open_r = await client.get("/api/v1/users/me/tasks?global_status=open")
     assert all(t["global_status"] == "open" for t in open_r.json())
+
+
+# ─── P2 error-path tests ────────────────────────────────────────────────────
+
+async def test_get_task_not_found(client: AsyncClient):
+    r = await client.get(f"/api/v1/tasks/{uuid.uuid4()}")
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "TASK_NOT_FOUND"
+
+
+async def test_patch_task_not_found(client: AsyncClient):
+    r = await client.patch(f"/api/v1/tasks/{uuid.uuid4()}", json={"title": "X", "version": 1})
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "TASK_NOT_FOUND"
+
+
+async def test_delete_task_not_found(client: AsyncClient):
+    r = await client.delete(f"/api/v1/tasks/{uuid.uuid4()}")
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "TASK_NOT_FOUND"
+
+
+async def test_assignment_status_not_found(client: AsyncClient):
+    r = await client.patch(f"/api/v1/assignments/{uuid.uuid4()}/status", json={"status_id": str(uuid.uuid4())})
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "ASSIGNMENT_NOT_FOUND"
+
+
+async def test_assign_user_no_default_status(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    """assign_user raises WORKFLOW_NO_DEFAULT_STATUS when workflow has no default status."""
+    project = await project_service.create_project(
+        db_session, ProjectCreate(name="NoDefault", key=_rnd_key()), stub_user
+    )
+    from app.schemas.workflow import WorkflowCreate, StatusCreate
+    from app.services import workflow_service
+    wf = await workflow_service.create_workflow(
+        db_session, project.id, WorkflowCreate(name="WF"), stub_user
+    )
+    # Create status but NOT as default
+    await workflow_service.create_status(
+        db_session, wf.id,
+        StatusCreate(name="Open", category=StatusCategory.initial, is_default=False),
+        stub_user,
+    )
+    from app.schemas.task import TaskCreate
+    from app.services import task_service
+    task = await task_service.create_task(
+        db_session, project.id,
+        TaskCreate(title="T", workflow_id=wf.id), stub_user,
+    )
+
+    r = await client.post(f"/api/v1/tasks/{task.id}/assignments", json={
+        "user_id": str(stub_user.id), "role": "lead",
+    })
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "WORKFLOW_NO_DEFAULT_STATUS"

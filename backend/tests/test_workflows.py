@@ -406,3 +406,86 @@ async def test_delete_workflow_with_tasks_blocked(
     r = await client.delete(f"/api/v1/workflows/{wf_non_default.id}")
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "WORKFLOW_HAS_TASKS"
+
+
+# ─── P2 error-path and happy-path tests ────────────────────────────────────
+
+async def test_update_workflow_name(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid, "Old Name")
+
+    r = await client.patch(f"/api/v1/workflows/{wf['id']}", json={"name": "New Name"})
+    assert r.status_code == 200
+    assert r.json()["name"] == "New Name"
+
+
+async def test_update_status_name(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    s = await _make_status(client, wf["id"], "Old", StatusCategory.intermediate)
+
+    r = await client.patch(f"/api/v1/statuses/{s['id']}", json={"name": "Renamed"})
+    assert r.status_code == 200
+    assert r.json()["name"] == "Renamed"
+
+
+async def test_status_default_must_be_initial_via_patch(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    """PATCH a final status to is_default=True should fail."""
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    done = await _make_status(client, wf["id"], "Done", StatusCategory.final)
+
+    r = await client.patch(f"/api/v1/statuses/{done['id']}", json={"is_default": True})
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "STATUS_DEFAULT_MUST_BE_INITIAL"
+
+
+async def test_migrate_status_mismatch_workflow(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    """Migrating to a status from a different workflow → STATUS_WORKFLOW_MISMATCH."""
+    pid = await _make_project(db_session, stub_user)
+    wf1 = await _make_workflow(client, pid, "WF1")
+    wf2_r = await client.post(f"/api/v1/projects/{pid}/workflows", json={"name": "WF2"})
+    wf2 = wf2_r.json()
+
+    src = await _make_status(client, wf1["id"], "Src", StatusCategory.intermediate)
+    tgt = await _make_status(client, wf2["id"], "Tgt", StatusCategory.intermediate)
+
+    r = await client.post(f"/api/v1/statuses/{src['id']}/migrate",
+                          json={"target_status_id": tgt["id"]})
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "STATUS_WORKFLOW_MISMATCH"
+
+
+async def test_delete_transition_not_found(client: AsyncClient):
+    r = await client.delete(f"/api/v1/transitions/{uuid.uuid4()}")
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "TRANSITION_NOT_FOUND"
+
+
+async def test_delete_transition_happy_path(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _make_project(db_session, stub_user)
+    wf = await _make_workflow(client, pid)
+    todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial)
+    inprog = await _make_status(client, wf["id"], "In Prog", StatusCategory.intermediate)
+
+    tr_r = await client.post(f"/api/v1/workflows/{wf['id']}/transitions", json={
+        "from_status_id": todo["id"],
+        "to_status_id": inprog["id"],
+    })
+    tr_id = tr_r.json()["id"]
+
+    del_r = await client.delete(f"/api/v1/transitions/{tr_id}")
+    assert del_r.status_code == 204
+
+    wf_data = (await client.get(f"/api/v1/workflows/{wf['id']}")).json()
+    assert all(t["id"] != tr_id for t in wf_data["transitions"])
