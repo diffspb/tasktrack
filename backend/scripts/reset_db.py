@@ -18,14 +18,25 @@ from app.models import (
 
 
 async def reset() -> None:
+    from sqlalchemy import text
+    from app.core.db import _FTS_DDL
+
     engine = create_async_engine(settings.database_url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+        for stmt in _FTS_DDL:
+            await conn.execute(text(stmt))
 
     Session = async_sessionmaker(engine, expire_on_commit=False)
     async with Session() as session:
         await seed(session)
+
+    # Backfill search_vector for all tasks inserted during seed
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "UPDATE tasks SET title = title"
+        ))
 
     await engine.dispose()
     print("✓ Database reset and seeded")
