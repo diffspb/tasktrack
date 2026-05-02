@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks, useProjectWorkflows, useProjectMembers, useTransitionStatus,
-  type Status,
+  useProjectTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers,
+  useTransitionStatus, type Status,
 } from './api'
 import { TaskCard } from './TaskCard'
+import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 
 function BoardSkeleton() {
@@ -27,7 +29,8 @@ function BoardSkeleton() {
 
 export function TaskBoard() {
   const { id: projectId } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
@@ -35,6 +38,7 @@ export function TaskBoard() {
 
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
+  const { data: resolutions = [] } = useProjectResolutions(projectId ?? '')
   const { data: membersData } = useProjectMembers(projectId)
   const transition = useTransitionStatus(projectId ?? '')
 
@@ -43,6 +47,7 @@ export function TaskBoard() {
     () => [...(defaultWorkflow?.statuses ?? [])].sort((a, b) => a.position - b.position),
     [defaultWorkflow],
   )
+  const transitions = defaultWorkflow?.transitions ?? []
 
   const userById = useMemo(
     () => new Map(membersData?.items.map(m => [m.user.id, m.user]) ?? []),
@@ -53,6 +58,8 @@ export function TaskBoard() {
     () => (tasks ?? []).filter(t => !t.deleted_at),
     [tasks],
   )
+
+  const selectedTask = activeTasks.find(t => t.id === selectedTaskId) ?? null
 
   async function handleDrop(targetStatusId: string) {
     if (!draggedId) return
@@ -66,7 +73,7 @@ export function TaskBoard() {
     } catch (err) {
       const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
       if (code === 'RESOLUTION_REQUIRED') {
-        navigate(`/tasks/${task.key}`)
+        setSelectedTaskId(task.id)
       } else if (code === 'WORKFLOW_TRANSITION_NOT_ALLOWED') {
         showError('That transition is not allowed in this workflow.')
       } else if (code === 'TASK_BLOCKED_BY_SUBTASKS') {
@@ -115,7 +122,6 @@ export function TaskBoard() {
             const isOver = dragOverCol === status.id
             return (
               <div key={status.id} className="flex flex-col w-[280px] shrink-0">
-                {/* Column header */}
                 <div className="flex items-center gap-2 pb-2.5 px-1">
                   <div
                     className="h-2 w-2 rounded-full"
@@ -140,7 +146,6 @@ export function TaskBoard() {
                   </button>
                 </div>
 
-                {/* Drop zone */}
                 <div
                   onDragOver={e => { e.preventDefault(); setDragOverCol(status.id) }}
                   onDragLeave={e => {
@@ -167,7 +172,7 @@ export function TaskBoard() {
                       task={task}
                       assigneeName={task.assignee_id ? userById.get(task.assignee_id)?.display_name : undefined}
                       isDragging={draggedId === task.id}
-                      onClick={() => navigate(`/tasks/${task.key}`)}
+                      onClick={() => setSelectedTaskId(task.id)}
                       onDragStart={() => setDraggedId(task.id)}
                       onDragEnd={() => { setDraggedId(null); setDragOverCol(null) }}
                     />
@@ -183,6 +188,16 @@ export function TaskBoard() {
           })}
         </div>
       </div>
+
+      <TaskDetail
+        task={selectedTask}
+        statuses={statuses}
+        transitions={transitions}
+        resolutions={resolutions}
+        projectId={projectId ?? ''}
+        currentUserId={user?.id ?? ''}
+        onClose={() => setSelectedTaskId(null)}
+      />
 
       <CreateTaskModal
         open={createOpen}

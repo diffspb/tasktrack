@@ -1,4 +1,5 @@
-import { Zap, LayoutDashboard, Kanban, List, Users, Settings } from 'lucide-react'
+import { useEffect } from 'react'
+import { Zap, LayoutDashboard, Kanban, List, Settings } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -8,22 +9,36 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { useProject } from '@/features/projects/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
+const LAST_PROJECT_KEY = 'tt_last_project'
+
 const TOP_NAV = [
   { to: '/projects', icon: List, label: 'All Projects' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
 ]
 
 const PROJECT_NAV = [
-  { icon: Kanban, label: 'Board',    suffix: 'board' },
-  { icon: List,   label: 'Backlog',  suffix: 'backlog' },
-  { icon: Users,  label: 'Members',  suffix: 'members' },
+  { icon: Kanban,   label: 'Board',    suffix: 'board' },
+  { icon: List,     label: 'Backlog',  suffix: 'backlog' },
   { icon: Settings, label: 'Settings', suffix: 'settings' },
 ]
 
 export function AppSidebar() {
   const { user, stubUsers, switchStubUser } = useAuth()
   const projectMatch = useMatch('/projects/:id/*')
-  const projectId = projectMatch?.params.id
+  const routeProjectId = projectMatch?.params.id
+
+  // Remember last project; clear when user goes to /projects list
+  const allProjectsMatch = useMatch('/projects')
+  useEffect(() => {
+    if (routeProjectId) {
+      sessionStorage.setItem(LAST_PROJECT_KEY, routeProjectId)
+    } else if (allProjectsMatch) {
+      sessionStorage.removeItem(LAST_PROJECT_KEY)
+    }
+  }, [routeProjectId, allProjectsMatch])
+
+  // Show project nav for current route OR last visited project
+  const projectId = routeProjectId ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
   const { data: project } = useProject(projectId)
 
   return (

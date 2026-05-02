@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import type { Task } from './api'
 
@@ -20,7 +21,7 @@ interface Props {
   task: Task
   assigneeName?: string
   isDragging: boolean
-  onClick: () => void
+  onClick: () => void        // opens detail sheet
   onDragStart: () => void
   onDragEnd: () => void
 }
@@ -37,9 +38,9 @@ export function TaskCard({ task, assigneeName, isDragging, onClick, onDragStart,
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'relative cursor-grab overflow-hidden rounded-lg border bg-card px-3 py-2.5 select-none',
+        'relative cursor-pointer overflow-hidden rounded-lg border bg-card px-3 py-2.5 select-none',
         'transition-shadow hover:shadow-md hover:border-ring/40',
-        isDragging && 'opacity-40 cursor-grabbing',
+        isDragging && 'opacity-40',
       )}
     >
       <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg" style={{ background: priorityColor }} />
@@ -52,7 +53,14 @@ export function TaskCard({ task, assigneeName, isDragging, onClick, onDragStart,
           >
             {typeKey}
           </span>
-          <span className="font-mono text-[11px] font-semibold text-muted-foreground/70">{task.key}</span>
+          {/* Key is a link to the full task page — stops propagation to avoid opening sheet */}
+          <Link
+            to={`/tasks/${task.key}`}
+            onClick={e => e.stopPropagation()}
+            className="font-mono text-[11px] font-semibold text-muted-foreground/70 hover:text-primary hover:underline transition-colors"
+          >
+            {task.key}
+          </Link>
         </div>
 
         <p className="text-[13px] font-medium leading-snug line-clamp-2">{task.title}</p>

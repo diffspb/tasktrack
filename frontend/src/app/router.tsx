@@ -1,11 +1,11 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/shared/ui/Layout'
 import { ProjectList } from '@/features/projects/ProjectList'
+import { ProjectSettings } from '@/features/projects/ProjectSettings'
 import { TaskBoard } from '@/features/tasks/TaskBoard'
 import { TaskBacklog } from '@/features/tasks/TaskBacklog'
 import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
-import { Placeholder } from '@/shared/ui/Placeholder'
 
 export const router = createBrowserRouter([
   {
@@ -13,13 +13,13 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'projects', element: <ProjectList /> },
-      { path: 'projects/:id/board',    element: <TaskBoard /> },
-      { path: 'projects/:id/backlog',  element: <TaskBacklog /> },
-      { path: 'projects/:id/members',  element: <Placeholder title="Members"   /> },
-      { path: 'projects/:id/settings', element: <Placeholder title="Settings"  /> },
-      { path: 'tasks/:key',            element: <TaskPage /> },
-      { path: 'dashboard',             element: <Dashboard /> },
+      { path: 'projects',                   element: <ProjectList /> },
+      { path: 'projects/:id/board',         element: <TaskBoard /> },
+      { path: 'projects/:id/backlog',       element: <TaskBacklog /> },
+      { path: 'projects/:id/settings',      element: <ProjectSettings /> },
+      { path: 'projects/:id/members',       element: <Navigate to="../settings" replace /> },
+      { path: 'tasks/:key',                 element: <TaskPage /> },
+      { path: 'dashboard',                  element: <Dashboard /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },
