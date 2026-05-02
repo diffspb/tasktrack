@@ -23,7 +23,6 @@ async def search_tasks(
     if not q.strip():
         return []
 
-    # Restricted/private projects: user must be a member.
     member_subq = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
     visibility_cond = (
         (Project.visibility == ProjectVisibility.public)
@@ -59,7 +58,7 @@ async def search_tasks(
     return [
         {
             "id": t.id, "key": t.key, "title": t.title,
-            "global_status": t.global_status,
+            "current_status_id": str(t.current_status_id),
             "project": {"id": p.id, "key": p.key, "name": p.name},
             "highlight": h,
         }

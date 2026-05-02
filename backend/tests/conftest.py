@@ -28,8 +28,10 @@ def postgres_container():
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def async_engine(postgres_container):
     from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from app.core.db import _FTS_DDL
+    from app.models.task_type import TaskType
 
     host = postgres_container.get_container_host_ip()
     port = postgres_container.get_exposed_port(5432)
@@ -43,6 +45,20 @@ async def async_engine(postgres_container):
         await conn.run_sync(Base.metadata.create_all)
         for stmt in _FTS_DDL:
             await conn.execute(text(stmt))
+
+    # Seed system task types (shared across all tests, never rolled back)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as session:
+        for key, name, icon, color in [
+            ("task",     "Задача",  "check-square", "#6366f1"),
+            ("bug",      "Баг",     "bug",          "#ef4444"),
+            ("story",    "История", "book-open",    "#10b981"),
+            ("epic",     "Эпик",    "zap",          "#f59e0b"),
+            ("decision", "Decision","git-branch",   "#8b5cf6"),
+        ]:
+            session.add(TaskType(key=key, name=name, is_system=True, icon=icon, color=color))
+        await session.commit()
+
     yield engine
     await engine.dispose()
 

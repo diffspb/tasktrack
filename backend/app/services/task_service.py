@@ -5,17 +5,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.decision import Solution, SolutionStatus, TaskDecision
-from app.models.task import Assignment, AssigneeRole, GlobalStatus, Task
+from app.models.task import Task, TaskPriority
+from app.models.task_type import TaskType
 from app.models.user import User
-from app.models.workflow import Status, StatusCategory
-from app.schemas.task import (
-    AssignmentCreate,
-    AssignmentRoleUpdate,
-    AssignmentTransition,
-    TaskCreate,
-    TaskUpdate,
-)
+from app.models.workflow import Status, StatusCategory, Workflow
+from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.services import notification_service
 from app.services.permissions import require_project_access
 from app.services.workflow_service import validate_transition
@@ -26,9 +20,30 @@ async def create_task(
 ) -> Task:
     await require_project_access(session, project_id, user)
 
-    project = await session.get(
-        __import__("app.models.project", fromlist=["Project"]).Project, project_id
+    from app.models.project import Project
+    project = await session.get(Project, project_id)
+
+    workflow_id = data.workflow_id
+    if workflow_id is None:
+        wf = await session.scalar(
+            select(Workflow).where(
+                Workflow.project_id == project_id, Workflow.is_default.is_(True)
+            )
+        )
+        if not wf:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "NO_DEFAULT_WORKFLOW"})
+        workflow_id = wf.id
+
+    default_status = await session.scalar(
+        select(Status).where(
+            Status.workflow_id == workflow_id, Status.is_default.is_(True)
+        )
     )
+    if not default_status:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_NO_DEFAULT_STATUS"})
+
+    task_type = await _resolve_task_type(session, data.task_type_key, project_id)
+
     count = await session.scalar(
         select(func.count()).select_from(Task).where(Task.project_id == project_id)
     ) or 0
@@ -36,19 +51,25 @@ async def create_task(
 
     task = Task(
         project_id=project_id,
-        workflow_id=data.workflow_id,
+        workflow_id=workflow_id,
+        task_type_id=task_type.id,
         reporter_id=user.id,
-        decision_maker_id=data.decision_maker_id,
+        assignee_id=data.assignee_id,
+        parent_task_id=data.parent_task_id,
+        current_status_id=default_status.id,
         key=key,
         title=data.title,
         description=data.description,
-        task_type=data.task_type,
         priority=data.priority,
-        global_status=GlobalStatus.open,
         due_date=data.due_date,
-        allow_multi_accept=data.allow_multi_accept,
+        meta=data.meta,
     )
     session.add(task)
+    await session.flush()
+
+    if data.assignee_id and data.assignee_id != user.id:
+        await notification_service.notify_task_assigned(session, task)
+
     await session.commit()
     return await _load_task(session, task.id)
 
@@ -63,18 +84,49 @@ async def get_task(
     return task
 
 
+async def get_task_by_key(
+    session: AsyncSession, key: str, user: User
+) -> Task:
+    task = await session.scalar(
+        select(Task)
+        .options(selectinload(Task.task_type), selectinload(Task.subtasks))
+        .where(Task.key == key, Task.deleted_at.is_(None))
+    )
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TASK_NOT_FOUND"})
+    await require_project_access(session, task.project_id, user)
+    return task
+
+
 async def list_tasks(
-    session: AsyncSession, project_id: uuid.UUID, user: User,
-    global_status: GlobalStatus | None = None,
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    user: User,
+    *,
+    status_id: uuid.UUID | None = None,
+    assignee_id: uuid.UUID | None = None,
+    task_type_key: str | None = None,
+    parent_task_id: uuid.UUID | None = None,
+    include_subtasks: bool = True,
 ) -> list[Task]:
     await require_project_access(session, project_id, user)
     stmt = (
         select(Task)
-        .options(selectinload(Task.assignments))
+        .options(selectinload(Task.task_type))
         .where(Task.project_id == project_id, Task.deleted_at.is_(None))
     )
-    if global_status:
-        stmt = stmt.where(Task.global_status == global_status)
+    if status_id:
+        stmt = stmt.where(Task.current_status_id == status_id)
+    if assignee_id:
+        stmt = stmt.where(Task.assignee_id == assignee_id)
+    if task_type_key:
+        stmt = stmt.join(TaskType, Task.task_type_id == TaskType.id).where(
+            TaskType.key == task_type_key
+        )
+    if not include_subtasks:
+        stmt = stmt.where(Task.parent_task_id.is_(None))
+    elif parent_task_id is not None:
+        stmt = stmt.where(Task.parent_task_id == parent_task_id)
     return list((await session.scalars(stmt)).all())
 
 
@@ -83,38 +135,23 @@ async def list_my_tasks(
     user: User,
     *,
     role: str | None = None,
-    global_status: GlobalStatus | None = None,
+    status_id: uuid.UUID | None = None,
     project_id: uuid.UUID | None = None,
 ) -> list[Task]:
-    """
-    Tasks where current user is involved.
-      role=None       → assignee OR reporter OR decision_maker (default dashboard view)
-      role=assignee   → has Assignment
-      role=reporter   → reporter_id matches
-      role=dm         → decision_maker_id matches
-    """
-    assigned_ids = select(Assignment.task_id).where(Assignment.user_id == user.id)
-
     if role == "assignee":
-        cond = Task.id.in_(assigned_ids)
+        cond = Task.assignee_id == user.id
     elif role == "reporter":
         cond = Task.reporter_id == user.id
-    elif role == "dm":
-        cond = Task.decision_maker_id == user.id
     else:
-        cond = (
-            Task.id.in_(assigned_ids)
-            | (Task.reporter_id == user.id)
-            | (Task.decision_maker_id == user.id)
-        )
+        cond = (Task.assignee_id == user.id) | (Task.reporter_id == user.id)
 
     stmt = (
         select(Task)
-        .options(selectinload(Task.assignments))
+        .options(selectinload(Task.task_type))
         .where(cond, Task.deleted_at.is_(None))
     )
-    if global_status:
-        stmt = stmt.where(Task.global_status == global_status)
+    if status_id:
+        stmt = stmt.where(Task.current_status_id == status_id)
     if project_id:
         stmt = stmt.where(Task.project_id == project_id)
     return list((await session.scalars(stmt)).all())
@@ -128,19 +165,24 @@ async def update_task(
     if data.version != task.version:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VERSION_CONFLICT"})
 
+    old_assignee = task.assignee_id
+
     if data.title is not None:
         task.title = data.title
     if data.description is not None:
         task.description = data.description
     if data.priority is not None:
         task.priority = data.priority
-    if data.decision_maker_id is not None:
-        task.decision_maker_id = data.decision_maker_id
+    if data.assignee_id is not None:
+        task.assignee_id = data.assignee_id
     if data.due_date is not None:
         task.due_date = data.due_date
-    if data.allow_multi_accept is not None:
-        task.allow_multi_accept = data.allow_multi_accept
+    if data.meta is not None:
+        task.meta = {**task.meta, **data.meta}
     task.version += 1
+
+    if data.assignee_id and data.assignee_id != old_assignee and data.assignee_id != user.id:
+        await notification_service.notify_task_assigned(session, task)
 
     await session.commit()
     return await _load_task(session, task.id)
@@ -155,103 +197,38 @@ async def delete_task(
     await session.commit()
 
 
-async def assign_user(
-    session: AsyncSession, task_id: uuid.UUID, data: AssignmentCreate, user: User
-) -> Assignment:
+async def transition_status(
+    session: AsyncSession,
+    task_id: uuid.UUID,
+    data: TaskStatusTransition,
+    user: User,
+) -> Task:
     task = await get_task(session, task_id, user)
 
-    initial_status = await session.scalar(
-        select(Status).where(
-            Status.workflow_id == task.workflow_id,
-            Status.is_default == True,  # noqa: E712
-        )
-    )
-    if not initial_status:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            {"code": "WORKFLOW_NO_DEFAULT_STATUS"},
-        )
-
-    assignment = Assignment(
-        task_id=task_id,
-        user_id=data.user_id,
-        role=data.role,
-        current_status_id=initial_status.id,
-    )
-    session.add(assignment)
-    await session.flush()
-
-    await _recalculate_global_status(session, task)
-
-    # Don't notify yourself if you're self-assigning ("Assign to me").
-    if assignment.user_id != user.id:
-        await notification_service.notify_task_assigned(session, task, assignment)
-
-    await session.commit()
-    await session.refresh(assignment)
-    return assignment
-
-
-async def transition_assignment_status(
-    session: AsyncSession,
-    assignment_id: uuid.UUID,
-    data: AssignmentTransition,
-    user: User,
-) -> Assignment:
-    assignment = await _get_assignment_or_404(session, assignment_id)
-    task = await get_task(session, assignment.task_id, user)
-
-    if assignment.user_id != user.id:
+    if task.assignee_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
     if not await validate_transition(
-        session, task.workflow_id, assignment.current_status_id, data.status_id
+        session, task.workflow_id, task.current_status_id, data.status_id
     ):
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"},
+            status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"}
         )
 
     target = await session.get(Status, data.status_id)
     if target and target.category == StatusCategory.final and data.resolution_id is None:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            {"code": "RESOLUTION_REQUIRED"},
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "RESOLUTION_REQUIRED"})
 
-    assignment.current_status_id = data.status_id
-    assignment.resolution_id = data.resolution_id
+    # Decision-type task: blocked until all subtasks have solution_comment_id in meta.
+    if task.task_type and task.task_type.key == "decision":
+        await _check_decision_task_unblocked(session, task)
 
-    await _recalculate_global_status(session, task)
+    task.current_status_id = data.status_id
+    if data.resolution_id:
+        task.meta = {**task.meta, "resolution_id": str(data.resolution_id)}
+
     await session.commit()
-    await session.refresh(assignment)
-    return assignment
-
-
-async def update_assignment_role(
-    session: AsyncSession,
-    assignment_id: uuid.UUID,
-    data: AssignmentRoleUpdate,
-    user: User,
-) -> Assignment:
-    assignment = await _get_assignment_or_404(session, assignment_id)
-    task = await get_task(session, assignment.task_id, user)
-
-    assignment.role = data.role
-    await _recalculate_global_status(session, task)
-    await session.commit()
-    await session.refresh(assignment)
-    return assignment
-
-
-async def remove_assignment(
-    session: AsyncSession, assignment_id: uuid.UUID, user: User
-) -> None:
-    assignment = await _get_assignment_or_404(session, assignment_id)
-    task = await get_task(session, assignment.task_id, user)
-    await session.delete(assignment)
-    await _recalculate_global_status(session, task)
-    await session.commit()
+    return await _load_task(session, task.id)
 
 
 # --- Internal helpers ---
@@ -259,82 +236,45 @@ async def remove_assignment(
 async def _load_task(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
     return await session.scalar(
         select(Task)
-        .options(selectinload(Task.assignments))
+        .options(selectinload(Task.task_type), selectinload(Task.subtasks))
         .where(Task.id == task_id)
     )
 
 
-async def _get_assignment_or_404(
-    session: AsyncSession, assignment_id: uuid.UUID
-) -> Assignment:
-    a = await session.get(Assignment, assignment_id)
-    if not a:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "ASSIGNMENT_NOT_FOUND"})
-    return a
-
-
-async def _recalculate_global_status(session: AsyncSession, task: Task) -> None:
-    """
-    Single-lead path: personal-status-based (open → in_progress → closed).
-    Multi-lead path: Solution-based — workflow personal status alone never
-    moves the task to awaiting_decision; that transition is owned by
-    decision_service.submit_solution. Same for in_revision / decided.
-    """
-    decided = await session.scalar(
-        select(TaskDecision).where(TaskDecision.task_id == task.id)
+async def _resolve_task_type(
+    session: AsyncSession, key: str, project_id: uuid.UUID
+) -> TaskType:
+    task_type = await session.scalar(
+        select(TaskType).where(
+            TaskType.key == key,
+            (TaskType.project_id == project_id) | TaskType.project_id.is_(None),
+        ).order_by(TaskType.project_id.nulls_last())
     )
-    if decided is not None and task.global_status in (
-        GlobalStatus.decided, GlobalStatus.closed,
-    ):
-        return
-
-    leads = list((await session.scalars(
-        select(Assignment).where(
-            Assignment.task_id == task.id,
-            Assignment.role == AssigneeRole.lead,
+    if not task_type:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            {"code": "TASK_TYPE_NOT_FOUND", "key": key},
         )
+    return task_type
+
+
+async def _check_decision_task_unblocked(
+    session: AsyncSession, task: Task
+) -> None:
+    subtasks = list((await session.scalars(
+        select(Task).where(Task.parent_task_id == task.id, Task.deleted_at.is_(None))
     )).all())
-
-    if not leads:
-        task.global_status = GlobalStatus.open
+    if not subtasks:
         return
-
-    if len(leads) == 1:
-        final_ids = set((await session.scalars(
-            select(Status.id).where(
-                Status.workflow_id == task.workflow_id,
-                Status.category == StatusCategory.final,
-            )
-        )).all())
-        lead = leads[0]
-        if lead.current_status_id in final_ids:
-            task.global_status = GlobalStatus.closed
-        else:
-            task.global_status = GlobalStatus.in_progress
-        return
-
-    # Multi-lead: Solution-based.
-    solutions = list((await session.scalars(
-        select(Solution).where(
-            Solution.assignment_id.in_([a.id for a in leads])
-        )
-    )).all())
-    by_assignment = {s.assignment_id: s for s in solutions}
-
-    if any(
-        (s := by_assignment.get(a.id)) is not None
-        and s.status == SolutionStatus.revision_requested
-        for a in leads
-    ):
-        task.global_status = GlobalStatus.in_revision
-        return
-
-    all_submitted = all(
-        (s := by_assignment.get(a.id)) is not None
-        and s.status == SolutionStatus.submitted
-        for a in leads
+    all_ready = all(
+        bool(st.meta.get("solution_comment_id")) for st in subtasks
     )
-    if all_submitted:
-        task.global_status = GlobalStatus.awaiting_decision
-    else:
-        task.global_status = GlobalStatus.in_progress
+    if not all_ready:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, {"code": "TASK_BLOCKED_BY_SUBTASKS"}
+        )
+
+
+def get_decision_maker_id(task: Task) -> uuid.UUID | None:
+    """Abstraction layer: currently DM = assignee of the decision task."""
+    return task.assignee_id

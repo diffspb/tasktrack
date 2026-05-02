@@ -14,7 +14,7 @@ from app.models.notification import (
     NotificationEntityType,
     NotificationEventType,
 )
-from app.models.task import Assignment, Task
+from app.models.task import Task
 
 
 async def notify(
@@ -41,12 +41,12 @@ async def notify(
 
 # --- High-level emitters used from business services ---------------------
 
-async def notify_task_assigned(
-    session: AsyncSession, task: Task, assignment: Assignment,
-) -> None:
+async def notify_task_assigned(session: AsyncSession, task: Task) -> None:
+    if task.assignee_id is None:
+        return
     await notify(
         session,
-        recipient_id=assignment.user_id,
+        recipient_id=task.assignee_id,
         event_type=NotificationEventType.task_assigned,
         entity_type=NotificationEntityType.task,
         entity_id=task.id,
@@ -56,68 +56,32 @@ async def notify_task_assigned(
 
 
 async def notify_awaiting_decision(session: AsyncSession, task: Task) -> None:
-    if task.decision_maker_id is None:
+    dm_id = task.assignee_id
+    if dm_id is None:
         return
     await notify(
         session,
-        recipient_id=task.decision_maker_id,
+        recipient_id=dm_id,
         event_type=NotificationEventType.awaiting_decision,
         entity_type=NotificationEntityType.task,
         entity_id=task.id,
         task_id=task.id,
-        message=f"Все Solution поданы по {task.key}: {task.title} — требуется Decision",
+        message=f"Все решения поданы по {task.key}: {task.title} — требуется Decision",
     )
-
-
-async def notify_revision_requested(
-    session: AsyncSession, task: Task, assignment: Assignment, feedback: str,
-) -> None:
-    snippet = feedback if len(feedback) <= 80 else feedback[:77] + "…"
-    await notify(
-        session,
-        recipient_id=assignment.user_id,
-        event_type=NotificationEventType.revision_requested,
-        entity_type=NotificationEntityType.solution,
-        entity_id=assignment.id,  # entity_id points at assignment for solution-level events
-        task_id=task.id,
-        message=f"Solution в {task.key} отправлен на доработку: {snippet}",
-    )
-
-
-async def notify_decision_made(
-    session: AsyncSession, task: Task,
-) -> None:
-    leads = (await session.scalars(
-        select(Assignment).where(
-            Assignment.task_id == task.id,
-        )
-    )).all()
-    for a in leads:
-        await notify(
-            session,
-            recipient_id=a.user_id,
-            event_type=NotificationEventType.decision_made,
-            entity_type=NotificationEntityType.task,
-            entity_id=task.id,
-            task_id=task.id,
-            message=f"Decision вынесен по {task.key}: {task.title}",
-        )
 
 
 async def notify_task_closed(session: AsyncSession, task: Task) -> None:
-    leads = (await session.scalars(
-        select(Assignment).where(Assignment.task_id == task.id)
-    )).all()
-    for a in leads:
-        await notify(
-            session,
-            recipient_id=a.user_id,
-            event_type=NotificationEventType.task_closed,
-            entity_type=NotificationEntityType.task,
-            entity_id=task.id,
-            task_id=task.id,
-            message=f"Задача {task.key} закрыта: {task.title}",
-        )
+    if task.assignee_id is None:
+        return
+    await notify(
+        session,
+        recipient_id=task.assignee_id,
+        event_type=NotificationEventType.task_closed,
+        entity_type=NotificationEntityType.task,
+        entity_id=task.id,
+        task_id=task.id,
+        message=f"Задача {task.key} закрыта: {task.title}",
+    )
 
 
 # --- Read-side ------------------------------------------------------------

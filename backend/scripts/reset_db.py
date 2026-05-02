@@ -9,12 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.models import (
-    Assignment, AssigneeRole, Base, DecisionCriteria, GlobalStatus,
-    Notification, NotificationEntityType, NotificationEventType,
+    Base, Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility,
-    Resolution, Solution, SolutionStatus, Status, StatusCategory,
-    Task, TaskPriority, TaskType, Transition, User, Workflow,
+    Resolution, Status, StatusCategory, Task, TaskPriority, TaskType,
+    Transition, User, Workflow,
 )
+from app.models.comment import Comment
 
 
 async def reset() -> None:
@@ -23,7 +23,9 @@ async def reset() -> None:
 
     engine = create_async_engine(settings.database_url)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # Drop all objects including ones unknown to current models
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
         for stmt in _FTS_DDL:
             await conn.execute(text(stmt))
@@ -32,11 +34,8 @@ async def reset() -> None:
     async with Session() as session:
         await seed(session)
 
-    # Backfill search_vector for all tasks inserted during seed
     async with engine.begin() as conn:
-        await conn.execute(text(
-            "UPDATE tasks SET title = title"
-        ))
+        await conn.execute(text("UPDATE tasks SET title = title"))
 
     await engine.dispose()
     print("✓ Database reset and seeded")
@@ -51,6 +50,15 @@ async def seed(session: AsyncSession) -> None:
     manager = User(id=manager_id, email="manager@localhost", display_name="Manager", keycloak_id=str(manager_id))
     dev1    = User(id=dev1_id,    email="dev1@localhost",    display_name="Dev 1",   keycloak_id=str(dev1_id))
     session.add_all([admin, manager, dev1])
+    await session.flush()
+
+    # System task types (project_id = NULL)
+    tt_task     = TaskType(key="task",     name="Задача",    is_system=True, icon="check-square", color="#6366f1")
+    tt_bug      = TaskType(key="bug",      name="Баг",       is_system=True, icon="bug",          color="#ef4444")
+    tt_story    = TaskType(key="story",    name="История",   is_system=True, icon="book-open",    color="#10b981")
+    tt_epic     = TaskType(key="epic",     name="Эпик",      is_system=True, icon="zap",          color="#f59e0b")
+    tt_decision = TaskType(key="decision", name="Decision",  is_system=True, icon="git-branch",   color="#8b5cf6")
+    session.add_all([tt_task, tt_bug, tt_story, tt_epic, tt_decision])
     await session.flush()
 
     demo = Project(
@@ -71,151 +79,143 @@ async def seed(session: AsyncSession) -> None:
     session.add(wf)
     await session.flush()
 
-    todo   = Status(workflow_id=wf.id, name="To Do",       category=StatusCategory.initial,       is_default=True, position=0)
-    inprog = Status(workflow_id=wf.id, name="In Progress", category=StatusCategory.intermediate,   is_default=False, position=1)
-    review = Status(workflow_id=wf.id, name="Review",      category=StatusCategory.intermediate,   is_default=False, position=2)
-    done   = Status(workflow_id=wf.id, name="Done",        category=StatusCategory.final,          is_default=False, position=3)
+    todo   = Status(workflow_id=wf.id, name="To Do",       category=StatusCategory.initial,       is_default=True,  position=0)
+    inprog = Status(workflow_id=wf.id, name="In Progress", category=StatusCategory.intermediate,  is_default=False, position=1)
+    review = Status(workflow_id=wf.id, name="Review",      category=StatusCategory.intermediate,  is_default=False, position=2)
+    done   = Status(workflow_id=wf.id, name="Done",        category=StatusCategory.final,         is_default=False, position=3)
     session.add_all([todo, inprog, review, done])
     await session.flush()
 
     session.add_all([
-        # Forward
         Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=inprog.id),
         Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=review.id),
         Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=done.id),
         Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=done.id),
-        # Backward (можно вернуть задачу назад)
         Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
         Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
     ])
 
-    res_done = Resolution(project_id=demo.id, name="Done",              is_default=True, position=0)
+    res_done = Resolution(project_id=demo.id, name="Done", is_default=True, position=0)
     session.add_all([
         res_done,
-        Resolution(project_id=demo.id, name="Won't Fix",         position=1),
-        Resolution(project_id=demo.id, name="Duplicate",         position=2),
-        Resolution(project_id=demo.id, name="Cannot Reproduce",  position=3),
+        Resolution(project_id=demo.id, name="Won't Fix",        position=1),
+        Resolution(project_id=demo.id, name="Duplicate",        position=2),
+        Resolution(project_id=demo.id, name="Cannot Reproduce", position=3),
     ])
     await session.flush()
 
-    def task(n, title, priority=TaskPriority.medium, gs=GlobalStatus.open, description=None):
+    def task(n, title, type_=None, assignee=None, status=None, priority=TaskPriority.medium, description=None, parent=None, meta=None):
         return Task(
             project_id=demo.id, workflow_id=wf.id, reporter_id=admin_id,
+            task_type_id=(type_ or tt_task).id,
+            assignee_id=assignee,
+            parent_task_id=parent.id if parent else None,
+            current_status_id=(status or todo).id,
             key=f"DEMO-{n}", title=title, priority=priority,
-            global_status=gs, description=description,
+            description=description,
+            meta=meta or {},
         )
 
-    # admin (AUTH_STUB) tasks — достаточно для демонстрации всего воркфлоу
-    t1  = task(1,  "Настроить CI/CD pipeline",            TaskPriority.high,
+    # Regular tasks assigned to admin
+    t1  = task(1,  "Настроить CI/CD pipeline",            assignee=admin_id,   priority=TaskPriority.high,
                description="Настроить GitHub Actions: lint → test → build → deploy on merge to main")
-    t2  = task(2,  "Написать документацию API",           TaskPriority.medium,
+    t2  = task(2,  "Написать документацию API",           assignee=admin_id,
                description="Покрыть все публичные эндпоинты, добавить примеры запросов/ответов")
-    t3  = task(3,  "Исправить баг с авторизацией",        TaskPriority.critical,
+    t3  = task(3,  "Исправить баг с авторизацией",        type_=tt_bug, assignee=admin_id, priority=TaskPriority.critical,
                description="При истечении токена редиректит на 404 вместо /login")
-    t4  = task(4,  "Реализовать поиск по задачам",        TaskPriority.medium, GlobalStatus.in_progress,
+    t4  = task(4,  "Реализовать поиск по задачам",        assignee=admin_id, status=inprog,
                description="FTS через PostgreSQL tsvector, поиск по заголовку и описанию")
-    t5  = task(5,  "Ревью дизайна онбординга",            TaskPriority.low,   GlobalStatus.in_progress,
+    t5  = task(5,  "Ревью дизайна онбординга",            assignee=admin_id, status=inprog, priority=TaskPriority.low,
                description="Пройти прототип, оставить комментарии в Figma")
-    t6  = task(6,  "Обновить зависимости",                TaskPriority.low,   GlobalStatus.in_progress)
-    t7  = task(7,  "Code review: модуль уведомлений",     TaskPriority.high,  GlobalStatus.in_progress)
-    t8  = task(8,  "Деплой на стейджинг",                 TaskPriority.high,  GlobalStatus.closed)
-    t9  = task(9,  "Добавить тесты для task_service",     TaskPriority.medium, GlobalStatus.closed)
-    # multi-assignee demo task — both leads have submitted Solutions, awaiting Decision from manager
-    t10 = task(10, "Выбрать подход к авторизации",        TaskPriority.high,  GlobalStatus.awaiting_decision,
-               description="Два варианта: Keycloak или собственный OAuth. Каждый исполнитель исследует и подаёт Solution.")
-    t10.decision_maker_id = manager_id
+    t6  = task(6,  "Обновить зависимости",                assignee=admin_id, status=review, priority=TaskPriority.low)
+    t7  = task(7,  "Code review: модуль уведомлений",     assignee=admin_id, status=review, priority=TaskPriority.high)
+    t8  = task(8,  "Деплой на стейджинг",                 assignee=admin_id, status=done,  priority=TaskPriority.high,
+               meta={"resolution_id": str(res_done.id)})
+    t9  = task(9,  "Добавить тесты для task_service",     assignee=admin_id, status=done,
+               meta={"resolution_id": str(res_done.id)})
+
+    # Decision task — manager is the DM (assignee), blocked until subtasks are ready
+    t10 = task(10, "Выбрать подход к авторизации",
+               type_=tt_decision, assignee=manager_id, status=todo, priority=TaskPriority.high,
+               description="Два варианта: Keycloak или собственный OAuth. Каждый исполнитель исследует и подаёт Solution.",
+               meta={"criteria": [
+                   {"description": "Простота интеграции с существующим стеком", "position": 0},
+                   {"description": "Минимальный объём поддержки на стороне приложения",  "position": 1},
+                   {"description": "Стоимость внедрения (часы разработчика)",              "position": 2},
+               ]})
+
     # dev1 tasks
-    t11 = task(11, "Оптимизировать запросы к БД",         TaskPriority.medium, GlobalStatus.in_progress)
-    t12 = task(12, "Добавить индексы на tasks.project_id", TaskPriority.low,  GlobalStatus.closed)
+    t11 = task(11, "Оптимизировать запросы к БД",         assignee=dev1_id, status=inprog)
+    t12 = task(12, "Добавить индексы на tasks.project_id", assignee=dev1_id, status=done, priority=TaskPriority.low,
+               meta={"resolution_id": str(res_done.id)})
 
     session.add_all([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12])
     await session.flush()
 
-    session.add_all([
-        # admin: To Do (3 задачи)
-        Assignment(task_id=t1.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=todo.id),
-        Assignment(task_id=t2.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=todo.id),
-        Assignment(task_id=t3.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=todo.id),
-        # admin: In Progress (2 задачи)
-        Assignment(task_id=t4.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=inprog.id),
-        Assignment(task_id=t5.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=inprog.id),
-        # admin: Review (2 задачи)
-        Assignment(task_id=t6.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=review.id),
-        Assignment(task_id=t7.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=review.id),
-        # admin: Done (2 задачи)
-        Assignment(task_id=t8.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=done.id, resolution_id=res_done.id),
-        Assignment(task_id=t9.id,  user_id=admin_id, role=AssigneeRole.lead, current_status_id=done.id, resolution_id=res_done.id),
-        # multi-assignee: admin + dev1 оба lead, оба в Done со submitted Solution
-        Assignment(task_id=t10.id, user_id=admin_id, role=AssigneeRole.lead, current_status_id=done.id, resolution_id=res_done.id),
-        Assignment(task_id=t10.id, user_id=dev1_id,  role=AssigneeRole.lead, current_status_id=done.id, resolution_id=res_done.id),
-        # dev1 tasks
-        Assignment(task_id=t11.id, user_id=dev1_id,  role=AssigneeRole.lead, current_status_id=inprog.id),
-        Assignment(task_id=t12.id, user_id=dev1_id,  role=AssigneeRole.lead, current_status_id=done.id, resolution_id=res_done.id),
-    ])
+    # Subtasks of t10 — one per lead assignee
+    t10_admin = task(13, "Исследовать Keycloak",
+                     assignee=admin_id, status=review, parent=t10,
+                     description="Realm для приложения, JWKS-валидация на бэке, встроенный UI для логина.")
+    t10_dev1  = task(14, "Исследовать собственный OAuth",
+                     assignee=dev1_id,  status=review, parent=t10,
+                     description="FastAPI + python-jose. Полный контроль над флоу, нет зависимости от внешнего сервиса.")
+    session.add_all([t10_admin, t10_dev1])
     await session.flush()
 
-    # Decision Process artefacts for t10 (multi-lead, awaiting_decision)
+    # Solution comments on each subtask
     from datetime import UTC, datetime
-    a_admin_t10 = next(
-        a for a in (await session.execute(
-            __import__('sqlalchemy').select(Assignment).where(
-                Assignment.task_id == t10.id, Assignment.user_id == admin_id,
-            )
-        )).scalars()
-    )
-    a_dev1_t10 = next(
-        a for a in (await session.execute(
-            __import__('sqlalchemy').select(Assignment).where(
-                Assignment.task_id == t10.id, Assignment.user_id == dev1_id,
-            )
-        )).scalars()
-    )
     now = datetime.now(UTC)
+
+    sol_admin = Comment(
+        task_id=t10_admin.id, author_id=admin_id,
+        content="Предлагаю Keycloak: realm для приложения, JWKS-валидация на бэке, "
+                "встроенный UI для логина. Минимум кода в приложении, готовый OAuth-флоу. "
+                "Часы внедрения: ~16ч (настройка + интеграция).",
+        labels=["solution"],
+    )
+    sol_dev1 = Comment(
+        task_id=t10_dev1.id, author_id=dev1_id,
+        content="Свой OAuth-провайдер на FastAPI + python-jose. Полный контроль над флоу, "
+                "нет зависимости от внешнего сервиса. Часы внедрения: ~40ч "
+                "(пользователи, токены, сессии, refresh, recovery).",
+        labels=["solution"],
+    )
+    session.add_all([sol_admin, sol_dev1])
+    await session.flush()
+
+    # Mark solution comments in subtask meta
+    t10_admin.meta = {"solution_comment_id": str(sol_admin.id)}
+    t10_dev1.meta  = {"solution_comment_id": str(sol_dev1.id)}
+
+    # Notifications
     session.add_all([
-        DecisionCriteria(task_id=t10.id, description="Простота интеграции с существующим стеком", position=0, is_locked=True),
-        DecisionCriteria(task_id=t10.id, description="Минимальный объём поддержки на стороне приложения", position=1, is_locked=True),
-        DecisionCriteria(task_id=t10.id, description="Стоимость внедрения (часы разработчика)", position=2, is_locked=True),
-        Solution(
-            assignment_id=a_admin_t10.id,
-            content="Предлагаю Keycloak: realm для приложения, JWKS-валидация на бэке, "
-                    "встроенный UI для логина. Минимум кода в приложении, готовый OAuth-флоу. "
-                    "Часы внедрения: ~16ч (настройка + интеграция).",
-            status=SolutionStatus.submitted, submitted_at=now,
-        ),
-        Solution(
-            assignment_id=a_dev1_t10.id,
-            content="Свой OAuth-провайдер на FastAPI + python-jose. Полный контроль над флоу, "
-                    "нет зависимости от внешнего сервиса. Часы внедрения: ~40ч "
-                    "(пользователи, токены, сессии, refresh, recovery).",
-            status=SolutionStatus.submitted, submitted_at=now,
-        ),
-        # Notifications для демонстрации колокольчика
         Notification(
             recipient_id=manager_id,
             event_type=NotificationEventType.awaiting_decision,
             entity_type=NotificationEntityType.task,
             entity_id=t10.id, task_id=t10.id,
-            message=f"Все Solution поданы по {t10.key}: {t10.title} — требуется Decision",
+            message=f"Все решения поданы по {t10.key}: {t10.title} — требуется Decision",
         ),
         Notification(
             recipient_id=admin_id,
             event_type=NotificationEventType.task_assigned,
             entity_type=NotificationEntityType.task,
-            entity_id=t10.id, task_id=t10.id,
-            message=f"Вас назначили на задачу {t10.key}: {t10.title}",
+            entity_id=t10_admin.id, task_id=t10_admin.id,
+            message=f"Вас назначили на задачу {t10_admin.key}: {t10_admin.title}",
         ),
         Notification(
             recipient_id=dev1_id,
             event_type=NotificationEventType.task_assigned,
             entity_type=NotificationEntityType.task,
-            entity_id=t10.id, task_id=t10.id,
-            message=f"Вас назначили на задачу {t10.key}: {t10.title}",
+            entity_id=t10_dev1.id, task_id=t10_dev1.id,
+            message=f"Вас назначили на задачу {t10_dev1.key}: {t10_dev1.title}",
         ),
     ])
+
     await session.commit()
-    print("  → 3 пользователя, проект DEMO, воркфлоу «Базовый», 12 задач")
-    print("  → DEMO-10: multi-lead Decision Process (2 submitted Solutions, awaiting Manager's Decision)")
-    print("  → 3 уведомления для демонстрации колокольчика (Manager: awaiting_decision, admin/dev1: assigned)")
+    print("  → 3 пользователя, 5 системных типов задач, проект DEMO, воркфлоу «Базовый»")
+    print("  → 12 обычных задач + 2 подзадачи DEMO-13/14 для Decision-задачи DEMO-10")
+    print("  → Solution-комментарии на подзадачах, уведомления для демонстрации колокольчика")
 
 
 if __name__ == "__main__":

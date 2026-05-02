@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
-from app.models.task import GlobalStatus
 from app.models.user import User
 from app.services import search_service
 
@@ -22,7 +21,7 @@ class SearchHit(BaseModel):
     id: uuid.UUID
     key: str
     title: str
-    global_status: GlobalStatus
+    current_status_id: str
     project: SearchProjectRef
     highlight: str
 

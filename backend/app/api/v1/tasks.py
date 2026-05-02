@@ -4,17 +4,8 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
-from app.models.task import GlobalStatus
 from app.models.user import User
-from app.schemas.task import (
-    AssignmentCreate,
-    AssignmentResponse,
-    AssignmentRoleUpdate,
-    AssignmentTransition,
-    TaskCreate,
-    TaskResponse,
-    TaskUpdate,
-)
+from app.schemas.task import TaskCreate, TaskResponse, TaskStatusTransition, TaskUpdate
 from app.services import task_service
 
 router = APIRouter()
@@ -38,11 +29,22 @@ async def create_task(
 @router.get("/projects/{project_id}/tasks", response_model=list[TaskResponse], tags=["tasks"])
 async def list_tasks(
     project_id: uuid.UUID,
-    global_status: GlobalStatus | None = None,
+    status_id: uuid.UUID | None = None,
+    assignee_id: uuid.UUID | None = None,
+    task_type_key: str | None = None,
+    parent_task_id: uuid.UUID | None = None,
+    include_subtasks: bool = True,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    return await task_service.list_tasks(session, project_id, user, global_status)
+    return await task_service.list_tasks(
+        session, project_id, user,
+        status_id=status_id,
+        assignee_id=assignee_id,
+        task_type_key=task_type_key,
+        parent_task_id=parent_task_id,
+        include_subtasks=include_subtasks,
+    )
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])
@@ -52,6 +54,15 @@ async def get_task(
     user: User = Depends(get_current_user),
 ):
     return await task_service.get_task(session, task_id, user)
+
+
+@router.get("/tasks/by-key/{key}", response_model=TaskResponse, tags=["tasks"])
+async def get_task_by_key(
+    key: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await task_service.get_task_by_key(session, key, user)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])
@@ -64,6 +75,20 @@ async def update_task(
     return await task_service.update_task(session, task_id, data, user)
 
 
+@router.post(
+    "/tasks/{task_id}/transition",
+    response_model=TaskResponse,
+    tags=["tasks"],
+)
+async def transition_status(
+    task_id: uuid.UUID,
+    data: TaskStatusTransition,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await task_service.transition_status(session, task_id, data, user)
+
+
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tasks"])
 async def delete_task(
     task_id: uuid.UUID,
@@ -71,59 +96,3 @@ async def delete_task(
     user: User = Depends(get_current_user),
 ):
     await task_service.delete_task(session, task_id, user)
-
-
-@router.post(
-    "/tasks/{task_id}/assignments",
-    response_model=AssignmentResponse,
-    status_code=status.HTTP_201_CREATED,
-    tags=["assignments"],
-)
-async def assign_user(
-    task_id: uuid.UUID,
-    data: AssignmentCreate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    return await task_service.assign_user(session, task_id, data, user)
-
-
-@router.patch(
-    "/assignments/{assignment_id}/status",
-    response_model=AssignmentResponse,
-    tags=["assignments"],
-)
-async def transition_status(
-    assignment_id: uuid.UUID,
-    data: AssignmentTransition,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    return await task_service.transition_assignment_status(session, assignment_id, data, user)
-
-
-@router.patch(
-    "/assignments/{assignment_id}/role",
-    response_model=AssignmentResponse,
-    tags=["assignments"],
-)
-async def update_role(
-    assignment_id: uuid.UUID,
-    data: AssignmentRoleUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    return await task_service.update_assignment_role(session, assignment_id, data, user)
-
-
-@router.delete(
-    "/assignments/{assignment_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    tags=["assignments"],
-)
-async def remove_assignment(
-    assignment_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    await task_service.remove_assignment(session, assignment_id, user)

@@ -173,10 +173,10 @@ async def migrate_status(
     if target.workflow_id != s.workflow_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "STATUS_WORKFLOW_MISMATCH"})
 
-    from app.models.task import Assignment
+    from app.models.task import Task
     await session.execute(
-        update(Assignment)
-        .where(Assignment.current_status_id == status_id)
+        update(Task)
+        .where(Task.current_status_id == status_id, Task.deleted_at.is_(None))
         .values(current_status_id=data.target_status_id)
     )
 
@@ -282,10 +282,11 @@ async def _unset_default_status(session: AsyncSession, workflow_id: uuid.UUID) -
 
 
 async def _count_active_assignments(session: AsyncSession, status_id: uuid.UUID) -> int:
-    from app.models.task import Assignment
+    from app.models.task import Task
     count = await session.scalar(
-        select(func.count()).select_from(Assignment).where(
-            Assignment.current_status_id == status_id
+        select(func.count()).select_from(Task).where(
+            Task.current_status_id == status_id,
+            Task.deleted_at.is_(None),
         )
     )
     return count or 0

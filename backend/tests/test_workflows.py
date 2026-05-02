@@ -314,13 +314,15 @@ async def test_status_color(client: AsyncClient, db_session: AsyncSession, stub_
     assert wf_data["statuses"][0]["color"] == "#3B82F6"
 
 
-async def test_migrate_status_reassigns_assignments(
+async def test_migrate_status_reassigns_tasks(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
     from app.schemas.project import ProjectCreate
     from app.schemas.workflow import WorkflowCreate, StatusCreate
-    from app.schemas.task import AssignmentCreate
+    from app.schemas.task import TaskCreate
     from app.services import task_service
+    from sqlalchemy import select
+    from app.models.task import Task
 
     project = await project_service.create_project(
         db_session, ProjectCreate(name="Migrate", key=_rnd_key()), stub_user
@@ -334,31 +336,25 @@ async def test_migrate_status_reassigns_assignments(
     tgt = await workflow_service.create_status(
         db_session, wf.id, StatusCreate(name="New", category=StatusCategory.intermediate), stub_user
     )
-    await db_session.flush()
 
-    from app.schemas.task import TaskCreate
     task = await task_service.create_task(
         db_session, project.id,
         TaskCreate(title="T", workflow_id=wf.id), stub_user
     )
-    assignment = await task_service.assign_user(
-        db_session, task.id,
-        AssignmentCreate(user_id=stub_user.id), stub_user
-    )
-    assert assignment.current_status_id == src.id
+    assert task.current_status_id == src.id
 
     r = await client.post(f"/api/v1/statuses/{src.id}/migrate",
                           json={"target_status_id": str(tgt.id)})
     assert r.status_code == 200
 
-    await db_session.refresh(assignment)
-    assert assignment.current_status_id == tgt.id
+    await db_session.refresh(task)
+    assert task.current_status_id == tgt.id
 
 
-async def test_delete_status_with_active_assignment(
+async def test_delete_status_with_active_task(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    from app.schemas.task import TaskCreate, AssignmentCreate
+    from app.schemas.task import TaskCreate
     from app.services import task_service
 
     pid = await _make_project(db_session, stub_user)
@@ -366,13 +362,9 @@ async def test_delete_status_with_active_assignment(
     todo = await _make_status(client, wf["id"], "To Do", StatusCategory.initial, is_default=True)
     await _make_status(client, wf["id"], "Done", StatusCategory.final, position=1)
 
-    task = await task_service.create_task(
+    await task_service.create_task(
         db_session, uuid.UUID(pid),
         TaskCreate(title="T", workflow_id=uuid.UUID(wf["id"])), stub_user
-    )
-    await task_service.assign_user(
-        db_session, task.id,
-        AssignmentCreate(user_id=stub_user.id), stub_user
     )
 
     r = await client.delete(f"/api/v1/statuses/{todo['id']}")

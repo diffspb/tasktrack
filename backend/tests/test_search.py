@@ -5,11 +5,9 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.models.workflow import StatusCategory
 from app.schemas.project import ProjectCreate
 from app.schemas.task import TaskCreate
-from app.schemas.workflow import StatusCreate, WorkflowCreate
-from app.services import project_service, task_service, workflow_service
+from app.services import project_service, task_service
 
 
 def _rnd_key() -> str:
@@ -20,15 +18,7 @@ async def _setup(db_session: AsyncSession, user: User) -> dict:
     project = await project_service.create_project(
         db_session, ProjectCreate(name="Search test", key=_rnd_key()), user
     )
-    wf = await workflow_service.create_workflow(
-        db_session, project.id, WorkflowCreate(name="Basic"), user
-    )
-    await workflow_service.create_status(
-        db_session, wf.id,
-        StatusCreate(name="To Do", category=StatusCategory.initial, is_default=True),
-        user,
-    )
-    return {"project_id": project.id, "workflow_id": wf.id}
+    return {"project_id": project.id}
 
 
 async def test_search_finds_by_title(
@@ -37,14 +27,12 @@ async def test_search_finds_by_title(
     ctx = await _setup(db_session, stub_user)
     await task_service.create_task(
         db_session, ctx["project_id"],
-        TaskCreate(title="Реализовать авторизацию через Keycloak",
-                   workflow_id=ctx["workflow_id"]),
+        TaskCreate(title="Реализовать авторизацию через Keycloak"),
         stub_user,
     )
     await task_service.create_task(
         db_session, ctx["project_id"],
-        TaskCreate(title="Настроить CI/CD pipeline",
-                   workflow_id=ctx["workflow_id"]),
+        TaskCreate(title="Настроить CI/CD pipeline"),
         stub_user,
     )
 
@@ -65,7 +53,6 @@ async def test_search_uses_russian_stemmer(
         TaskCreate(
             title="Доделать модуль",
             description="Уделить внимание авторизации пользователей",
-            workflow_id=ctx["workflow_id"],
         ),
         stub_user,
     )
@@ -82,12 +69,12 @@ async def test_search_filters_by_project(
 
     await task_service.create_task(
         db_session, ctx_a["project_id"],
-        TaskCreate(title="Авторизация в проекте А", workflow_id=ctx_a["workflow_id"]),
+        TaskCreate(title="Авторизация в проекте А"),
         stub_user,
     )
     await task_service.create_task(
         db_session, ctx_b["project_id"],
-        TaskCreate(title="Авторизация в проекте Б", workflow_id=ctx_b["workflow_id"]),
+        TaskCreate(title="Авторизация в проекте Б"),
         stub_user,
     )
 
@@ -107,7 +94,7 @@ async def test_search_skips_soft_deleted(
     ctx = await _setup(db_session, stub_user)
     t = await task_service.create_task(
         db_session, ctx["project_id"],
-        TaskCreate(title="Скоро удалим", workflow_id=ctx["workflow_id"]),
+        TaskCreate(title="Скоро удалим"),
         stub_user,
     )
     await task_service.delete_task(db_session, t.id, stub_user)
@@ -122,7 +109,7 @@ async def test_search_empty_query_returns_nothing(
     ctx = await _setup(db_session, stub_user)
     await task_service.create_task(
         db_session, ctx["project_id"],
-        TaskCreate(title="Anything", workflow_id=ctx["workflow_id"]),
+        TaskCreate(title="Anything"),
         stub_user,
     )
     r = await client.get("/api/v1/search?q=")

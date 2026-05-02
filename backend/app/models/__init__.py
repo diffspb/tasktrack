@@ -3,8 +3,9 @@ from app.models.user import User
 from app.models.project import Project, ProjectMember, ProjectMemberRole, ProjectVisibility
 from app.models.workflow import Status, StatusCategory, Transition, Workflow
 from app.models.resolution import Resolution
-from app.models.task import Assignment, AssigneeRole, GlobalStatus, Task, TaskLink, TaskLinkType, TaskPriority, TaskType
-from app.models.decision import DecisionCriteria, Solution, SolutionStatus, TaskDecision
+from app.models.task_type import TaskType, SYSTEM_KEYS
+from app.models.task import Task, TaskLink, TaskLinkType, TaskPriority
+from app.models.comment import Comment
 from app.models.notification import Notification, NotificationEntityType, NotificationEventType
 
 __all__ = [
@@ -13,8 +14,8 @@ __all__ = [
     "Project", "ProjectMember", "ProjectMemberRole", "ProjectVisibility",
     "Workflow", "Status", "StatusCategory", "Transition",
     "Resolution",
-    "Task", "Assignment", "TaskLink", "GlobalStatus", "TaskType", "TaskPriority",
-    "AssigneeRole", "TaskLinkType",
-    "Solution", "SolutionStatus", "DecisionCriteria", "TaskDecision",
+    "TaskType", "SYSTEM_KEYS",
+    "Task", "TaskLink", "TaskLinkType", "TaskPriority",
+    "Comment",
     "Notification", "NotificationEntityType", "NotificationEventType",
 ]
