@@ -11,6 +11,7 @@ import { api } from '@/shared/api/client'
 import { useProject } from './api'
 import { useAuth } from '@/features/auth/AuthProvider'
 import type { ProjectMember } from '@/features/tasks/api'
+import { WorkflowEditor } from './WorkflowEditor'
 
 const ROLES = ['admin', 'manager', 'member', 'viewer'] as const
 type Role = typeof ROLES[number]
@@ -172,6 +173,15 @@ export function ProjectSettings() {
             </Button>
           </form>
         )}
+      </section>
+
+      {/* Workflow */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold">Workflow</h2>
+          <p className="text-sm text-muted-foreground">Statuses and allowed transitions for this project.</p>
+        </div>
+        {projectId && <WorkflowEditor projectId={projectId} />}
       </section>
     </div>
   )

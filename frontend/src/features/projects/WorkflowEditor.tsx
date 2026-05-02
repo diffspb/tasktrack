@@ -1,0 +1,397 @@
+import { useState } from 'react'
+import { GripVertical, Plus, Trash2, ArrowRight } from 'lucide-react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy,
+  useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import {
+  useProjectWorkflows, useCreateStatus, useUpdateStatus, useDeleteStatus,
+  useMigrateStatus, useCreateTransition, useDeleteTransition,
+  type Workflow, type WorkflowStatus, type StatusCategory,
+} from './workflowApi'
+
+const CATEGORY_OPTS: { value: StatusCategory; label: string; cls: string }[] = [
+  { value: 'initial',      label: 'Initial',       cls: 'bg-muted text-muted-foreground' },
+  { value: 'intermediate', label: 'Intermediate',   cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  { value: 'final',        label: 'Final',          cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+]
+
+const DEFAULT_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b']
+
+interface Props { projectId: string }
+
+export function WorkflowEditor({ projectId }: Props) {
+  const { data: workflows = [], isLoading } = useProjectWorkflows(projectId)
+  const workflow = workflows.find(w => w.is_default) ?? workflows[0]
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading workflow…</p>
+  if (!workflow) return <p className="text-sm text-muted-foreground">No workflow found.</p>
+
+  return (
+    <div className="space-y-8">
+      <StatusesEditor workflow={workflow} projectId={projectId} />
+      <TransitionsEditor workflow={workflow} projectId={projectId} />
+    </div>
+  )
+}
+
+// ── Statuses ──────────────────────────────────────────────────────────────────
+
+function StatusesEditor({ workflow, projectId }: { workflow: Workflow; projectId: string }) {
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>(() =>
+    [...workflow.statuses].sort((a, b) => a.position - b.position)
+  )
+  const [addOpen, setAddOpen] = useState(false)
+  const [migrateFor, setMigrateFor] = useState<WorkflowStatus | null>(null)
+
+  const updateStatus = useUpdateStatus(projectId)
+  const deleteStatus = useDeleteStatus(projectId)
+  const migrateStatus = useMigrateStatus(projectId)
+
+  // Keep local statuses in sync when workflow refetches
+  if (workflow.statuses.length !== statuses.length ||
+      workflow.statuses.some(s => !statuses.find(ls => ls.id === s.id))) {
+    setStatuses([...workflow.statuses].sort((a, b) => a.position - b.position))
+  }
+
+  const sensors = useSensors(useSensor(PointerSensor))
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = statuses.findIndex(s => s.id === active.id)
+    const newIndex = statuses.findIndex(s => s.id === over.id)
+    const reordered = arrayMove(statuses, oldIndex, newIndex)
+    setStatuses(reordered)
+    // Persist new positions
+    await Promise.all(
+      reordered.map((s, i) =>
+        s.position !== i ? updateStatus.mutateAsync({ statusId: s.id, position: i }) : Promise.resolve()
+      )
+    )
+  }
+
+  async function handleDelete(status: WorkflowStatus) {
+    try {
+      await deleteStatus.mutateAsync(status.id)
+      setStatuses(prev => prev.filter(s => s.id !== status.id))
+    } catch (err: unknown) {
+      const code = (err as { response?: { data?: { detail?: { code?: string } } } })
+        ?.response?.data?.detail?.code
+      if (code === 'STATUS_HAS_ACTIVE_ASSIGNMENTS') {
+        setMigrateFor(status)
+      }
+    }
+  }
+
+  const otherStatuses = statuses.filter(s => s.id !== migrateFor?.id)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Statuses</h3>
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setAddOpen(true)}>
+          <Plus className="h-3.5 w-3.5" /> Add status
+        </Button>
+      </div>
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={statuses.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          <ul className="space-y-1.5">
+            {statuses.map(status => (
+              <SortableStatusRow
+                key={status.id}
+                status={status}
+                projectId={projectId}
+                onDelete={() => handleDelete(status)}
+              />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
+
+      {addOpen && (
+        <AddStatusForm
+          workflowId={workflow.id}
+          projectId={projectId}
+          nextPosition={statuses.length}
+          onDone={() => setAddOpen(false)}
+        />
+      )}
+
+      {/* Migrate dialog */}
+      {migrateFor && (
+        <MigrateDialog
+          status={migrateFor}
+          targets={otherStatuses}
+          onConfirm={async targetId => {
+            await migrateStatus.mutateAsync({ statusId: migrateFor.id, targetStatusId: targetId })
+            setStatuses(prev => prev.filter(s => s.id !== migrateFor.id))
+            setMigrateFor(null)
+          }}
+          onCancel={() => setMigrateFor(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function SortableStatusRow({
+  status, projectId, onDelete,
+}: {
+  status: WorkflowStatus; projectId: string; onDelete: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: status.id })
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(status.name)
+  const [color, setColor] = useState(status.color ?? '#6366f1')
+  const updateStatus = useUpdateStatus(projectId)
+
+  const catMeta = CATEGORY_OPTS.find(c => c.value === status.category)
+
+  async function saveEdit() {
+    if (name.trim() && (name !== status.name || color !== status.color)) {
+      await updateStatus.mutateAsync({ statusId: status.id, name: name.trim(), color })
+    }
+    setEditing(false)
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn('flex items-center gap-2 rounded-lg border bg-background px-3 py-2',
+        isDragging && 'opacity-50 shadow-lg')}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground/40 hover:text-muted-foreground shrink-0">
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      {/* Color dot */}
+      <div className="h-3 w-3 rounded-full shrink-0 border" style={{ background: color }} />
+
+      {editing ? (
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+            className="h-7 text-xs flex-1"
+            autoFocus
+          />
+          <div className="flex gap-1">
+            {DEFAULT_COLORS.map(c => (
+              <button key={c} onClick={() => setColor(c)}
+                className={cn('h-5 w-5 rounded-full border-2 transition-all',
+                  color === c ? 'border-foreground scale-110' : 'border-transparent')}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <Button size="sm" className="h-6 px-2 text-xs" onClick={saveEdit}>Save</Button>
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditing(false)}>Cancel</Button>
+        </div>
+      ) : (
+        <>
+          <button className="flex-1 text-sm text-left hover:text-primary transition-colors" onClick={() => setEditing(true)}>
+            {status.name}
+          </button>
+          <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0', catMeta?.cls)}>
+            {catMeta?.label}
+          </span>
+          {status.is_default && (
+            <span className="text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">default</span>
+          )}
+          <button onClick={onDelete} className="rounded p-1 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </>
+      )}
+    </li>
+  )
+}
+
+function AddStatusForm({ workflowId, projectId, nextPosition, onDone }: {
+  workflowId: string; projectId: string; nextPosition: number; onDone: () => void
+}) {
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState<StatusCategory>('intermediate')
+  const [color, setColor] = useState('#6366f1')
+  const createStatus = useCreateStatus(projectId)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    await createStatus.mutateAsync({ workflowId, name: name.trim(), category, position: nextPosition, color })
+    onDone()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-lg border border-dashed p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Status name"
+          className="h-7 text-xs flex-1"
+          autoFocus
+        />
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value as StatusCategory)}
+          className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+        >
+          {CATEGORY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Color:</span>
+        {DEFAULT_COLORS.map(c => (
+          <button key={c} type="button" onClick={() => setColor(c)}
+            className={cn('h-5 w-5 rounded-full border-2 transition-all',
+              color === c ? 'border-foreground scale-110' : 'border-transparent')}
+            style={{ background: c }}
+          />
+        ))}
+        <div className="flex-1" />
+        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onDone}>Cancel</Button>
+        <Button type="submit" size="sm" className="h-6 px-2 text-xs" disabled={!name.trim() || createStatus.isPending}>
+          {createStatus.isPending ? 'Adding…' : 'Add'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function MigrateDialog({ status, targets, onConfirm, onCancel }: {
+  status: WorkflowStatus
+  targets: WorkflowStatus[]
+  onConfirm: (targetId: string) => Promise<void>
+  onCancel: () => void
+}) {
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? '')
+  const [pending, setPending] = useState(false)
+
+  async function handleConfirm() {
+    if (!targetId) return
+    setPending(true)
+    await onConfirm(targetId)
+    setPending(false)
+  }
+
+  return (
+    <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 p-4 space-y-3">
+      <p className="text-sm font-medium">
+        Status <strong>{status.name}</strong> has active tasks.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Move all tasks to another status before deleting:
+      </p>
+      <select
+        value={targetId}
+        onChange={e => setTargetId(e.target.value)}
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+      >
+        {targets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button size="sm" disabled={!targetId || pending} onClick={handleConfirm}>
+          {pending ? 'Migrating…' : 'Migrate & delete'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Transitions ───────────────────────────────────────────────────────────────
+
+function TransitionsEditor({ workflow, projectId }: { workflow: Workflow; projectId: string }) {
+  const [addOpen, setAddOpen] = useState(false)
+  const [fromId, setFromId] = useState('')
+  const [toId, setToId] = useState('')
+  const createTransition = useCreateTransition(projectId)
+  const deleteTransition = useDeleteTransition(projectId)
+
+  const statuses = [...workflow.statuses].sort((a, b) => a.position - b.position)
+  const statusById = new Map(statuses.map(s => [s.id, s]))
+
+  const existingPairs = new Set(workflow.transitions.map(t => `${t.from_status_id}→${t.to_status_id}`))
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!fromId || !toId || fromId === toId) return
+    if (existingPairs.has(`${fromId}→${toId}`)) return
+    await createTransition.mutateAsync({ workflowId: workflow.id, from_status_id: fromId, to_status_id: toId })
+    setAddOpen(false); setFromId(''); setToId('')
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Transitions</h3>
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setAddOpen(true)}>
+          <Plus className="h-3.5 w-3.5" /> Add transition
+        </Button>
+      </div>
+
+      {workflow.transitions.length === 0 && !addOpen && (
+        <p className="text-xs text-muted-foreground">No transitions — tasks won't be movable on the board.</p>
+      )}
+
+      <ul className="space-y-1.5">
+        {workflow.transitions.map(t => {
+          const from = statusById.get(t.from_status_id)
+          const to = statusById.get(t.to_status_id)
+          if (!from || !to) return null
+          return (
+            <li key={t.id} className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2">
+              <span className="text-sm font-medium w-32 truncate">{from.name}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+              <span className="text-sm font-medium flex-1 truncate">{to.name}</span>
+              <button
+                onClick={() => deleteTransition.mutateAsync(t.id)}
+                className="rounded p-1 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {addOpen && (
+        <form onSubmit={handleAdd} className="rounded-lg border border-dashed p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <select value={fromId} onChange={e => setFromId(e.target.value)}
+              className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs">
+              <option value="">From…</option>
+              {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+            <select value={toId} onChange={e => setToId(e.target.value)}
+              className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs">
+              <option value="">To…</option>
+              {statuses.filter(s => s.id !== fromId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button type="submit" size="sm" className="h-6 px-2 text-xs"
+              disabled={!fromId || !toId || fromId === toId || createTransition.isPending}>
+              {createTransition.isPending ? 'Adding…' : 'Add'}
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
