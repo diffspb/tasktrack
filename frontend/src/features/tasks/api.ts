@@ -128,6 +128,15 @@ export function useProjectTaskTypes(projectId: string | null | undefined) {
   })
 }
 
+export function useChildTasks(projectId: string | null | undefined, parentTaskId: string | null | undefined) {
+  return useQuery<Task[]>({
+    queryKey: ['child-tasks', projectId, parentTaskId],
+    queryFn: () =>
+      api.get(`/projects/${projectId}/tasks?parent_task_id=${parentTaskId}`).then(r => r.data),
+    enabled: !!projectId && !!parentTaskId,
+  })
+}
+
 export function useProjectEpics(projectId: string | null | undefined) {
   return useQuery<Task[]>({
     queryKey: ['epics', projectId],

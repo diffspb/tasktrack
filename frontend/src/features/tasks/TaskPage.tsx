@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useTaskByKey, useTask, useProjectWorkflows, useProjectResolutions, useProjectMembers,
+  useTaskByKey, useTask, useChildTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers,
   useTransitionStatus, useUpdateTask,
   type Status, type Resolution,
 } from './api'
@@ -28,6 +28,7 @@ export function TaskPage() {
 
   const { data: task, isLoading, error } = useTaskByKey(key)
   const { data: parentTask } = useTask(task?.parent_task_id)
+  const { data: childTasks = [] } = useChildTasks(task?.project_id, task?.id)
   const { data: workflows } = useProjectWorkflows(task?.project_id ?? '')
   const { data: resolutions = [] } = useProjectResolutions(task?.project_id ?? '')
   const { data: members } = useProjectMembers(task?.project_id)
@@ -184,6 +185,47 @@ export function TaskPage() {
                 <p className="text-sm text-muted-foreground italic">No description.</p>
               )}
             </div>
+
+            {/* Child tasks */}
+            {childTasks.filter(t => !t.deleted_at).length > 0 && (
+              <div className="space-y-2 border-t pt-5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Child tasks ({childTasks.filter(t => !t.deleted_at).length})
+                </p>
+                <ul className="space-y-1">
+                  {childTasks.filter(t => !t.deleted_at).map(child => {
+                    const childStatus = statuses.find(s => s.id === child.current_status_id)
+                    const statusCls =
+                      childStatus?.category === 'final' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                      childStatus?.category === 'initial' ? 'bg-muted text-muted-foreground' :
+                      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    return (
+                      <li key={child.id}>
+                        <Link
+                          to={`/tasks/${child.key}`}
+                          className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 hover:bg-muted/50 transition-colors group"
+                        >
+                          <span className="font-mono text-[11px] font-semibold text-muted-foreground/70 group-hover:text-primary transition-colors w-20 shrink-0">
+                            {child.key}
+                          </span>
+                          <span className="flex-1 text-sm truncate">{child.title}</span>
+                          {childStatus && (
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${statusCls}`}>
+                              {childStatus.name}
+                            </span>
+                          )}
+                          {child.assignee_id && userById.get(child.assignee_id) && (
+                            <span className="text-[11px] text-muted-foreground/60 shrink-0">
+                              {userById.get(child.assignee_id)!.display_name}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
 
             {/* Comments */}
             <div className="border-t pt-5">
