@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import type { Task, Assignment } from './api'
+import type { Task } from './api'
 
 const PRIORITY_COLORS: Record<string, string> = {
   low:      'oklch(0.65 0.08 240)',
@@ -8,29 +8,27 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: 'oklch(0.55 0.22 25)',
 }
 
-const GLOBAL_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  open:              { bg: 'bg-muted',                                          text: 'text-muted-foreground',                 label: 'Open' },
-  in_progress:       { bg: 'bg-blue-100 dark:bg-blue-900/30',                   text: 'text-blue-700 dark:text-blue-300',       label: 'In Progress' },
-  awaiting_decision: { bg: 'bg-yellow-100 dark:bg-yellow-900/30',               text: 'text-yellow-700 dark:text-yellow-300',   label: 'Awaiting' },
-  in_revision:       { bg: 'bg-orange-100 dark:bg-orange-900/30',               text: 'text-orange-700 dark:text-orange-300',   label: 'Revision' },
-  decided:           { bg: 'bg-green-100 dark:bg-green-900/30',                 text: 'text-green-700 dark:text-green-300',     label: 'Decided' },
-  closed:            { bg: 'bg-muted',                                          text: 'text-muted-foreground',                  label: 'Closed' },
+const TYPE_COLORS: Record<string, string> = {
+  bug:      '#ef4444',
+  story:    '#10b981',
+  epic:     '#f59e0b',
+  decision: '#8b5cf6',
+  task:     '#6366f1',
 }
 
 interface Props {
   task: Task
-  myAssignment: Assignment | undefined
-  statusName: string
+  assigneeName?: string
   isDragging: boolean
   onClick: () => void
   onDragStart: () => void
   onDragEnd: () => void
 }
 
-export function TaskCard({ task, isDragging, onClick, onDragStart, onDragEnd }: Props) {
-  const gs = GLOBAL_STATUS_STYLES[task.global_status] ?? GLOBAL_STATUS_STYLES.open
+export function TaskCard({ task, assigneeName, isDragging, onClick, onDragStart, onDragEnd }: Props) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.medium
-  const multiLead = task.assignments.filter(a => a.role === 'lead').length > 1
+  const typeKey = task.task_type?.key ?? 'task'
+  const typeColor = task.task_type?.color ?? TYPE_COLORS[typeKey] ?? TYPE_COLORS.task
 
   return (
     <div
@@ -48,23 +46,25 @@ export function TaskCard({ task, isDragging, onClick, onDragStart, onDragEnd }: 
 
       <div className="pl-1.5 space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[11px] font-semibold text-muted-foreground/70">{task.key}</span>
-          <div className="flex-1" />
-          <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium', gs.bg, gs.text)}>
-            {gs.label}
+          <span
+            className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase"
+            style={{ background: typeColor + '22', color: typeColor }}
+          >
+            {typeKey}
           </span>
+          <span className="font-mono text-[11px] font-semibold text-muted-foreground/70">{task.key}</span>
         </div>
 
         <p className="text-[13px] font-medium leading-snug line-clamp-2">{task.title}</p>
 
         <div className="flex items-center gap-2 pt-0.5">
           <span className="text-[11px] capitalize text-muted-foreground/60">{task.priority}</span>
-          {multiLead && (
-            <span className="text-[10px] text-muted-foreground/60 bg-muted rounded px-1">
-              {task.assignments.filter(a => a.role === 'lead').length} leads
+          <div className="flex-1" />
+          {assigneeName && (
+            <span className="text-[11px] text-muted-foreground/60 max-w-[80px] truncate">
+              {assigneeName}
             </span>
           )}
-          <div className="flex-1" />
           {task.due_date && (
             <span className="text-[11px] text-muted-foreground/60">
               {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}

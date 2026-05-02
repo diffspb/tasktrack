@@ -26,6 +26,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
         <MemoryRouter initialEntries={[`/projects/${PROJECT_ID}/board`]}>
           <Routes>
             <Route path="/projects/:id/board" element={children} />
+            <Route path="/tasks/:key" element={<div>Task page</div>} />
           </Routes>
         </MemoryRouter>
       </TooltipProvider>
@@ -49,27 +50,33 @@ const MOCK_WORKFLOW: api.Workflow[] = [{
 const makeTasks = (): api.Task[] => [
   {
     id: 'task1', project_id: PROJECT_ID, workflow_id: 'wf1',
+    task_type_id: 'tt1', task_type: { id: 'tt1', key: 'task', name: 'Task', is_system: true, color: '#6366f1', icon: 'check-square' },
     key: 'P-1', title: 'My todo task', description: null,
-    task_type: 'task', priority: 'medium', global_status: 'open',
-    reporter_id: STUB_USER, decision_maker_id: null,
-    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
-    assignments: [{ id: 'a1', task_id: 'task1', user_id: STUB_USER, role: 'lead', current_status_id: 's1', resolution_id: null, created_at: '2026-01-01' }],
+    priority: 'medium', reporter_id: STUB_USER,
+    assignee_id: STUB_USER, parent_task_id: null,
+    current_status_id: 's1',
+    meta: {}, due_date: null, version: 1,
+    deleted_at: null, created_at: '2026-01-01', updated_at: '2026-01-01',
   },
   {
     id: 'task2', project_id: PROJECT_ID, workflow_id: 'wf1',
+    task_type_id: 'tt1', task_type: { id: 'tt1', key: 'task', name: 'Task', is_system: true, color: '#6366f1', icon: 'check-square' },
     key: 'P-2', title: 'In progress task', description: null,
-    task_type: 'task', priority: 'high', global_status: 'in_progress',
-    reporter_id: STUB_USER, decision_maker_id: null,
-    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
-    assignments: [{ id: 'a2', task_id: 'task2', user_id: STUB_USER, role: 'lead', current_status_id: 's2', resolution_id: null, created_at: '2026-01-01' }],
+    priority: 'high', reporter_id: STUB_USER,
+    assignee_id: STUB_USER, parent_task_id: null,
+    current_status_id: 's2',
+    meta: {}, due_date: null, version: 1,
+    deleted_at: null, created_at: '2026-01-01', updated_at: '2026-01-01',
   },
   {
     id: 'task3', project_id: PROJECT_ID, workflow_id: 'wf1',
-    key: 'P-3', title: 'Not assigned to me', description: null,
-    task_type: 'task', priority: 'low', global_status: 'open',
-    reporter_id: 'other', decision_maker_id: null,
-    due_date: null, allow_multi_accept: false, version: 1, created_at: '2026-01-01', updated_at: '2026-01-01',
-    assignments: [{ id: 'a3', task_id: 'task3', user_id: 'other-user', role: 'lead', current_status_id: 's1', resolution_id: null, created_at: '2026-01-01' }],
+    task_type_id: 'tt1', task_type: null,
+    key: 'P-3', title: 'Unassigned task', description: null,
+    priority: 'low', reporter_id: 'other',
+    assignee_id: null, parent_task_id: null,
+    current_status_id: 's1',
+    meta: {}, due_date: null, version: 1,
+    deleted_at: null, created_at: '2026-01-01', updated_at: '2026-01-01',
   },
 ]
 
@@ -80,30 +87,24 @@ beforeEach(() => {
   vi.spyOn(api, 'useProjectTasks').mockReturnValue(
     { data: makeTasks(), isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectTasks>,
   )
-  vi.spyOn(api, 'useProjectResolutions').mockReturnValue(
-    { data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectResolutions>,
+  vi.spyOn(api, 'useProjectMembers').mockReturnValue(
+    { data: { items: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectMembers>,
   )
 })
 
 describe('TaskBoard', () => {
   it('renders kanban columns from workflow statuses', () => {
     render(<TaskBoard />, { wrapper: Wrapper })
-    // Column headers are rendered as uppercase spans — use getAllByText since
-    // "In Progress" also appears on task card status badges
     expect(screen.getByText('To Do')).toBeInTheDocument()
     expect(screen.getAllByText('In Progress').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Done')).toBeInTheDocument()
   })
 
-  it('shows tasks assigned to current user in correct columns', () => {
+  it('shows tasks in correct columns by current_status_id', () => {
     render(<TaskBoard />, { wrapper: Wrapper })
     expect(screen.getByText('My todo task')).toBeInTheDocument()
     expect(screen.getByText('In progress task')).toBeInTheDocument()
-  })
-
-  it('does not show tasks not assigned to current user', () => {
-    render(<TaskBoard />, { wrapper: Wrapper })
-    expect(screen.queryByText('Not assigned to me')).not.toBeInTheDocument()
+    expect(screen.getByText('Unassigned task')).toBeInTheDocument()
   })
 
   it('shows loading skeleton while fetching', () => {
@@ -114,7 +115,6 @@ describe('TaskBoard', () => {
       { data: undefined, isLoading: true, isError: false } as unknown as ReturnType<typeof api.useProjectTasks>,
     )
     render(<TaskBoard />, { wrapper: Wrapper })
-    // Skeletons rendered — no task titles visible
     expect(screen.queryByText('My todo task')).not.toBeInTheDocument()
   })
 })

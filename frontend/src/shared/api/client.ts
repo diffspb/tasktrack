@@ -12,6 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   VERSION_REQUIRED:                'Не передан параметр version',
   WORKFLOW_TRANSITION_NOT_ALLOWED: 'Этот переход статуса недопустим',
   WORKFLOW_NO_DEFAULT_STATUS:      'В воркфлоу нет статуса по умолчанию',
+  TASK_BLOCKED_BY_SUBTASKS:        'Задача заблокирована: не все подзадачи завершены',
   // decision process
   SOLUTION_NOT_FOUND:              'Решение не найдено',
   SOLUTION_ALREADY_SUBMITTED:      'Решение уже отправлено',

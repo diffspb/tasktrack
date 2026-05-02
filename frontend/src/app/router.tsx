@@ -3,6 +3,7 @@ import { Layout } from '@/shared/ui/Layout'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { TaskBoard } from '@/features/tasks/TaskBoard'
 import { TaskBacklog } from '@/features/tasks/TaskBacklog'
+import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
 import { Placeholder } from '@/shared/ui/Placeholder'
 
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
       { path: 'projects/:id/backlog',  element: <TaskBacklog /> },
       { path: 'projects/:id/members',  element: <Placeholder title="Members"   /> },
       { path: 'projects/:id/settings', element: <Placeholder title="Settings"  /> },
+      { path: 'tasks/:key',            element: <TaskPage /> },
       { path: 'dashboard',             element: <Dashboard /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],

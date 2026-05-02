@@ -1,42 +1,28 @@
 import { useState, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Plus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks,
-  useProjectWorkflows,
-  useProjectResolutions,
-  useProjectMembers,
-  type Task,
-  type GlobalStatus,
+  useProjectTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers, type Task,
 } from './api'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 
-const GS_STYLES: Record<GlobalStatus, { cls: string; label: string }> = {
-  open:              { cls: 'bg-muted text-muted-foreground',                                          label: 'Open' },
-  in_progress:       { cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',        label: 'In Progress' },
-  awaiting_decision: { cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', label: 'Awaiting Decision' },
-  in_revision:       { cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', label: 'In Revision' },
-  decided:           { cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',    label: 'Decided' },
-  closed:            { cls: 'bg-muted text-muted-foreground',                                          label: 'Closed' },
-}
-
-type Filter = 'all' | 'mine' | 'awaiting_my_decision' | 'reported_by_me'
+type Filter = 'all' | 'mine' | 'reported_by_me'
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'mine', label: 'My work' },
-  { value: 'awaiting_my_decision', label: 'Awaiting my decision' },
   { value: 'reported_by_me', label: 'Reported by me' },
 ]
 
 export function TaskBacklog() {
   const { id: projectId } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
@@ -49,6 +35,10 @@ export function TaskBacklog() {
   const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
   const statuses = defaultWorkflow?.statuses ?? []
   const transitions = defaultWorkflow?.transitions ?? []
+  const statusById = useMemo(
+    () => new Map(statuses.map(s => [s.id, s])),
+    [statuses],
+  )
   const userById = useMemo(
     () => new Map(members?.items.map(m => [m.user.id, m.user]) ?? []),
     [members],
@@ -57,19 +47,11 @@ export function TaskBacklog() {
   const selectedTask = (tasks ?? []).find(t => t.id === selectedTaskId) ?? null
 
   const filtered = useMemo(() => {
-    const list = tasks ?? []
+    const list = (tasks ?? []).filter(t => !t.deleted_at)
     switch (filter) {
-      case 'mine':
-        return list.filter(t => t.assignments.some(a => a.user_id === user?.id))
-      case 'awaiting_my_decision':
-        return list.filter(t =>
-          t.decision_maker_id === user?.id &&
-          (t.global_status === 'awaiting_decision' || t.global_status === 'in_revision'),
-        )
-      case 'reported_by_me':
-        return list.filter(t => t.reporter_id === user?.id)
-      default:
-        return list
+      case 'mine': return list.filter(t => t.assignee_id === user?.id)
+      case 'reported_by_me': return list.filter(t => t.reporter_id === user?.id)
+      default: return list
     }
   }, [tasks, filter, user?.id])
 
@@ -102,11 +84,9 @@ export function TaskBacklog() {
         </div>
         <div className="flex-1" />
         <span className="text-xs text-muted-foreground">{filtered.length} tasks</span>
-        {defaultWorkflow && (
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Create task
-          </Button>
-        )}
+        <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> Create task
+        </Button>
       </div>
 
       {/* List */}
@@ -121,8 +101,11 @@ export function TaskBacklog() {
               <BacklogRow
                 key={t.id}
                 task={t}
-                userById={userById}
+                statusName={statusById.get(t.current_status_id)?.name ?? '—'}
+                statusCategory={statusById.get(t.current_status_id)?.category}
+                assigneeName={t.assignee_id ? userById.get(t.assignee_id)?.display_name : undefined}
                 onClick={() => setSelectedTaskId(t.id)}
+                onOpenPage={() => navigate(`/tasks/${t.key}`)}
               />
             ))}
           </ul>
@@ -139,50 +122,52 @@ export function TaskBacklog() {
         onClose={() => setSelectedTaskId(null)}
       />
 
-      {defaultWorkflow && (
-        <CreateTaskModal
-          open={createOpen}
-          projectId={projectId ?? ''}
-          workflowId={defaultWorkflow.id}
-          onClose={() => setCreateOpen(false)}
-        />
-      )}
+      <CreateTaskModal
+        open={createOpen}
+        projectId={projectId ?? ''}
+        onClose={() => setCreateOpen(false)}
+      />
     </div>
   )
 }
 
 function BacklogRow({
-  task, userById, onClick,
+  task, statusName, statusCategory, assigneeName, onClick, onOpenPage,
 }: {
   task: Task
-  userById: Map<string, { display_name: string; email: string }>
+  statusName: string
+  statusCategory?: 'initial' | 'intermediate' | 'final'
+  assigneeName?: string
   onClick: () => void
+  onOpenPage: () => void
 }) {
-  const gs = GS_STYLES[task.global_status]
+  const typeKey = task.task_type?.key ?? 'task'
+  const statusCls =
+    statusCategory === 'final' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+    statusCategory === 'initial' ? 'bg-muted text-muted-foreground' :
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+
   return (
-    <li>
-      <button onClick={onClick} className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/40 transition-colors text-left">
-        <span className="font-mono text-xs font-semibold text-muted-foreground w-20 shrink-0">{task.key}</span>
-        <span className="flex-1 text-sm truncate">{task.title}</span>
-        <Badge variant="outline" className="text-[10px] capitalize h-5">{task.priority}</Badge>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${gs.cls}`}>{gs.label}</span>
-        <div className="flex -space-x-1.5 w-16 shrink-0">
-          {task.assignments.slice(0, 3).map(a => (
-            <span
-              key={a.id}
-              title={userById.get(a.user_id)?.display_name ?? a.user_id}
-              className="h-5 w-5 rounded-full bg-muted-foreground/20 border-2 border-background flex items-center justify-center text-[9px] font-bold"
-            >
-              {(userById.get(a.user_id)?.display_name ?? '??').slice(0, 2).toUpperCase()}
-            </span>
-          ))}
-          {task.assignments.length > 3 && (
-            <span className="h-5 w-5 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] text-muted-foreground">
-              +{task.assignments.length - 3}
-            </span>
+    <li className="group">
+      <div className="flex items-center gap-3 px-5 py-2.5 hover:bg-muted/40 transition-colors">
+        <button onClick={onClick} className="flex items-center gap-3 flex-1 text-left min-w-0">
+          <span className="font-mono text-xs font-semibold text-muted-foreground w-20 shrink-0">{task.key}</span>
+          <span className="text-xs text-muted-foreground/60 capitalize w-14 shrink-0">{typeKey}</span>
+          <span className="flex-1 text-sm truncate">{task.title}</span>
+          <Badge variant="outline" className="text-[10px] capitalize h-5 shrink-0">{task.priority}</Badge>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${statusCls}`}>{statusName}</span>
+          {assigneeName && (
+            <span className="text-[11px] text-muted-foreground/60 shrink-0 max-w-[80px] truncate">{assigneeName}</span>
           )}
-        </div>
-      </button>
+        </button>
+        <button
+          onClick={onOpenPage}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/50 hover:text-muted-foreground p-1 rounded"
+          title="Open task page"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </li>
   )
 }

@@ -3,24 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/shared/api/client'
-import type { GlobalStatus } from '@/features/tasks/api'
 
 interface SearchHit {
   id: string
   key: string
   title: string
-  global_status: GlobalStatus
+  current_status_id: string
   project: { id: string; key: string; name: string }
   highlight: string
-}
-
-const GS_CLS: Record<GlobalStatus, string> = {
-  open:              'bg-muted text-muted-foreground',
-  in_progress:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  awaiting_decision: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  in_revision:       'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  decided:           'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  closed:            'bg-muted text-muted-foreground',
 }
 
 export function SearchBar() {
@@ -56,7 +46,7 @@ export function SearchBar() {
   function handlePick(hit: SearchHit) {
     setOpen(false)
     setQ('')
-    navigate(`/projects/${hit.project.id}/backlog`)
+    navigate(`/tasks/${hit.key}`)
   }
 
   return (
@@ -92,9 +82,6 @@ export function SearchBar() {
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] text-muted-foreground">{hit.project.key}/{hit.key}</span>
                       <span className="font-medium text-sm flex-1 truncate">{hit.title}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${GS_CLS[hit.global_status]}`}>
-                        {hit.global_status.replace('_', ' ')}
-                      </span>
                     </div>
                     <p
                       className="text-xs text-muted-foreground line-clamp-2 [&_b]:text-foreground [&_b]:font-semibold"

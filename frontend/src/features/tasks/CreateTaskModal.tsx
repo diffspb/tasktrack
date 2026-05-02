@@ -9,18 +9,18 @@ import { useCreateTask, useProjectMembers, type Priority } from './api'
 interface Props {
   open: boolean
   projectId: string
-  workflowId: string
   onClose: () => void
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'critical']
+const TASK_TYPES = ['task', 'bug', 'story', 'epic', 'decision']
 
-export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props) {
+export function CreateTaskModal({ open, projectId, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [description, setDescription] = useState('')
-  const [decisionMakerId, setDecisionMakerId] = useState<string>('')
-  const [allowMultiAccept, setAllowMultiAccept] = useState(false)
+  const [typeKey, setTypeKey] = useState('task')
+  const [assigneeId, setAssigneeId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
@@ -32,17 +32,16 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
     try {
       await create.mutateAsync({
         title: title.trim(),
-        workflow_id: workflowId,
         priority,
         description: description.trim() || undefined,
-        decision_maker_id: decisionMakerId || undefined,
-        allow_multi_accept: allowMultiAccept,
+        task_type_key: typeKey,
+        assignee_id: assigneeId || undefined,
       })
       setTitle('')
       setPriority('medium')
       setDescription('')
-      setDecisionMakerId('')
-      setAllowMultiAccept(false)
+      setTypeKey('task')
+      setAssigneeId('')
       onClose()
     } catch (err) {
       const detail = (err as AxiosError<{ detail: unknown }>)?.response?.data?.detail
@@ -66,6 +65,37 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
               placeholder="Task title"
               autoFocus
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="task-type">Type</Label>
+              <select
+                id="task-type"
+                value={typeKey}
+                onChange={e => setTypeKey(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {TASK_TYPES.map(t => (
+                  <option key={t} value={t} className="capitalize">{t}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="task-assignee">Assignee</Label>
+              <select
+                id="task-assignee"
+                value={assigneeId}
+                onChange={e => setAssigneeId(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">— None —</option>
+                {members?.items.map(m => (
+                  <option key={m.user.id} value={m.user.id}>{m.user.display_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -101,33 +131,6 @@ export function CreateTaskModal({ open, projectId, workflowId, onClose }: Props)
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring resize-none"
             />
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="task-dm">
-              Decision-maker <span className="text-muted-foreground font-normal">(optional, required for multi-lead)</span>
-            </Label>
-            <select
-              id="task-dm"
-              value={decisionMakerId}
-              onChange={e => setDecisionMakerId(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="">— None —</option>
-              {members?.items.map(m => (
-                <option key={m.user.id} value={m.user.id}>{m.user.display_name}</option>
-              ))}
-            </select>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={allowMultiAccept}
-              onChange={e => setAllowMultiAccept(e.target.checked)}
-            />
-            Allow multiple accepted Solutions
-            <span className="text-xs text-muted-foreground">(experimental)</span>
-          </label>
 
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>

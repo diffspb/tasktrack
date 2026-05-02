@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuth } from '@/features/auth/AuthProvider'
-import { useProjectTasks, useProjectWorkflows, useProjectResolutions, useTransitionStatus, type Task, type Status } from './api'
+import {
+  useProjectTasks, useProjectWorkflows, useProjectMembers, useTransitionStatus,
+  type Status,
+} from './api'
 import { TaskCard } from './TaskCard'
-import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 
 function BoardSkeleton() {
@@ -26,8 +27,7 @@ function BoardSkeleton() {
 
 export function TaskBoard() {
   const { id: projectId } = useParams<{ id: string }>()
-  const { user } = useAuth()
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
@@ -35,9 +35,7 @@ export function TaskBoard() {
 
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
-  // Derive from live query cache — always fresh after any mutation
-  const selectedTask = (tasks ?? []).find(t => t.id === selectedTaskId) ?? null
-  const { data: resolutions = [] } = useProjectResolutions(projectId ?? '')
+  const { data: membersData } = useProjectMembers(projectId)
   const transition = useTransitionStatus(projectId ?? '')
 
   const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
@@ -45,33 +43,34 @@ export function TaskBoard() {
     () => [...(defaultWorkflow?.statuses ?? [])].sort((a, b) => a.position - b.position),
     [defaultWorkflow],
   )
-  const transitions = defaultWorkflow?.transitions ?? []
 
-  const myTasks = useMemo(
-    () => (tasks ?? []).filter(t => t.assignments.some(a => a.user_id === user?.id)),
-    [tasks, user?.id],
+  const userById = useMemo(
+    () => new Map(membersData?.items.map(m => [m.user.id, m.user]) ?? []),
+    [membersData],
   )
 
-  function myStatusFor(task: Task) {
-    return task.assignments.find(a => a.user_id === user?.id)?.current_status_id ?? null
-  }
+  const activeTasks = useMemo(
+    () => (tasks ?? []).filter(t => !t.deleted_at),
+    [tasks],
+  )
 
   async function handleDrop(targetStatusId: string) {
     if (!draggedId) return
-    const task = myTasks.find(t => t.id === draggedId)
-    const assignment = task?.assignments.find(a => a.user_id === user?.id)
-    if (!assignment || assignment.current_status_id === targetStatusId) {
+    const task = activeTasks.find(t => t.id === draggedId)
+    if (!task || task.current_status_id === targetStatusId) {
       setDraggedId(null); setDragOverCol(null); return
     }
     setDraggedId(null); setDragOverCol(null); setBoardError(null)
     try {
-      await transition.mutateAsync({ assignmentId: assignment.id, status_id: targetStatusId })
+      await transition.mutateAsync({ taskId: task.id, status_id: targetStatusId })
     } catch (err) {
       const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
       if (code === 'RESOLUTION_REQUIRED') {
-        setSelectedTaskId(task?.id ?? null) // open detail so user can pick resolution
+        navigate(`/tasks/${task.key}`)
       } else if (code === 'WORKFLOW_TRANSITION_NOT_ALLOWED') {
         showError('That transition is not allowed in this workflow.')
+      } else if (code === 'TASK_BLOCKED_BY_SUBTASKS') {
+        showError('Task is blocked: subtasks are not resolved yet.')
       } else {
         showError('Failed to move task.')
       }
@@ -98,7 +97,7 @@ export function TaskBoard() {
       {/* Toolbar */}
       <div className="flex items-center gap-3 border-b px-5 py-3 shrink-0">
         <span className="text-sm text-muted-foreground">
-          Showing <strong className="text-foreground">my tasks</strong> — personal workflow view
+          Board — <strong className="text-foreground">{activeTasks.length}</strong> tasks
         </span>
         <div className="flex-1" />
         {boardError && <span className="text-sm text-destructive">{boardError}</span>}
@@ -112,7 +111,7 @@ export function TaskBoard() {
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <div className="flex gap-4 p-5 h-full items-start">
           {statuses.map(status => {
-            const colTasks = myTasks.filter(t => myStatusFor(t) === status.id)
+            const colTasks = activeTasks.filter(t => t.current_status_id === status.id)
             const isOver = dragOverCol === status.id
             return (
               <div key={status.id} className="flex flex-col w-[280px] shrink-0">
@@ -166,10 +165,9 @@ export function TaskBoard() {
                     <TaskCard
                       key={task.id}
                       task={task}
-                      myAssignment={task.assignments.find(a => a.user_id === user?.id)}
-                      statusName={status.name}
+                      assigneeName={task.assignee_id ? userById.get(task.assignee_id)?.display_name : undefined}
                       isDragging={draggedId === task.id}
-                      onClick={() => setSelectedTaskId(task.id)}
+                      onClick={() => navigate(`/tasks/${task.key}`)}
                       onDragStart={() => setDraggedId(task.id)}
                       onDragEnd={() => { setDraggedId(null); setDragOverCol(null) }}
                     />
@@ -186,20 +184,9 @@ export function TaskBoard() {
         </div>
       </div>
 
-      <TaskDetail
-        task={selectedTask}
-        statuses={statuses}
-        transitions={transitions}
-        resolutions={resolutions}
-        projectId={projectId ?? ''}
-        currentUserId={user?.id ?? ''}
-        onClose={() => setSelectedTaskId(null)}
-      />
-
       <CreateTaskModal
         open={createOpen}
         projectId={projectId ?? ''}
-        workflowId={defaultWorkflow.id}
         onClose={() => setCreateOpen(false)}
       />
     </div>
