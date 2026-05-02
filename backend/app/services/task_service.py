@@ -16,6 +16,7 @@ from app.schemas.task import (
     TaskCreate,
     TaskUpdate,
 )
+from app.services import notification_service
 from app.services.permissions import require_project_access
 from app.services.workflow_service import validate_transition
 
@@ -77,13 +78,45 @@ async def list_tasks(
     return list((await session.scalars(stmt)).all())
 
 
-async def list_my_tasks(session: AsyncSession, user: User) -> list[Task]:
-    assigned_task_ids = select(Assignment.task_id).where(Assignment.user_id == user.id)
+async def list_my_tasks(
+    session: AsyncSession,
+    user: User,
+    *,
+    role: str | None = None,
+    global_status: GlobalStatus | None = None,
+    project_id: uuid.UUID | None = None,
+) -> list[Task]:
+    """
+    Tasks where current user is involved.
+      role=None       → assignee OR reporter OR decision_maker (default dashboard view)
+      role=assignee   → has Assignment
+      role=reporter   → reporter_id matches
+      role=dm         → decision_maker_id matches
+    """
+    assigned_ids = select(Assignment.task_id).where(Assignment.user_id == user.id)
+
+    if role == "assignee":
+        cond = Task.id.in_(assigned_ids)
+    elif role == "reporter":
+        cond = Task.reporter_id == user.id
+    elif role == "dm":
+        cond = Task.decision_maker_id == user.id
+    else:
+        cond = (
+            Task.id.in_(assigned_ids)
+            | (Task.reporter_id == user.id)
+            | (Task.decision_maker_id == user.id)
+        )
+
     stmt = (
         select(Task)
         .options(selectinload(Task.assignments))
-        .where(Task.id.in_(assigned_task_ids), Task.deleted_at.is_(None))
+        .where(cond, Task.deleted_at.is_(None))
     )
+    if global_status:
+        stmt = stmt.where(Task.global_status == global_status)
+    if project_id:
+        stmt = stmt.where(Task.project_id == project_id)
     return list((await session.scalars(stmt)).all())
 
 
@@ -149,6 +182,11 @@ async def assign_user(
     await session.flush()
 
     await _recalculate_global_status(session, task)
+
+    # Don't notify yourself if you're self-assigning ("Assign to me").
+    if assignment.user_id != user.id:
+        await notification_service.notify_task_assigned(session, task, assignment)
+
     await session.commit()
     await session.refresh(assignment)
     return assignment

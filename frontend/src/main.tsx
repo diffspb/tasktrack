@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/features/auth/AuthProvider'
+import { Toaster } from 'sonner'
 import { router } from '@/app/router'
 import './index.css'
 
@@ -17,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <TooltipProvider>
           <RouterProvider router={router} />
+          <Toaster position="bottom-right" richColors closeButton />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

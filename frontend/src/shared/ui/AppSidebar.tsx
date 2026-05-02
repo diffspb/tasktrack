@@ -5,6 +5,7 @@ import {
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useProject } from '@/features/projects/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 const TOP_NAV = [
@@ -23,6 +24,7 @@ export function AppSidebar() {
   const { user, stubUsers, switchStubUser } = useAuth()
   const projectMatch = useMatch('/projects/:id/*')
   const projectId = projectMatch?.params.id
+  const { data: project } = useProject(projectId)
 
   return (
     <Sidebar>
@@ -55,7 +57,16 @@ export function AppSidebar() {
 
         {projectId && (
           <SidebarGroup>
-            <SidebarGroupLabel>Project</SidebarGroupLabel>
+            <SidebarGroupLabel className="flex items-center gap-1.5 truncate">
+              <span className="truncate font-semibold text-foreground">
+                {project?.name ?? '…'}
+              </span>
+              {project && (
+                <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">
+                  {project.key}
+                </span>
+              )}
+            </SidebarGroupLabel>
             <SidebarMenu>
               {PROJECT_NAV.map(item => (
                 <SidebarMenuItem key={item.suffix}>

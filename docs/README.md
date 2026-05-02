@@ -22,7 +22,7 @@
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка + Alembic | `mvp-research-launch` | 🔲 |
+| 8. Доводка | `mvp-research-launch` | 🔲 |
 
 Инфра: Docker обязателен. Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
 Архитектурные решения → **[decisions/](./decisions/)**.

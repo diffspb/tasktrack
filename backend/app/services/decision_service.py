@@ -27,6 +27,7 @@ from app.schemas.decision import (
     SolutionCreate,
     SolutionUpdate,
 )
+from app.services import notification_service
 from app.services.permissions import require_project_access
 from app.services.task_service import _recalculate_global_status
 
@@ -206,6 +207,9 @@ async def submit_solution(
     await _recalculate_global_status(session, task)
     transitioned = task.global_status if task.global_status != before else None
 
+    if transitioned == GlobalStatus.awaiting_decision:
+        await notification_service.notify_awaiting_decision(session, task)
+
     await session.commit()
     await session.refresh(sol)
     return sol, transitioned
@@ -279,6 +283,8 @@ async def request_revision(
     before = task.global_status
     await _recalculate_global_status(session, task)
     transitioned = task.global_status if task.global_status != before else None
+
+    await notification_service.notify_revision_requested(session, task, assignment, feedback)
 
     await session.commit()
     await session.refresh(sol)
@@ -466,6 +472,8 @@ async def make_decision(
 
     task.global_status = GlobalStatus.decided
 
+    await notification_service.notify_decision_made(session, task)
+
     await session.commit()
     await session.refresh(decision)
     return decision
@@ -502,6 +510,7 @@ async def close_task(
         )
 
     task.global_status = GlobalStatus.closed
+    await notification_service.notify_task_closed(session, task)
     await session.commit()
     return await session.scalar(
         select(Task)

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 from app.models import (
     Assignment, AssigneeRole, Base, DecisionCriteria, GlobalStatus,
+    Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility,
     Resolution, Solution, SolutionStatus, Status, StatusCategory,
     Task, TaskPriority, TaskType, Transition, User, Workflow,
@@ -177,10 +178,33 @@ async def seed(session: AsyncSession) -> None:
                     "(пользователи, токены, сессии, refresh, recovery).",
             status=SolutionStatus.submitted, submitted_at=now,
         ),
+        # Notifications для демонстрации колокольчика
+        Notification(
+            recipient_id=manager_id,
+            event_type=NotificationEventType.awaiting_decision,
+            entity_type=NotificationEntityType.task,
+            entity_id=t10.id, task_id=t10.id,
+            message=f"Все Solution поданы по {t10.key}: {t10.title} — требуется Decision",
+        ),
+        Notification(
+            recipient_id=admin_id,
+            event_type=NotificationEventType.task_assigned,
+            entity_type=NotificationEntityType.task,
+            entity_id=t10.id, task_id=t10.id,
+            message=f"Вас назначили на задачу {t10.key}: {t10.title}",
+        ),
+        Notification(
+            recipient_id=dev1_id,
+            event_type=NotificationEventType.task_assigned,
+            entity_type=NotificationEntityType.task,
+            entity_id=t10.id, task_id=t10.id,
+            message=f"Вас назначили на задачу {t10.key}: {t10.title}",
+        ),
     ])
     await session.commit()
     print("  → 3 пользователя, проект DEMO, воркфлоу «Базовый», 12 задач")
     print("  → DEMO-10: multi-lead Decision Process (2 submitted Solutions, awaiting Manager's Decision)")
+    print("  → 3 уведомления для демонстрации колокольчика (Manager: awaiting_decision, admin/dev1: assigned)")
 
 
 if __name__ == "__main__":

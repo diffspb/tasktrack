@@ -5,6 +5,7 @@ from app.models.workflow import Status, StatusCategory, Transition, Workflow
 from app.models.resolution import Resolution
 from app.models.task import Assignment, AssigneeRole, GlobalStatus, Task, TaskLink, TaskLinkType, TaskPriority, TaskType
 from app.models.decision import DecisionCriteria, Solution, SolutionStatus, TaskDecision
+from app.models.notification import Notification, NotificationEntityType, NotificationEventType
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -15,4 +16,5 @@ __all__ = [
     "Task", "Assignment", "TaskLink", "GlobalStatus", "TaskType", "TaskPriority",
     "AssigneeRole", "TaskLinkType",
     "Solution", "SolutionStatus", "DecisionCriteria", "TaskDecision",
+    "Notification", "NotificationEntityType", "NotificationEventType",
 ]
