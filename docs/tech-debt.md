@@ -7,10 +7,20 @@
 
 ---
 
-## Отложено на Этап 8 (доводка)
+## Блокеры перед командным пилотом
+
+**`GET /projects/{id}/task-types` отсутствует в бэкенде.**
+Фронтенд (хук `useProjectTaskTypes`) вызывает этот endpoint при загрузке CreateTaskModal, фильтров и настроек типов. Бэкенд возвращает 404 — типы задач не загружаются. Реализация: `GET /projects/{project_id}/task-types` → системные типы (`is_system=true`) + кастомные типы проекта, отсортированные по позиции. Тест: `test_get_project_task_types` в `tests/test_projects.py`.
+
+**`ProjectMember.role` — роль `viewer` не реализована в бэкенде.**
+Frontend `ProjectSettings.tsx` предлагает роли `['admin', 'manager', 'member', 'viewer']`. Backend enum `ProjectMemberRole` содержит только `{admin, manager, member}`. При попытке добавить участника с ролью `viewer` бэкенд возвращает `422 Unprocessable Entity`. Исправить: добавить `viewer = "viewer"` в `ProjectMemberRole` и описать его права в матрице (`docs/13-permissions.md`).
+
+---
+
+## Отложено на post-MVP (после исследовательского запуска)
 
 **APScheduler стартует без задач.**
-`scheduler.start()` в lifespan — мёртвый код. Структуру не убираем; задачи (напоминания decision-maker'у через 3 дня в `awaiting_decision`) — после реализации `Notification` в Этапе 8.
+`scheduler.start()` в lifespan — мёртвый код. Структуру не убираем; задачи (напоминания decision-maker'у через 3 дня в `awaiting_decision`) — после реализации полноценного Decision Process (зависит от восстановления Assignment+Solution).
 
 ---
 
@@ -26,17 +36,25 @@
 
 **Transition: несколько ролей.** Сейчас `Transition.required_role` — одиночная строка (один required_role или NULL). Документация описывала `allowed_roles[]` (массив). Изменить на массив, когда понадобится разрешать переход нескольким разным ролям одновременно.
 
+**`resolution_id` хранится в `Task.meta` как строка, не как FK.**
+При переходе в финальный статус воркфлоу `resolution_id` сохраняется в `Task.meta["resolution_id"]` (строка UUID). Последствия: нет FK-ограничения (можно указать несуществующую резолюцию), нет индекса для фильтрации задач по резолюции, `TaskResponse` не возвращает `resolution_id` — фронтенд не может показать выбранную резолюцию на карточке задачи. Правильное решение: добавить `Task.resolution_id FK → resolutions.id` как отдельную колонку.
+
+**`Comment.search_vector` не реализован.**
+Поиск по тексту комментариев (`09-mvp.md`: 🟢) не работает — `Comment` не имеет поля `search_vector`, `search_service.py` ищет только по `Task.search_vector`. Добавить: поле `search_vector tsvector` в `Comment`, триггер обновления, `GIN`-индекс, расширить запрос в `search_service.py`.
+
+**`_count_active_assignments()` — вводящее в заблуждение имя.**
+Функция в `workflow_service.py` считает `Task.current_status_id`, а не Assignment-записи (которых нет). Переименовать в `_count_tasks_in_status()`.
+
 ---
 
 ## Непокрытые тесты
 
-Закрыты P0/P1 перед Этапом 4 (2026-04-29). Оставшиеся кейсы не блокируют фронтенд-разработку, дописать в Этапе 8.
+Закрыты P0/P1 перед Этапом 4 (2026-04-29). Оставшиеся кейсы:
 
 **Error cases:**
 
 - `TASK_NOT_FOUND` при GET/PATCH/DELETE с несуществующим UUID задачи
-- `ASSIGNMENT_NOT_FOUND` при переходе статуса по несуществующему `assignment_id`
-- `WORKFLOW_NO_DEFAULT_STATUS` в `assign_user` (воркфлоу без дефолтного статуса)
+- `NO_DEFAULT_WORKFLOW` при создании задачи в проекте без дефолтного воркфлоу
 - `STATUS_WORKFLOW_MISMATCH` в `migrate_status` (target из другого воркфлоу)
 - `TRANSITION_NOT_FOUND` при `DELETE /transitions/{id}` с несуществующим ID
 - `STATUS_DEFAULT_MUST_BE_INITIAL` через `PATCH /statuses/{id}`
