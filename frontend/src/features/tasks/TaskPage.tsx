@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useTaskByKey, useProjectWorkflows, useProjectResolutions, useProjectMembers,
+  useTaskByKey, useTask, useProjectWorkflows, useProjectResolutions, useProjectMembers,
   useTransitionStatus, useUpdateTask,
   type Status, type Resolution,
 } from './api'
@@ -112,6 +112,7 @@ export function TaskPage() {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.medium
   const assignee = task.assignee_id ? userById.get(task.assignee_id) : null
   const isAssignee = task.assignee_id === user?.id
+  const { data: parentTask } = useTask(task?.parent_task_id)
   const inFinalStatus = currentStatus?.category === 'final'
 
   return (
@@ -312,6 +313,20 @@ export function TaskPage() {
                 <span className="capitalize font-medium">{task.priority}</span>
               </div>
             </div>
+
+            {/* Parent (epic) */}
+            {parentTask && (
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-0.5">Parent</p>
+                <Link
+                  to={`/tasks/${parentTask.key}`}
+                  className="flex items-center gap-1.5 text-xs hover:underline"
+                >
+                  <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">{parentTask.key}</span>
+                  <span className="text-foreground truncate">{parentTask.title}</span>
+                </Link>
+              </div>
+            )}
 
             {/* Reporter */}
             <div>

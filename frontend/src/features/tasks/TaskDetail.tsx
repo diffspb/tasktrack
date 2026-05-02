@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Task, Status, Resolution } from './api'
-import { useTransitionStatus, useUpdateTask, useProjectMembers } from './api'
+import { useTask, useTransitionStatus, useUpdateTask, useProjectMembers } from './api'
 
 interface Props {
   task: Task | null
@@ -74,6 +74,7 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
   const assignee = task?.assignee_id ? userById.get(task.assignee_id) : null
   const isAssignee = task?.assignee_id === currentUserId
   const typeKey = task?.task_type?.key ?? 'task'
+  const { data: parentTask } = useTask(task?.parent_task_id)
 
   if (!task) return null
 
@@ -224,10 +225,17 @@ export function TaskDetail({ task, statuses, transitions, resolutions, projectId
               <p className="font-medium">{new Date(task.due_date).toLocaleDateString()}</p>
             </div>
           )}
-          {task.parent_task_id && (
-            <div>
+          {parentTask && (
+            <div className="col-span-2">
               <p className="text-[11px] text-muted-foreground mb-0.5">Parent</p>
-              <p className="font-medium text-xs text-primary">{task.parent_task_id.slice(0, 8)}…</p>
+              <Link
+                to={`/tasks/${parentTask.key}`}
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-xs hover:underline"
+              >
+                <span className="font-mono font-semibold text-muted-foreground">{parentTask.key}</span>
+                <span className="text-foreground truncate">{parentTask.title}</span>
+              </Link>
             </div>
           )}
         </div>
