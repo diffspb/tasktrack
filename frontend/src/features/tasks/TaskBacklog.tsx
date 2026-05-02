@@ -10,21 +10,14 @@ import {
 } from './api'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
-
-type Filter = 'all' | 'mine' | 'reported_by_me'
-
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'My work' },
-  { value: 'reported_by_me', label: 'Reported by me' },
-]
+import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
 
 export function TaskBacklog() {
   const { id: projectId } = useParams<{ id: string }>()
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
 
   const { data: workflows } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading } = useProjectTasks(projectId ?? '')
@@ -34,10 +27,8 @@ export function TaskBacklog() {
   const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
   const statuses = defaultWorkflow?.statuses ?? []
   const transitions = defaultWorkflow?.transitions ?? []
-  const statusById = useMemo(
-    () => new Map(statuses.map(s => [s.id, s])),
-    [statuses],
-  )
+  const statusById = useMemo(() => new Map(statuses.map(s => [s.id, s])), [statuses])
+  const taskById = useMemo(() => new Map((tasks ?? []).map(t => [t.id, t])), [tasks])
   const userById = useMemo(
     () => new Map(members?.items.map(m => [m.user.id, m.user]) ?? []),
     [members],
@@ -45,14 +36,10 @@ export function TaskBacklog() {
 
   const selectedTask = (tasks ?? []).find(t => t.id === selectedTaskId) ?? null
 
-  const filtered = useMemo(() => {
-    const list = (tasks ?? []).filter(t => !t.deleted_at)
-    switch (filter) {
-      case 'mine': return list.filter(t => t.assignee_id === user?.id)
-      case 'reported_by_me': return list.filter(t => t.reporter_id === user?.id)
-      default: return list
-    }
-  }, [tasks, filter, user?.id])
+  const filtered = useMemo(
+    () => applyFilter((tasks ?? []).filter(t => !t.deleted_at), filter, user?.id ?? ''),
+    [tasks, filter, user?.id],
+  )
 
   if (isLoading) {
     return (
@@ -63,52 +50,41 @@ export function TaskBacklog() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b px-5 py-3 shrink-0 flex-wrap">
-        <div className="flex items-center gap-1">
-          {FILTERS.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
-                filter === f.value
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+    <div className="flex h-full overflow-hidden">
+      {/* Left: list content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 border-b px-5 py-3 shrink-0 flex-wrap">
+          <TaskFilterBar filter={filter} onChange={setFilter} taskCount={filtered.length} />
+          <div className="flex-1" />
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Create task
+          </Button>
         </div>
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">{filtered.length} tasks</span>
-        <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" /> Create task
-        </Button>
-      </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
-            No tasks match this filter.
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {filtered.map(t => (
-              <BacklogRow
-                key={t.id}
-                task={t}
-                statusName={statusById.get(t.current_status_id)?.name ?? '—'}
-                statusCategory={statusById.get(t.current_status_id)?.category}
-                assigneeName={t.assignee_id ? userById.get(t.assignee_id)?.display_name : undefined}
-                onClick={() => setSelectedTaskId(t.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
+              No tasks match this filter.
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {filtered.map(t => (
+                <BacklogRow
+                  key={t.id}
+                  task={t}
+                  statusName={statusById.get(t.current_status_id)?.name ?? '—'}
+                  statusCategory={statusById.get(t.current_status_id)?.category}
+                  assigneeName={t.assignee_id ? userById.get(t.assignee_id)?.display_name : undefined}
+                  epicKey={t.parent_task_id ? taskById.get(t.parent_task_id)?.key : undefined}
+                  onClick={() => setSelectedTaskId(t.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>{/* end left */}
 
       <TaskDetail
         task={selectedTask}
@@ -130,12 +106,13 @@ export function TaskBacklog() {
 }
 
 function BacklogRow({
-  task, statusName, statusCategory, assigneeName, onClick,
+  task, statusName, statusCategory, assigneeName, epicKey, onClick,
 }: {
   task: Task
   statusName: string
   statusCategory?: 'initial' | 'intermediate' | 'final'
   assigneeName?: string
+  epicKey?: string
   onClick: () => void
 }) {
   const typeKey = task.task_type?.key ?? 'task'
@@ -147,7 +124,6 @@ function BacklogRow({
   return (
     <li>
       <div className="flex items-center gap-3 px-5 py-2.5 hover:bg-muted/40 transition-colors cursor-pointer" onClick={onClick}>
-        {/* Key is a link — stops propagation so it doesn't open the sheet */}
         <Link
           to={`/tasks/${task.key}`}
           onClick={e => e.stopPropagation()}
@@ -156,7 +132,14 @@ function BacklogRow({
           {task.key}
         </Link>
         <span className="text-xs text-muted-foreground/60 capitalize w-14 shrink-0">{typeKey}</span>
-        <span className="flex-1 text-sm truncate">{task.title}</span>
+        <span className="flex-1 text-sm truncate">
+          {epicKey && (
+            <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mr-1.5 shrink-0">
+              {epicKey}
+            </span>
+          )}
+          {task.title}
+        </span>
         <Badge variant="outline" className="text-[10px] capitalize h-5 shrink-0">{task.priority}</Badge>
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${statusCls}`}>{statusName}</span>
         {assigneeName && (

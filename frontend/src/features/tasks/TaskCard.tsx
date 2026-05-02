@@ -20,13 +20,14 @@ const TYPE_COLORS: Record<string, string> = {
 interface Props {
   task: Task
   assigneeName?: string
+  epicKey?: string
   isDragging: boolean
   onClick: () => void        // opens detail sheet
   onDragStart: () => void
   onDragEnd: () => void
 }
 
-export function TaskCard({ task, assigneeName, isDragging, onClick, onDragStart, onDragEnd }: Props) {
+export function TaskCard({ task, assigneeName, epicKey, isDragging, onClick, onDragStart, onDragEnd }: Props) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.medium
   const typeKey = task.task_type?.key ?? 'task'
   const typeColor = task.task_type?.color ?? TYPE_COLORS[typeKey] ?? TYPE_COLORS.task
@@ -63,6 +64,9 @@ export function TaskCard({ task, assigneeName, isDragging, onClick, onDragStart,
           </Link>
         </div>
 
+        {epicKey && (
+          <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">{epicKey}</span>
+        )}
         <p className="text-[13px] font-medium leading-snug line-clamp-2">{task.title}</p>
 
         <div className="flex items-center gap-2 pt-0.5">

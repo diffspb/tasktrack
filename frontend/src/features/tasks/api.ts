@@ -128,6 +128,15 @@ export function useProjectTaskTypes(projectId: string | null | undefined) {
   })
 }
 
+export function useProjectEpics(projectId: string | null | undefined) {
+  return useQuery<Task[]>({
+    queryKey: ['epics', projectId],
+    queryFn: () =>
+      api.get(`/projects/${projectId}/tasks?task_type_key=epic`).then(r => r.data),
+    enabled: !!projectId,
+  })
+}
+
 // --- Mutations ---
 
 export interface CreateTaskInput {
@@ -136,6 +145,7 @@ export interface CreateTaskInput {
   task_type_key?: string
   priority?: Priority
   assignee_id?: string
+  parent_task_id?: string
   due_date?: string
 }
 

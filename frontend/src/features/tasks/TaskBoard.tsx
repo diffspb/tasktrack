@@ -12,6 +12,7 @@ import {
 import { TaskCard } from './TaskCard'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
+import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
 
 function BoardSkeleton() {
   return (
@@ -32,6 +33,7 @@ export function TaskBoard() {
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [boardError, setBoardError] = useState<string | null>(null)
@@ -54,9 +56,11 @@ export function TaskBoard() {
     [membersData],
   )
 
+  const allActive = useMemo(() => (tasks ?? []).filter(t => !t.deleted_at), [tasks])
+  const taskById = useMemo(() => new Map(allActive.map(t => [t.id, t])), [allActive])
   const activeTasks = useMemo(
-    () => (tasks ?? []).filter(t => !t.deleted_at),
-    [tasks],
+    () => applyFilter(allActive, filter, user?.id ?? ''),
+    [allActive, filter, user?.id],
   )
 
   const selectedTask = activeTasks.find(t => t.id === selectedTaskId) ?? null
@@ -100,12 +104,12 @@ export function TaskBoard() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden">
+      {/* Left: board content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center gap-3 border-b px-5 py-3 shrink-0">
-        <span className="text-sm text-muted-foreground">
-          Board — <strong className="text-foreground">{activeTasks.length}</strong> tasks
-        </span>
+        <TaskFilterBar filter={filter} onChange={setFilter} taskCount={activeTasks.length} />
         <div className="flex-1" />
         {boardError && <span className="text-sm text-destructive">{boardError}</span>}
         <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
@@ -171,6 +175,7 @@ export function TaskBoard() {
                       key={task.id}
                       task={task}
                       assigneeName={task.assignee_id ? userById.get(task.assignee_id)?.display_name : undefined}
+                      epicKey={task.parent_task_id ? taskById.get(task.parent_task_id)?.key : undefined}
                       isDragging={draggedId === task.id}
                       onClick={() => setSelectedTaskId(task.id)}
                       onDragStart={() => setDraggedId(task.id)}
@@ -188,6 +193,8 @@ export function TaskBoard() {
           })}
         </div>
       </div>
+
+      </div>{/* end left */}
 
       <TaskDetail
         task={selectedTask}

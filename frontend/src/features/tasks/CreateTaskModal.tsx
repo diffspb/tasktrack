@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateTask, useProjectMembers, type Priority } from './api'
+import { useCreateTask, useProjectMembers, useProjectEpics, type Priority } from './api'
 
 interface Props {
   open: boolean
@@ -21,9 +21,11 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
   const [description, setDescription] = useState('')
   const [typeKey, setTypeKey] = useState('task')
   const [assigneeId, setAssigneeId] = useState('')
+  const [parentEpicId, setParentEpicId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
+  const { data: epics = [] } = useProjectEpics(projectId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -36,12 +38,14 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
         description: description.trim() || undefined,
         task_type_key: typeKey,
         assignee_id: assigneeId || undefined,
+        parent_task_id: parentEpicId || undefined,
       })
       setTitle('')
       setPriority('medium')
       setDescription('')
       setTypeKey('task')
       setAssigneeId('')
+      setParentEpicId('')
       onClose()
     } catch (err) {
       const detail = (err as AxiosError<{ detail: unknown }>)?.response?.data?.detail
@@ -117,6 +121,23 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
               ))}
             </div>
           </div>
+
+          {typeKey !== 'epic' && epics.filter(e => !e.deleted_at).length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="task-epic">Epic <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <select
+                id="task-epic"
+                value={parentEpicId}
+                onChange={e => setParentEpicId(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">— No epic —</option>
+                {epics.filter(e => !e.deleted_at).map(e => (
+                  <option key={e.id} value={e.id}>{e.key}: {e.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="task-desc">
