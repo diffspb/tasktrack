@@ -1,6 +1,12 @@
 # 15. REST API — контракты для MVP-сценариев
 
-Внутренний API для фронтенда. Базовый URL: `/api/v1`. Формат: JSON. Аутентификация: HTTP-only cookie (session). Пагинация: offset-based, параметры `?limit=50&offset=0`.
+Внутренний API для фронтенда. Базовый URL: `/api/v1`. Формат: JSON. Аутентификация: Bearer JWT (dev: `AUTH_STUB=true`). Пагинация: offset-based, параметры `?limit=50&offset=0`.
+
+> **Статус реализации (2026-05-02):**  
+> - ✅ **Реализовано:** Аутентификация (stub), Проекты, Воркфлоу, Задачи, Комментарии, Уведомления, Поиск, Резолюции.  
+> - 🔲 **Запланировано (FR-001):** Типы задач, воркфлоу по типу, колонки борды — раздел «FR-001» ниже.  
+> - 📋 **v2 (не реализовано):** Назначения (Assignment), Decision Process (Solution/Decision), Группы, Связи проектов, Вложения, История, Аудит-лог.  
+> Разделы v2 сохранены для справки; эндпоинты не работают.
 
 Документ покрывает все эндпоинты, необходимые для прохождения MVP-сценариев из `09-mvp.md`.
 
@@ -339,13 +345,13 @@
       "name": "Default",
       "is_default": true,
       "statuses": [
-        { "id": "uuid", "name": "To Do", "category": "open", "is_initial": true, "is_final": false, "position": 1 },
-        { "id": "uuid", "name": "In Progress", "category": "in_progress", "is_initial": false, "is_final": false, "position": 2 },
-        { "id": "uuid", "name": "Done", "category": "done", "is_initial": false, "is_final": true, "position": 3 }
+        { "id": "uuid", "name": "To Do", "category": "initial", "is_default": true, "position": 1, "color": "#CCCCCC" },
+        { "id": "uuid", "name": "In Progress", "category": "intermediate", "is_default": false, "position": 2, "color": "#0099FF" },
+        { "id": "uuid", "name": "Done", "category": "final", "is_default": false, "position": 3, "color": "#00CC66" }
       ],
       "transitions": [
-        { "id": "uuid", "from_status_id": "uuid1", "to_status_id": "uuid2", "allowed_roles": [] },
-        { "id": "uuid", "from_status_id": "uuid2", "to_status_id": "uuid3", "allowed_roles": [] }
+        { "id": "uuid", "from_status_id": "uuid1", "to_status_id": "uuid2", "required_role": null },
+        { "id": "uuid", "from_status_id": "uuid2", "to_status_id": "uuid3", "required_role": null }
       ]
     }
   ]
@@ -382,34 +388,31 @@
     {
       "id": "uuid",
       "name": "To Do",
-      "category": "open",
+      "category": "initial",
       "color": "#CCCCCC",
       "position": 1,
-      "is_initial": true,
-      "is_final": false
+      "is_default": true
     },
     {
       "id": "uuid",
       "name": "In Progress",
-      "category": "in_progress",
+      "category": "intermediate",
       "color": "#0099FF",
       "position": 2,
-      "is_initial": false,
-      "is_final": false
+      "is_default": false
     },
     {
       "id": "uuid",
       "name": "Done",
-      "category": "done",
+      "category": "final",
       "color": "#00CC66",
       "position": 3,
-      "is_initial": false,
-      "is_final": true
+      "is_default": false
     }
   ],
   "transitions": [
-    { "id": "uuid", "from_status_id": "uuid1", "to_status_id": "uuid2", "allowed_roles": [] },
-    { "id": "uuid", "from_status_id": "uuid2", "to_status_id": "uuid3", "allowed_roles": [] }
+    { "id": "uuid", "from_status_id": "uuid1", "to_status_id": "uuid2", "required_role": null },
+    { "id": "uuid", "from_status_id": "uuid2", "to_status_id": "uuid3", "required_role": "manager" }
   ]
 }
 ```
@@ -444,11 +447,10 @@
 ```json
 {
   "name": "In Review",
-  "category": "in_progress",
+  "category": "intermediate",
   "color": "#FFA500",
   "position": 3,
-  "is_initial": false,
-  "is_final": false
+  "is_default": false
 }
 ```
 
@@ -636,7 +638,7 @@ Soft-delete задачи.
 
 ---
 
-### Назначение исполнителей
+### Назначение исполнителей _(v2 — не реализовано; зависит от восстановления Assignment)_
 
 #### POST /tasks/{task_id}/assignments
 Назначить исполнителя.
@@ -929,7 +931,7 @@ Soft-delete задачи.
 
 ---
 
-## S2 + S3. Мульти-исполнители и Decision Process
+## S2 + S3. Мульти-исполнители и Decision Process _(v2 — не реализовано)_
 
 ### DecisionCriteria
 
@@ -1375,6 +1377,278 @@ Soft-delete задачи.
 Удалить связь между проектами.
 
 **Ответ 204:** (нет тела)
+
+---
+
+## FR-001. Воркфлоу по типу задачи и колонки борды
+
+> Планируется к реализации в Этапе 9. Контракты утверждены на основании дизайна из `docs/phase-9-fr001-multi-workflow.md`.
+
+### Типы задач
+
+#### GET /projects/{project_id}/task-types
+Список типов задач, доступных в проекте: системные (`is_system = true`) + кастомные типы проекта.
+
+**Ответ 200:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "key": "task",
+      "name": "Task",
+      "is_system": true,
+      "color": "#3B82F6",
+      "icon": null,
+      "project_id": null
+    },
+    {
+      "id": "uuid",
+      "key": "bug",
+      "name": "Bug",
+      "is_system": true,
+      "color": "#EF4444",
+      "icon": null,
+      "project_id": null
+    },
+    {
+      "id": "uuid",
+      "key": "story",
+      "name": "Story",
+      "is_system": true,
+      "color": "#10B981",
+      "icon": null,
+      "project_id": null
+    },
+    {
+      "id": "uuid",
+      "key": "epic",
+      "name": "Epic",
+      "is_system": true,
+      "color": "#8B5CF6",
+      "icon": null,
+      "project_id": null
+    },
+    {
+      "id": "uuid",
+      "key": "decision",
+      "name": "Decision",
+      "is_system": true,
+      "color": "#F59E0B",
+      "icon": null,
+      "project_id": null
+    }
+  ]
+}
+```
+
+**Ошибки:**
+- `403 Forbidden` — нет доступа к проекту
+- `404 Not Found` — проект не найден
+
+---
+
+### Конфигурация воркфлоу по типу задачи
+
+#### GET /projects/{project_id}/task-type-configs
+Конфигурация воркфлоу для каждого типа задачи. Для типов без явной конфигурации возвращается системный дефолт.
+
+**Ответ 200:**
+```json
+{
+  "items": [
+    {
+      "task_type_id": "uuid",
+      "task_type_key": "task",
+      "task_type_name": "Task",
+      "workflow_id": "uuid",
+      "workflow_name": "Default",
+      "is_project_override": false
+    },
+    {
+      "task_type_id": "uuid",
+      "task_type_key": "bug",
+      "task_type_name": "Bug",
+      "workflow_id": "uuid",
+      "workflow_name": "Bug tracking",
+      "is_project_override": true
+    }
+  ]
+}
+```
+
+- `is_project_override: true` — для этого типа задан проектный воркфлоу (из `ProjectTaskTypeConfig`).
+- `is_project_override: false` — используется системный дефолт (`TaskType.default_workflow_id`).
+
+---
+
+#### PUT /projects/{project_id}/task-type-configs/{task_type_id}
+Задать (или сменить) воркфлоу для конкретного типа задачи в проекте.
+
+**Тело запроса:**
+```json
+{
+  "workflow_id": "uuid"
+}
+```
+
+- `workflow_id` — должен принадлежать этому проекту или быть системным воркфлоу (`Workflow.project_id = NULL`).
+
+**Ответ 200:**
+```json
+{
+  "task_type_id": "uuid",
+  "task_type_key": "bug",
+  "workflow_id": "uuid",
+  "workflow_name": "Bug tracking",
+  "is_project_override": true
+}
+```
+
+**Ошибки:**
+- `400 Bad Request — WORKFLOW_NOT_ACCESSIBLE` — воркфлоу не принадлежит этому проекту и не является системным
+- `403 Forbidden` — нужен Manager или Admin
+- `404 Not Found` — тип задачи или воркфлоу не найден
+
+---
+
+#### DELETE /projects/{project_id}/task-type-configs/{task_type_id}
+Сбросить проектный override: тип задачи возвращается к системному дефолтному воркфлоу.
+
+**Ответ 204:** (нет тела)
+
+**Ошибки:**
+- `404 Not Found` — нет проектного override для этого типа (уже использует системный дефолт)
+- `403 Forbidden` — нужен Manager или Admin
+
+---
+
+### Колонки Kanban-борды
+
+#### GET /projects/{project_id}/board-columns
+Список колонок борды с маппингом статусов.
+
+**Ответ 200:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "name": "To Do",
+      "position": 1,
+      "status_ids": ["uuid-status-1", "uuid-status-2"]
+    },
+    {
+      "id": "uuid",
+      "name": "In Progress",
+      "position": 2,
+      "status_ids": ["uuid-status-3", "uuid-status-4"]
+    },
+    {
+      "id": "uuid",
+      "name": "Done",
+      "position": 3,
+      "status_ids": ["uuid-status-5"]
+    }
+  ]
+}
+```
+
+`status_ids` — статусы из всех воркфлоу проекта, сопоставленные этой колонке. Задача отображается в колонке по совпадению `Task.current_status_id ∈ status_ids`.
+
+---
+
+#### POST /projects/{project_id}/board-columns
+Создать колонку борды.
+
+**Тело запроса:**
+```json
+{
+  "name": "Review",
+  "position": 3
+}
+```
+
+**Ответ 201:**
+```json
+{
+  "id": "uuid",
+  "name": "Review",
+  "position": 3,
+  "status_ids": []
+}
+```
+
+**Ошибки:**
+- `403 Forbidden` — нужен Manager или Admin
+
+---
+
+#### PATCH /board-columns/{column_id}
+Переименовать колонку или изменить позицию.
+
+**Тело запроса:**
+```json
+{
+  "name": "Code Review",
+  "position": 4
+}
+```
+
+Все поля опциональны.
+
+**Ответ 200:** (обновлённая колонка)
+
+**Ошибки:**
+- `403 Forbidden` — нужен Manager или Admin
+- `404 Not Found` — колонка не найдена
+
+---
+
+#### DELETE /board-columns/{column_id}
+Удалить колонку борды. Статусы, сопоставленные этой колонке, освобождаются (маппинг удаляется, сами статусы не затрагиваются).
+
+**Ответ 204:** (нет тела)
+
+**Ошибки:**
+- `403 Forbidden` — нужен Manager или Admin
+- `404 Not Found` — колонка не найдена
+
+---
+
+#### POST /board-columns/{column_id}/statuses
+Добавить статус в колонку.
+
+**Тело запроса:**
+```json
+{
+  "status_id": "uuid"
+}
+```
+
+**Ответ 201:**
+```json
+{
+  "board_column_id": "uuid",
+  "status_id": "uuid"
+}
+```
+
+**Ошибки:**
+- `400 Bad Request — STATUS_ALREADY_MAPPED` — статус уже сопоставлен другой колонке в этом проекте
+- `400 Bad Request — STATUS_NOT_IN_PROJECT` — статус не принадлежит ни одному воркфлоу этого проекта
+- `403 Forbidden` — нужен Manager или Admin
+
+---
+
+#### DELETE /board-columns/{column_id}/statuses/{status_id}
+Убрать статус из колонки.
+
+**Ответ 204:** (нет тела)
+
+**Ошибки:**
+- `404 Not Found` — статус не сопоставлен этой колонке
+- `403 Forbidden` — нужен Manager или Admin
 
 ---
 
@@ -1969,7 +2243,18 @@ Soft-deleted задачи не включаются в результаты по
 |-----|------|---------|
 | `INVALID_STATUS_TRANSITION` | 400 | Переход между статусами недопустим воркфлоу |
 | `RESOLUTION_REQUIRED` | 400 | Резолюция обязательна при переходе в финальный статус |
-| `WORKFLOW_TRANSITION_NOT_ALLOWED` | 403 | Нет права на данный переход (роль не включена в `allowed_roles`) |
+| `WORKFLOW_TRANSITION_NOT_ALLOWED` | 403 | Нет права на данный переход (роль не включена в `required_role`) |
+| `NO_DEFAULT_WORKFLOW` | 400 | У проекта нет дефолтного воркфлоу (и нет конфигурации для типа задачи) |
+
+### FR-001: Воркфлоу по типу и колонки борды (400/404/409)
+
+| Код | HTTP | Описание |
+|-----|------|---------|
+| `WORKFLOW_NOT_ACCESSIBLE` | 400 | Указанный воркфлоу не принадлежит этому проекту и не является системным |
+| `STATUS_ALREADY_MAPPED` | 400 | Статус уже сопоставлен другой колонке борды в этом проекте |
+| `STATUS_NOT_IN_PROJECT` | 400 | Статус не принадлежит ни одному воркфлоу этого проекта |
+| `BOARD_COLUMN_NOT_FOUND` | 404 | Колонка борды не найдена |
+| `TASK_TYPE_CONFIG_NOT_FOUND` | 404 | Нет проектного override для данного типа (уже используется системный дефолт) |
 
 ### Solution и Decision Process (400/409)
 
@@ -1992,8 +2277,8 @@ Soft-deleted задачи не включаются в результаты по
 | Код | HTTP | Описание |
 |-----|------|---------|
 | `WORKFLOW_IN_USE` | 409 | Попытка удалить воркфлоу с активными задачами |
-| `STATUS_IN_USE` | 409 | Попытка удалить статус с активными Assignment'ами; `details.affected_assignments_count` и `details.default_status_id` |
-| `RESOLUTION_IN_USE` | 409 | Попытка удалить резолюцию, уже использованную в Assignment'ах; следует деактивировать |
+| `STATUS_HAS_ACTIVE_TASKS` | 409 | Попытка удалить статус с активными задачами; `details.affected_tasks_count` и `details.default_status_id` для миграции |
+| `RESOLUTION_IN_USE` | 409 | Попытка удалить резолюцию, уже использованную в задачах |
 
 ### Доступ (403)
 
