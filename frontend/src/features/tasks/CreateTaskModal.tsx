@@ -122,7 +122,7 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
             </div>
           </div>
 
-          {typeKey !== 'epic' && epics.filter(e => !e.deleted_at).length > 0 && (
+          {typeKey !== 'epic' && (
             <div className="space-y-1.5">
               <Label htmlFor="task-epic">Epic <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <select
@@ -136,6 +136,9 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
                   <option key={e.id} value={e.id}>{e.key}: {e.title}</option>
                 ))}
               </select>
+              {epics.length === 0 && (
+                <p className="text-xs text-muted-foreground">No epics yet — create a task with type "epic" first.</p>
+              )}
             </div>
           )}
 
