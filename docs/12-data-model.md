@@ -1,5 +1,10 @@
 # 12. Модель данных
 
+> **Актуальность:** отражает текущее состояние кода (ветка `main`, 2026-05-02).  
+> MVP-упрощения по сравнению с целевой архитектурой зафиксированы в `docs/tech-debt.md`.
+
+---
+
 ## ERD (Entity-Relationship Diagram)
 
 ```mermaid
@@ -8,27 +13,11 @@ erDiagram
         uuid id PK
         string email UK
         string display_name
-        string avatar_url
-        string timezone
-        string password_hash
-        string oauth_provider
-        string oauth_id
+        string keycloak_id UK
         boolean is_active
+        string timezone
         timestamp created_at
         timestamp updated_at
-    }
-
-    Group {
-        uuid id PK
-        string name UK
-        string description
-        timestamp created_at
-    }
-
-    GroupMember {
-        uuid group_id FK
-        uuid user_id FK
-        timestamp added_at
     }
 
     Project {
@@ -39,7 +28,6 @@ erDiagram
         string visibility
         uuid owner_id FK
         boolean is_archived
-        timestamp archived_at
         timestamp deleted_at
         integer version
         timestamp created_at
@@ -47,21 +35,23 @@ erDiagram
     }
 
     ProjectMember {
-        uuid id PK
         uuid project_id FK
         uuid user_id FK
-        uuid group_id FK
         string role
         timestamp created_at
     }
 
-    ProjectLink {
+    TaskType {
         uuid id PK
-        uuid project_a_id FK
-        uuid project_b_id FK
-        string link_type
-        uuid created_by FK
+        uuid project_id FK
+        string key
+        string name
+        boolean is_system
+        string color
+        string icon
+        jsonb meta_schema
         timestamp created_at
+        timestamp updated_at
     }
 
     Workflow {
@@ -70,6 +60,7 @@ erDiagram
         string name
         boolean is_default
         timestamp created_at
+        timestamp updated_at
     }
 
     Status {
@@ -77,10 +68,11 @@ erDiagram
         uuid workflow_id FK
         string name
         string category
-        string color
+        boolean is_default
         integer position
-        boolean is_initial
-        boolean is_final
+        string color
+        timestamp created_at
+        timestamp updated_at
     }
 
     Transition {
@@ -88,14 +80,16 @@ erDiagram
         uuid workflow_id FK
         uuid from_status_id FK
         uuid to_status_id FK
-        string[] allowed_roles
+        string required_role
+        timestamp created_at
+        timestamp updated_at
     }
 
     Resolution {
         uuid id PK
         uuid project_id FK
         string name
-        boolean is_active
+        boolean is_default
         integer position
     }
 
@@ -104,18 +98,17 @@ erDiagram
         string key UK
         uuid project_id FK
         uuid workflow_id FK
+        uuid task_type_id FK
         uuid reporter_id FK
-        uuid decision_maker_id FK
+        uuid assignee_id FK
+        uuid parent_task_id FK
+        uuid current_status_id FK
         string title
         text description
-        string task_type
         string priority
-        uuid current_status_id FK
-        enum global_status
-        tsvector search_vector
+        jsonb meta
         date due_date
-        decimal estimated_hours
-        boolean allow_multi_accept
+        tsvector search_vector
         timestamp deleted_at
         integer version
         timestamp created_at
@@ -129,73 +122,7 @@ erDiagram
         string link_type
         uuid created_by FK
         timestamp created_at
-    }
-
-    Label {
-        uuid id PK
-        uuid project_id FK
-        string name
-        string color
-        boolean is_active
-    }
-
-    TaskLabel {
-        uuid task_id FK
-        uuid label_id FK
-    }
-
-    Attachment {
-        uuid id PK
-        uuid task_id FK
-        uuid comment_id FK
-        uuid uploaded_by FK
-        string filename
-        string storage_path
-        integer file_size
-        string mime_type
-        timestamp created_at
-    }
-
-    Assignment {
-        uuid id PK
-        uuid task_id FK
-        uuid user_id FK
-        uuid workflow_id FK
-        uuid current_status_id FK
-        string assignee_role
-        uuid resolution_id FK
-        timestamp started_at
-        timestamp completed_at
-        timestamp created_at
         timestamp updated_at
-    }
-
-    DecisionCriteria {
-        uuid id PK
-        uuid task_id FK
-        text description
-        integer position
-        boolean is_locked
-    }
-
-    Solution {
-        uuid id PK
-        uuid assignment_id FK
-        text content
-        string status
-        text revision_comment
-        timestamp submitted_at
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    TaskDecision {
-        uuid id PK
-        uuid task_id FK
-        uuid decision_maker_id FK
-        uuid[] accepted_solution_ids
-        text note
-        timestamp decided_at
     }
 
     Comment {
@@ -204,188 +131,121 @@ erDiagram
         uuid author_id FK
         uuid parent_comment_id FK
         text content
-        tsvector search_vector
-        boolean is_deleted
+        string[] labels
         timestamp edited_at
+        timestamp deleted_at
         timestamp created_at
-    }
-
-    Watcher {
-        uuid task_id FK
-        uuid user_id FK
-        timestamp subscribed_at
-    }
-
-    TaskHistory {
-        uuid id PK
-        uuid task_id FK
-        uuid user_id FK
-        string action
-        string field_name
-        text old_value
-        text new_value
-        timestamp created_at
-    }
-
-    AuditLog {
-        uuid id PK
-        uuid user_id FK
-        string entity_type
-        uuid entity_id
-        string action
-        jsonb payload
-        timestamp created_at
+        timestamp updated_at
     }
 
     Notification {
         uuid id PK
         uuid recipient_id FK
-        string channel
+        uuid task_id FK
         string event_type
-        uuid entity_id
         string entity_type
+        uuid entity_id
         text message
         boolean is_read
         timestamp created_at
+        timestamp updated_at
     }
 
     User ||--o{ ProjectMember : "состоит в"
-    User ||--o{ GroupMember : "состоит в"
-    User ||--o{ Assignment : "назначен"
-    User ||--o{ Comment : "пишет"
-    User ||--o{ Watcher : "наблюдает"
-    User ||--o{ Notification : "получает"
-    User ||--o{ TaskHistory : "совершает действие"
-    User ||--o{ AuditLog : "совершает действие"
     User ||--o{ Task : "создаёт (reporter)"
-    User ||--o{ Task : "decision-maker"
-
-    Group ||--o{ GroupMember : "содержит"
-    Group ||--o{ ProjectMember : "получает доступ"
+    User ||--o{ Task : "исполнитель (assignee)"
+    User ||--o{ Comment : "пишет"
+    User ||--o{ Notification : "получает"
+    User ||--o{ TaskLink : "создаёт"
 
     Project ||--o{ ProjectMember : "имеет участников"
     Project ||--o{ Task : "содержит задачи"
     Project ||--o{ Workflow : "использует"
     Project ||--o{ Resolution : "имеет"
-    Project ||--o{ Label : "имеет метки"
-    Project }o--o{ ProjectLink : "связан"
+    Project ||--o{ TaskType : "кастомные типы"
+
+    TaskType ||--o{ Task : "определяет тип"
 
     Workflow ||--o{ Status : "содержит статусы"
     Workflow ||--o{ Transition : "содержит переходы"
     Status ||--o{ Transition : "from"
     Status ||--o{ Transition : "to"
+    Status ||--o{ Task : "current_status"
 
-    Task ||--o{ Assignment : "имеет назначения"
-    Task ||--o{ DecisionCriteria : "имеет критерии"
-    Task ||--o| TaskDecision : "имеет итоговое решение"
+    Task ||--o{ Task : "подзадачи (parent_task_id)"
     Task ||--o{ Comment : "имеет комментарии"
-    Task ||--o{ Watcher : "имеет наблюдателей"
-    Task ||--o{ TaskHistory : "имеет историю"
-    Task ||--o{ TaskLabel : "помечена метками"
-    Task ||--o{ Attachment : "имеет вложения"
-    Task }o--o{ TaskLink : "связана с"
     Task ||--o{ Notification : "порождает"
-
-    Label ||--o{ TaskLabel : "применяется"
-    Assignment ||--o| Solution : "подаёт"
-    Comment ||--o{ Attachment : "имеет вложения"
-    Comment ||--o{ Comment : "ответы"
+    Task }o--o{ TaskLink : "связана с"
 ```
 
 ---
 
 ## Комментарии к нетривиальным решениям
 
-### Поле global_status в Task
+### TaskType: системные и проектные
 
-`Task.global_status` — денормализованное поле типа `enum`. Допустимые значения: `open | in_progress | awaiting_decision | in_revision | decided | closed`. Поле `NOT NULL DEFAULT 'open'`.
+`TaskType` — таблица, не enum. Системные типы (`is_system = true`, `project_id = NULL`): `task`, `bug`, `story`, `epic`, `decision`. Проектные типы (`project_id = <project>`) — кастомные типы конкретного проекта.
 
-Поле не вычисляется на лету — оно хранится в БД и обновляется бизнес-логикой бэкенда при каждом изменении состояния Assignment'ов и Solution'ов. Обновление происходит в той же транзакции, что и само изменение (см. раздел «Оптимистичные блокировки»).
+`Task.task_type_id` — FK → `task_types.id`, NOT NULL. Выбор воркфлоу при создании задачи определяется типом задачи (подробнее в разделе «FR-001»).
+
+### Поле workflow_id у Task
+
+`Task.workflow_id` — FK → `workflows.id`, NOT NULL. Фиксируется при создании задачи и не меняется. Даже если менеджер изменит конфигурацию воркфлоу для типа задачи — уже созданные задачи движутся по своему воркфлоу.
+
+Текущая логика выбора при создании: берётся воркфлоу с `is_default = true` для проекта. После реализации FR-001: `ProjectTaskTypeConfig → TaskType.default_workflow_id`.
+
+### Один исполнитель (MVP-упрощение)
+
+`Task.assignee_id` — FK → `users.id`, nullable. В MVP — один исполнитель на задачу. Полная реализация мульти-исполнителей (таблица `Assignment` с независимыми воркфлоу) — см. `docs/tech-debt.md`.
+
+### parent_task_id: иерархия задач
+
+`Task.parent_task_id` — FK → `tasks.id`, nullable (self-reference). Используется для связи подзадач с родительской задачей и для связи задач с эпиком (`task_type_key = 'epic'`). ORM-relationship: `Task.subtasks`.
+
+### StatusCategory enum
+
+`Status.category` — enum: `initial | intermediate | final`. Семантика:
+- `initial` — начальный статус; задача создаётся с `is_default = true` среди initial-статусов.
+- `intermediate` — в работе.
+- `final` — финальный; переход в него = завершение работы исполнителя.
+
+Ровно один статус воркфлоу должен иметь `is_default = true` — это начальный статус для новых задач.
+
+### Transition.required_role
+
+`Transition.required_role` — nullable string. Если `NULL` — переход доступен всем участникам проекта. Если задано — только пользователям с соответствующей ролью в проекте (`admin`, `manager`, `member`).
+
+Текущее ограничение MVP: одна роль на переход. Расширение до массива ролей — см. `docs/tech-debt.md`.
 
 ### Полнотекстовый поиск (search_vector)
 
-- `Task.search_vector tsvector` — объединение полей `title || description`, обновляется триггером при изменении задачи. Конфигурация: `russian` (snowball stemmer).
-- `Comment.search_vector tsvector` — поле `body` (`content`), обновляется триггером. Конфигурация: `russian`.
-- Индекс: `GIN(search_vector)` на обеих таблицах.
+`Task.search_vector tsvector` — объединение полей `title || description`, обновляется триггером при изменении задачи. Конфигурация: `russian` (snowball stemmer). Индекс: `GIN(search_vector)`.
 
-Без явного указания конфигурации `russian` стемминг для русскоязычного контента не работает.
+Поиск по комментариям в текущей реализации не поддерживается (поле `search_vector` в `Comment` отсутствует). В v2 — добавить триггер и GIN-индекс для `Comment.content`.
+
+### Comment.labels
+
+`Comment.labels: string[]` — PostgreSQL ARRAY(String). Используется для внутренней классификации комментариев. Текущее значение: `["solution"]` — суррогат для MVP-реализации Decision Process (см. `docs/07-decision-process.md` раздел «MVP-упрощение»).
+
+### Comment soft-delete
+
+`Comment.deleted_at` — timestamp nullable. При удалении: `deleted_at` проставляется, тело комментария по-прежнему хранится (не заменяется текстом «удалён»). Физическое удаление не предусмотрено. Клиент при `deleted_at IS NOT NULL` показывает «Комментарий удалён» вместо контента.
 
 ### Политика деактивации пользователя
 
-Физическое удаление пользователей не поддерживается. При необходимости блокировки учётной записи — деактивация через `is_active = false`. FK-ссылки (`reporter_id`, `decision_maker_id`, `author_id` и т.д.) остаются валидными — нет битых ссылок.
+Физическое удаление пользователей не поддерживается. При блокировке: `User.is_active = false`. FK-ссылки остаются валидными. Деактивированный пользователь отображается в UI как «[Деактивирован]».
 
-**Открытые Assignment'ы:** остаются без изменений. Деактивированный пользователь не может войти в систему и не может двигать свои Assignment'ы. Менеджер может переназначить или удалить его Assignment'ы вручную.
+### Soft-delete
 
-**Незаконченные Solution'ы (draft):** остаются в статусе `draft`, не видны decision-maker'у. Менеджер решает: удалить Assignment или принять Solution в текущем виде.
-
-**Submitted Solution'ы:** остаются в статусе `submitted`, участвуют в Decision Process как обычно. Decision-maker видит их с пометкой «[Деактивирован]» у автора.
-
-**Комментарии:** остаются без изменений, автор отображается как «[Деактивирован]».
-
-**Авторство задач:** поле `task.reporter_id` остаётся прежним, имя отображается как «[Деактивирован]». Задачи не переназначаются автоматически.
-
-**Роль decision-maker:** если деактивируемый пользователь является decision-maker'ом незакрытой задачи, система предупреждает администратора. Менеджер должен явно переназначить decision-maker'а через `PATCH /tasks/{id}` (поле `decision_maker_id`). Без этого задача остаётся в `awaiting_decision` без возможности вынести Decision.
-
-### Поведение при изменении воркфлоу
-
-Если менеджер редактирует воркфлоу (удаляет статус или закрывает переход), и в этом статусе находятся активные Assignment'ы:
-
-1. Все Assignment'ы в удалённом/недоступном статусе откатываются к дефолтному статусу воркфлоу (начальному статусу с `is_initial = true`).
-2. Система генерирует уведомление «Статус задачи изменён из-за обновления воркфлоу» для всех участников затронутых задач.
-3. Событие логируется в `AuditLog`.
-
-Если удаление статуса не затрагивает активных Assignment'ов — изменение применяется без откатов.
-
-### Изменение воркфлоу при активных задачах
-
-Воркфлоу изменяемый (не иммутабельный). Допустимые операции и их ограничения:
-
-- **Переименование статуса, смена цвета, описания** — допускается без ограничений. Активные Assignment'ы не затрагиваются.
-- **Удаление статуса** — если в статусе есть активные Assignment'ы, API возвращает `409 Conflict` (код `STATUS_IN_USE`) с количеством затронутых Assignment'ов и идентификатором дефолтного статуса. Клиент должен явно вызвать `POST .../statuses/{status_id}/migrate` с указанием `target_status_id`, после чего повторить удаление.
-- **Удаление перехода** — допускается. Если пользователь находится в статусе, из которого удалён переход, он теряет возможность перейти в этот статус через UI (менеджер может совершить переход вручную).
-- **Смена дефолтного статуса** — допускается только если нет активных Assignment'ов в текущем дефолтном статусе (т.е. ещё не взявших задачу). Проверка выполняется на уровне API; при наличии блокирующих Assignment'ов — `409 Conflict`.
-- **Миграция Assignment'ов** — после выполнения `POST .../statuses/{status_id}/migrate` затронутые пользователи получают in-app уведомление; событие логируется в `AuditLog`.
-
-### Хранение personal_status каждого Assignment
-
-Каждый `Assignment` хранит своё состояние в воркфлоу через поле `current_status_id`, ссылающееся на `Status`. У каждого Assignment может быть свой `workflow_id` (воркфлоу, по которому движется этот исполнитель — может отличаться от воркфлоу задачи, если для разных типов исполнителей используются разные воркфлоу).
-
-Ключевой принцип: `Task.current_status_id` — **глобальный** статус задачи (open / in_progress / awaiting_decision и т.д.), а `Assignment.current_status_id` — **персональный** статус конкретного исполнителя в его воркфлоу (To Do / In Progress / Done и т.д.). Это два разных измерения.
-
-### Связь Solution → TaskDecision
-
-`TaskDecision.accepted_solution_ids[]` — массив UUID, хранящий ссылки на принятые Solution'ы. Это денормализованное поле (не отдельная join-таблица), обоснование:
-
-- Decision — иммутабельная запись (после вынесения не меняется).
-- Количество принятых Solution'ов невелико (обычно 1, редко 2–3).
-- Запрос «какой Solution принят?» тривиален: `SELECT * FROM solution WHERE id = ANY(task_decision.accepted_solution_ids)`.
-
-Если потребуется полноценная M:N таблица — выносится в v2 без миграции данных (массив остаётся).
-
-### Soft-delete поля
-
-Soft-delete реализован через `deleted_at timestamp` у сущностей `Task` и `Project`:
-
-- `deleted_at IS NULL` — активная запись.
-- `deleted_at IS NOT NULL` — мягко удалённая; не возвращается в API-запросах (кроме admin-запросов).
-- Физическое удаление — только администратором вручную через специальный admin-эндпоинт.
-- `Comment` и `Attachment` не имеют soft-delete: у комментария есть флаг `is_deleted` (тело заменяется на «Комментарий удалён», запись остаётся для сохранения треда).
+`Task.deleted_at` и `Project.deleted_at` — поле `timestamp nullable`. `IS NULL` — активная запись; `IS NOT NULL` — мягко удалённая; не возвращается в API-запросах. Физическое удаление — только администратором через специальный admin-эндпоинт.
 
 ### Оптимистичные блокировки
 
-`Task.version` (integer) инкрементируется при каждом обновлении задачи. При редактировании клиент передаёт текущую версию; если в БД версия выше — возвращается 409 Conflict. Это предотвращает потерю изменений при одновременном редактировании задачи несколькими исполнителями.
+`Task.version` (integer) инкрементируется при каждом обновлении полей задачи (заголовок, описание, приоритет и т.д.). Смена `Task.current_status_id` через переход статуса — не инкрементирует `version`. При PATCH клиент передаёт текущую версию; если в БД версия выше — `409 Conflict`.
 
-### Уведомления
+### meta (JSONB)
 
-`Notification` хранит канал (`in_app` / `email`) и статус прочтения. Email-уведомления реализуются через асинхронную очередь (фоновый воркер); запись в таблице создаётся при постановке в очередь. Email-канал используется только для событий Decision Process (из `10-nfr.md`).
-
-### ProjectMember: user_id или group_id
-
-`ProjectMember` имеет два опциональных поля: `user_id` и `group_id`. Ровно одно из них заполнено:
-- `user_id IS NOT NULL, group_id IS NULL` — прямое добавление пользователя.
-- `group_id IS NOT NULL, user_id IS NULL` — добавление группы.
-
-При разрешении прав — выполняется объединение: берётся наивысшая роль из всех записей пользователя (прямая + через группы).
+`Task.meta: jsonb` — произвольные метаданные задачи. В текущей реализации используется для хранения `solution_comment_id` (MVP-суррогат Decision Process).
 
 ---
 
@@ -393,15 +253,15 @@ Soft-delete реализован через `deleted_at timestamp` у сущно
 
 ### Таблицы
 
-**Workflow** — воркфлоу привязан к проекту. Один проект может иметь несколько воркфлоу (например, для разных типов задач). Один воркфлоу помечен как `is_default = true`.
+**Workflow** — воркфлоу привязан к проекту. Один воркфлоу помечен `is_default = true`.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid | PK |
-| project_id | uuid FK | Проект |
-| name | string | Название (например, «Разработка», «Баг-трекинг») |
-| is_default | boolean | Используется по умолчанию для новых задач |
-| created_at | timestamp | |
+| project_id | uuid FK | Проект (NOT NULL в текущей реализации; nullable после FR-001 — для системных воркфлоу) |
+| name | string | Название («Разработка», «Баг-трекинг») |
+| is_default | boolean | Используется по умолчанию для новых задач (до FR-001) |
+| created_at / updated_at | timestamp | |
 
 **Status** — статус в рамках конкретного воркфлоу.
 
@@ -409,12 +269,11 @@ Soft-delete реализован через `deleted_at timestamp` у сущно
 |------|-----|----------|
 | id | uuid | PK |
 | workflow_id | uuid FK | Воркфлоу |
-| name | string | Название (например, «В работе», «Готово») |
-| category | enum | `open` / `in_progress` / `done` — семантическая категория |
-| color | string | Hex-цвет для UI |
+| name | string | Название («В работе», «Готово») |
+| category | enum | `initial` / `intermediate` / `final` |
+| is_default | boolean | Начальный статус — `true` ровно у одного статуса в воркфлоу |
 | position | integer | Порядок отображения |
-| is_initial | boolean | Начальный статус (задача попадает в него при создании) |
-| is_final | boolean | Финальный статус (переход в него = завершение работы исполнителя) |
+| color | string | Hex-цвет (#3B82F6) |
 
 **Transition** — допустимый переход между статусами.
 
@@ -424,40 +283,50 @@ Soft-delete реализован через `deleted_at timestamp` у сущно
 | workflow_id | uuid FK | Воркфлоу |
 | from_status_id | uuid FK | Исходный статус |
 | to_status_id | uuid FK | Целевой статус |
-| allowed_roles | string[] | Роли ProjectRole, которым разрешён переход. Пустой массив = разрешено всем |
+| required_role | string nullable | Роль (`admin`, `manager`, `member`), которой разрешён переход. NULL = разрешено всем |
 
 ### Правила переходов
 
-1. Пользователь может совершить переход, если:
-   - Существует `Transition` с `from_status_id = текущий_статус` и `to_status_id = целевой_статус`.
-   - Роль пользователя в проекте входит в `allowed_roles` (или `allowed_roles` пуст).
-2. Для персонального статуса Assignment — проверяются те же правила, но применяются к исполнителю конкретного Assignment.
-3. Переходы, недоступные пользователю, не отображаются в UI.
+1. Пользователь может совершить переход, если существует `Transition` с `from_status_id = текущий_статус` и `to_status_id = целевой_статус`.
+2. Если у перехода задан `required_role` — роль пользователя в проекте должна совпадать.
+3. `admin` может совершать любые переходы независимо от `required_role`.
+4. Переходы, недоступные пользователю, не отображаются в UI.
 
-### Связь воркфлоу с Assignment
+### Поведение при изменении воркфлоу
 
-- При создании задачи ей назначается воркфлоу (`Task.workflow_id`).
-- При добавлении исполнителя создаётся `Assignment` с `workflow_id` = `Task.workflow_id` (наследование) и `current_status_id` = начальный статус воркфлоу.
-- Исполнитель самостоятельно движется по статусам своего Assignment через допустимые переходы.
-- Смена `Assignment.current_status_id` — персональный прогресс исполнителя, не влияет на `Task.current_status_id` напрямую (кроме автоматических триггеров: переход всех lead'ов в финальный статус → задача в `awaiting_decision`).
+- **Переименование статуса, смена цвета, is_default** — допускается без ограничений.
+- **Удаление статуса** — если в статусе есть задачи (`Task.current_status_id == status_id`), API возвращает `409 STATUS_HAS_ACTIVE_TASKS`. Клиент вызывает `POST /statuses/{id}/migrate` с `target_status_id`, после чего удаление разрешено.
+- **Удаление перехода** — допускается. Если задача находится в статусе, из которого удалён переход, она теряет возможность перейти в следующий статус через UI (менеджер может сделать переход принудительно).
 
-### Кто может делать какой переход
+---
 
-| Субъект | Может делать |
-|---------|-------------|
-| Исполнитель (lead) своего Assignment | Переходы в своём Assignment, если `allowed_roles` включает его ProjectRole |
-| Менеджер | Любые переходы в любом Assignment + принудительное закрытие задачи |
-| Admin | Любые переходы; обходит ограничения ролей |
-| Reviewer | Не может менять статусы |
-| Consultant | Не может менять статусы |
-| Viewer | Не может менять статусы |
+## Индексы
 
-### Индексы для Assignment
+| Таблица | Индекс | Зачем |
+|---------|--------|-------|
+| `tasks` | `(project_id, deleted_at)` | Список задач проекта |
+| `tasks` | `GIN(search_vector)` | Полнотекстовый поиск |
+| `task_types` | `(is_system, key)` | Поиск системных типов по ключу |
+| `notifications` | `(recipient_id, is_read, created_at)` | Счётчик непрочитанных |
 
-Для корректной работы персонализированных запросов (канбан-доска, фильтр «мои задачи») необходимы следующие индексы на таблице `Assignment`:
+---
 
-- `(task_id, user_id)` — быстрый поиск Assignment пользователя по конкретной задаче.
-- `(user_id, current_status_id)` — выборка всех задач пользователя в заданном персональном статусе.
+## Сущности v2 (не реализованы в MVP)
 
-Без этих индексов запросы на канбан-доске при 30 000 задач и 300 пользователей потребуют полного сканирования таблицы.
+Следующие таблицы описаны в продуктовых требованиях, но отсутствуют в текущем коде. Реализуются после MVP-запуска по приоритету из `docs/tech-debt.md`:
 
+| Таблица | Зачем |
+|---------|-------|
+| `Assignment` | Мульти-исполнители с независимыми воркфлоу (ключевая фича) |
+| `Solution` | Поданное решение исполнителя (Decision Process) |
+| `TaskDecision` | Итоговое решение decision-maker'а |
+| `DecisionCriteria` | Критерии оценки Solution'ов |
+| `ProjectTaskTypeConfig` | Воркфлоу по типу задачи (FR-001) |
+| `BoardColumn` / `BoardColumnStatus` | Независимые колонки Kanban-борды (FR-001) |
+| `Label` / `TaskLabel` | Метки задач |
+| `Attachment` | Вложения файлов |
+| `Watcher` | Подписчики задачи |
+| `TaskHistory` | История изменений |
+| `AuditLog` | Аудит-лог |
+| `Group` / `GroupMember` | Группы пользователей |
+| `ProjectLink` | Связи между проектами |
