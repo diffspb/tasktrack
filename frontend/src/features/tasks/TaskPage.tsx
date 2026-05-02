@@ -27,6 +27,7 @@ export function TaskPage() {
   const [copied, setCopied] = useState(false)
 
   const { data: task, isLoading, error } = useTaskByKey(key)
+  const { data: parentTask } = useTask(task?.parent_task_id)
   const { data: workflows } = useProjectWorkflows(task?.project_id ?? '')
   const { data: resolutions = [] } = useProjectResolutions(task?.project_id ?? '')
   const { data: members } = useProjectMembers(task?.project_id)
@@ -112,7 +113,6 @@ export function TaskPage() {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.medium
   const assignee = task.assignee_id ? userById.get(task.assignee_id) : null
   const isAssignee = task.assignee_id === user?.id
-  const { data: parentTask } = useTask(task?.parent_task_id)
   const inFinalStatus = currentStatus?.category === 'final'
 
   return (
