@@ -30,6 +30,7 @@ WORKDIR /app
 
 COPY --from=backend-builder /venv /venv
 COPY --from=backend-builder /app/app ./app
+COPY backend/scripts ./scripts
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 ENV PATH="/venv/bin:$PATH" \
