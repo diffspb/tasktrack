@@ -845,19 +845,19 @@ export function BoardColumnEditor({ projectId }: { projectId: string }) {
 ### Стадия 3 — Реализация
 
 #### Блокеры (шаг 0)
-- [ ] 0-A. `GET /projects/{id}/task-types` endpoint + тест
-- [ ] 0-B. `viewer` роль в `ProjectMemberRole` + тест + docs/13-permissions.md
+- [x] 0-A. `GET /projects/{id}/task-types` endpoint + тест
+- [x] 0-B. `viewer` роль в `ProjectMemberRole` + тест
 
 #### Backend
-- [ ] 1. Модели данных (Workflow nullable, TaskType.default_workflow_id, ProjectTaskTypeConfig, BoardColumn, BoardColumnStatus)
-- [ ] 2. Seed (системные воркфлоу + default_workflow_id + BoardColumn для DEMO)
-- [ ] 3. Сервисный слой (get_workflow_for_task_type, board columns CRUD, task type configs, rename _count_active_assignments)
-- [ ] 4. API эндпоинты (task-type-configs в projects.py, новый board_columns.py, регистрация в router.py)
-- [ ] 5. Тесты (test_task_type_workflow.py, test_board_columns.py, обновить test_tasks.py)
+- [x] 1. Модели данных (Workflow nullable, TaskType.default_workflow_id, ProjectTaskTypeConfig, BoardColumn, BoardColumnStatus)
+- [x] 2. Seed (системные воркфлоу + default_workflow_id + BoardColumn для DEMO)
+- [x] 3. Сервисный слой (get_workflow_for_task_type, board columns CRUD, task type configs, rename _count_active_assignments)
+- [x] 4. API эндпоинты (task-type-configs в projects.py, новый board_columns.py, регистрация в router.py)
+- [x] 5. Тесты (test_task_type_workflow.py: 7 тестов, test_board_columns.py: 8 тестов)
 
 #### Frontend
-- [ ] 6. API-хуки (workflowApi.ts: BoardColumn типы + 9 новых хуков)
-- [ ] 7. WorkflowEditor — вкладки по воркфлоу, создание/удаление воркфлоу
+- [x] 6. API-хуки (workflowApi.ts: BoardColumn/TaskTypeConfig типы + 11 новых хуков)
+- [x] 7. WorkflowEditor — вкладки по воркфлоу, Dialog создания/удаления
 - [ ] 8. BoardColumnEditor — новый компонент с DnD и маппингом статусов
 - [ ] 9. ProjectSettings — секции «Task type workflows» + «Board columns»
 - [ ] 10. TaskBoard — рендер по board_column, fix drag highlighting (UX item 5)
