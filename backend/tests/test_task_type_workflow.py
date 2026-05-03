@@ -35,11 +35,15 @@ async def test_create_task_uses_project_default_workflow(
     assert task["workflow_id"] == project_wf["id"]
 
 
-async def test_create_task_uses_system_default_workflow(
+async def test_create_task_no_project_default_raises(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    """Task type with default_workflow_id → task uses system workflow when no project override."""
-    # Create project WITHOUT a default workflow (direct model, no service)
+    """No ProjectTaskTypeConfig, no project default workflow → 400 NO_DEFAULT_WORKFLOW.
+
+    System workflow fallback (via TaskType.default_workflow_id) is intentionally NOT used:
+    system workflows are invisible to the board's useProjectWorkflows query and would cause
+    tasks to appear without a visible status. Explicit ProjectTaskTypeConfig is required.
+    """
     from app.models.project import Project, ProjectMember, ProjectMemberRole, ProjectVisibility
     project = Project(
         name="No Default WF",
@@ -52,24 +56,9 @@ async def test_create_task_uses_system_default_workflow(
     db_session.add(ProjectMember(project_id=project.id, user_id=stub_user.id, role=ProjectMemberRole.admin))
     await db_session.flush()
 
-    # Create system workflow (project_id=None)
-    sys_wf = Workflow(name="SysWF", is_default=False)
-    db_session.add(sys_wf)
-    await db_session.flush()
-    default_status = Status(workflow_id=sys_wf.id, name="Todo", category=StatusCategory.initial, is_default=True, position=0)
-    db_session.add(default_status)
-    await db_session.flush()
-
-    # Find the 'task' system type and set default_workflow_id
-    tt = await db_session.scalar(
-        select(TaskType).where(TaskType.key == "task", TaskType.is_system.is_(True))
-    )
-    tt.default_workflow_id = sys_wf.id
-    await db_session.flush()
-
-    r = await client.post(f"/api/v1/projects/{project.id}/tasks", json={"title": "Sys WF Task"})
-    assert r.status_code == 201
-    assert r.json()["workflow_id"] == str(sys_wf.id)
+    r = await client.post(f"/api/v1/projects/{project.id}/tasks", json={"title": "No WF Task"})
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "NO_DEFAULT_WORKFLOW"
 
 
 async def test_create_task_uses_project_override(
@@ -105,26 +94,6 @@ async def test_create_task_uses_project_override(
     assert bug_r.status_code == 201
     assert bug_r.json()["workflow_id"] == str(wf2.id)
 
-
-async def test_create_task_no_workflow_raises(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    """No default_workflow_id, no ProjectTaskTypeConfig, no project default → 400."""
-    from app.models.project import Project, ProjectMember, ProjectMemberRole, ProjectVisibility
-    project = Project(
-        name="Empty WF",
-        key=uuid.uuid4().hex[:8].upper(),
-        visibility=ProjectVisibility.restricted,
-        owner_id=stub_user.id,
-    )
-    db_session.add(project)
-    await db_session.flush()
-    db_session.add(ProjectMember(project_id=project.id, user_id=stub_user.id, role=ProjectMemberRole.admin))
-    await db_session.flush()
-
-    r = await client.post(f"/api/v1/projects/{project.id}/tasks", json={"title": "No WF"})
-    assert r.status_code == 400
-    assert r.json()["detail"]["code"] == "NO_DEFAULT_WORKFLOW"
 
 
 async def test_set_task_type_workflow_upsert(

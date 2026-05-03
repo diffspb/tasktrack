@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import {
   useProjectWorkflows, useCreateStatus, useUpdateStatus, useDeleteStatus,
   useMigrateStatus, useCreateTransition, useDeleteTransition,
-  useCreateWorkflow, useDeleteWorkflow,
+  useCreateWorkflow, useUpdateWorkflow, useDeleteWorkflow,
   type Workflow, type WorkflowStatus, type StatusCategory,
 } from './workflowApi'
 
@@ -37,6 +37,7 @@ export function WorkflowEditor({ projectId }: Props) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const createWorkflow = useCreateWorkflow(projectId)
+  const updateWorkflow = useUpdateWorkflow(projectId)
   const deleteWorkflow = useDeleteWorkflow(projectId)
 
   const selected = (selectedId ? workflows.find(w => w.id === selectedId) : null)
@@ -82,9 +83,18 @@ export function WorkflowEditor({ projectId }: Props) {
                 )}
               >
                 {wf.name}
-                {wf.is_default && (
-                  <span className="text-[10px] text-muted-foreground">(default)</span>
-                )}
+                {wf.is_default
+                  ? <span className="text-[10px] text-muted-foreground">(default)</span>
+                  : (
+                    <button
+                      onClick={e => { e.stopPropagation(); updateWorkflow.mutate({ workflowId: wf.id, is_default: true }) }}
+                      className="text-[10px] text-muted-foreground/50 hover:text-primary underline underline-offset-2"
+                      title="Set as default workflow for new tasks"
+                    >
+                      set default
+                    </button>
+                  )
+                }
               </button>
               <button
                 onClick={() => setDeleteConfirmId(wf.id)}

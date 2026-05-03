@@ -72,8 +72,8 @@ export function useProjectWorkflows(projectId: string | undefined) {
 export function useUpdateWorkflow(projectId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workflowId, name }: { workflowId: string; name: string }) =>
-      api.patch(`/workflows/${workflowId}`, { name }).then(r => r.data),
+    mutationFn: ({ workflowId, name, is_default }: { workflowId: string; name?: string; is_default?: boolean }) =>
+      api.patch(`/workflows/${workflowId}`, { name, is_default }).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows', projectId] }),
   })
 }

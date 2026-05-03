@@ -68,6 +68,13 @@ async def update_workflow(
     if data.name is not None:
         wf.name = data.name
     if data.is_default is not None:
+        if data.is_default and wf.project_id is not None:
+            # Unset previous default in the same project before setting new one
+            await session.execute(
+                update(Workflow)
+                .where(Workflow.project_id == wf.project_id, Workflow.is_default.is_(True))
+                .values(is_default=False)
+            )
         wf.is_default = data.is_default
     await session.commit()
     return await _load_workflow(session, wf.id)
@@ -258,9 +265,12 @@ async def validate_transition(
 async def get_workflow_for_task_type(
     session: AsyncSession, project_id: uuid.UUID, task_type_id: uuid.UUID
 ) -> Workflow:
-    """Fallback chain: ProjectTaskTypeConfig → TaskType.default_workflow_id → project is_default."""
-    from app.models.task_type import TaskType
+    """Fallback chain: ProjectTaskTypeConfig → project is_default workflow.
 
+    System workflows (project_id=NULL) are only used when explicitly configured via
+    ProjectTaskTypeConfig. Without explicit config, falls back to the project's default
+    workflow so statuses remain visible on the board.
+    """
     config = await session.scalar(
         select(ProjectTaskTypeConfig).where(
             ProjectTaskTypeConfig.project_id == project_id,
@@ -269,10 +279,6 @@ async def get_workflow_for_task_type(
     )
     if config:
         return await _get_workflow_or_404(session, config.workflow_id)
-
-    task_type = await session.get(TaskType, task_type_id)
-    if task_type and task_type.default_workflow_id:
-        return await _get_workflow_or_404(session, task_type.default_workflow_id)
 
     wf = await session.scalar(
         select(Workflow).where(
