@@ -54,7 +54,9 @@ async def get_workflow(
     wf = await _load_workflow(session, workflow_id)
     if not wf:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "WORKFLOW_NOT_FOUND"})
-    await require_project_access(session, wf.project_id, user)
+    # System workflows (project_id=None) are readable by any authenticated user
+    if wf.project_id is not None:
+        await require_project_access(session, wf.project_id, user)
     return wf
 
 

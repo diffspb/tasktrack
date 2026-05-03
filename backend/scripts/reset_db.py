@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 from app.models import (
     Base, BoardColumn, BoardColumnStatus, Notification, NotificationEntityType, NotificationEventType,
-    Project, ProjectMember, ProjectMemberRole, ProjectVisibility,
+    Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
     Resolution, Status, StatusCategory, Task, TaskPriority, TaskType,
     Transition, User, Workflow,
 )
@@ -150,6 +150,14 @@ async def seed(session: AsyncSession) -> None:
         Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
         Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
     ])
+
+    # ProjectTaskTypeConfig: all types in DEMO → project «Базовый» workflow
+    # (ensures tasks appear on the board; can be overridden in settings)
+    for tt in [tt_task, tt_bug, tt_story, tt_epic, tt_decision]:
+        session.add(ProjectTaskTypeConfig(
+            project_id=demo.id, task_type_id=tt.id, workflow_id=wf.id,
+        ))
+    await session.flush()
 
     # Board columns for DEMO project
     bc1 = BoardColumn(project_id=demo.id, name="To Do",       position=0)

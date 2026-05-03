@@ -858,9 +858,9 @@ export function BoardColumnEditor({ projectId }: { projectId: string }) {
 #### Frontend
 - [x] 6. API-хуки (workflowApi.ts: BoardColumn/TaskTypeConfig типы + 11 новых хуков)
 - [x] 7. WorkflowEditor — вкладки по воркфлоу, Dialog создания/удаления
-- [ ] 8. BoardColumnEditor — новый компонент с DnD и маппингом статусов
-- [ ] 9. ProjectSettings — секции «Task type workflows» + «Board columns»
-- [ ] 10. TaskBoard — рендер по board_column, fix drag highlighting (UX item 5)
+- [x] 8. BoardColumnEditor — DnD + маппинг статусов + предупреждение о немаппированных
+- [x] 9. ProjectSettings → 3 под-страницы (Team / Workflow / Board); TaskTypeWorkflowTable
+- [x] 10. TaskBoard — рендер по board_column, drag подсветка только для разрешённых колонок
 - [ ] 11. Проверить CreateTaskModal (useProjectTaskTypes теперь работает)
 - [ ] 12. Smoke-тест ручной (7 шагов из плана)
 

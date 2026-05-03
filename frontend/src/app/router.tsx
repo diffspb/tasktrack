@@ -2,6 +2,9 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/shared/ui/Layout'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { ProjectSettings } from '@/features/projects/ProjectSettings'
+import { TeamSettingsPage } from '@/features/projects/TeamSettingsPage'
+import { WorkflowSettingsPage } from '@/features/projects/WorkflowSettingsPage'
+import { BoardSettingsPage } from '@/features/projects/BoardSettingsPage'
 import { TaskBoard } from '@/features/tasks/TaskBoard'
 import { TaskBacklog } from '@/features/tasks/TaskBacklog'
 import { TaskPage } from '@/features/tasks/TaskPage'
@@ -13,13 +16,22 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'projects',                   element: <ProjectList /> },
-      { path: 'projects/:id/board',         element: <TaskBoard /> },
-      { path: 'projects/:id/backlog',       element: <TaskBacklog /> },
-      { path: 'projects/:id/settings',      element: <ProjectSettings /> },
-      { path: 'projects/:id/members',       element: <Navigate to="../settings" replace /> },
-      { path: 'tasks/:key',                 element: <TaskPage /> },
-      { path: 'dashboard',                  element: <Dashboard /> },
+      { path: 'projects',             element: <ProjectList /> },
+      { path: 'projects/:id/board',   element: <TaskBoard /> },
+      { path: 'projects/:id/backlog', element: <TaskBacklog /> },
+      {
+        path: 'projects/:id/settings',
+        element: <ProjectSettings />,
+        children: [
+          { index: true, element: <Navigate to="team" replace /> },
+          { path: 'team',     element: <TeamSettingsPage /> },
+          { path: 'workflow', element: <WorkflowSettingsPage /> },
+          { path: 'board',    element: <BoardSettingsPage /> },
+        ],
+      },
+      { path: 'projects/:id/members', element: <Navigate to="../settings/team" replace /> },
+      { path: 'tasks/:key',           element: <TaskPage /> },
+      { path: 'dashboard',            element: <Dashboard /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },
