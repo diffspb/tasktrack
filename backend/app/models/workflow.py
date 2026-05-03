@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -16,8 +16,8 @@ class StatusCategory(str, enum.Enum):
 class Workflow(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "workflows"
 
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -64,3 +64,53 @@ class Transition(Base, UUIDMixin, TimestampMixin):
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="transitions")
     from_status: Mapped["Status"] = relationship("Status", foreign_keys=[from_status_id])
     to_status: Mapped["Status"] = relationship("Status", foreign_keys=[to_status_id])
+
+
+class ProjectTaskTypeConfig(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = "project_task_type_configs"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    task_type_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_types.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+
+    __table_args__ = (UniqueConstraint("project_id", "task_type_id"),)
+
+
+class BoardColumn(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = "board_columns"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    statuses: Mapped[list["BoardColumnStatus"]] = relationship(
+        "BoardColumnStatus", back_populates="column", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_board_columns_project_position", "project_id", "position"),)
+
+    @property
+    def status_ids(self) -> list[uuid.UUID]:
+        return [s.status_id for s in self.statuses]
+
+
+class BoardColumnStatus(Base):
+    __tablename__ = "board_column_statuses"
+
+    board_column_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("board_columns.id", ondelete="CASCADE"), primary_key=True
+    )
+    status_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("statuses.id", ondelete="CASCADE"), primary_key=True,
+        unique=True,
+    )
+
+    column: Mapped["BoardColumn"] = relationship("BoardColumn", back_populates="statuses")

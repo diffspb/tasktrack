@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GripVertical, Plus, Trash2, ArrowRight } from 'lucide-react'
+import { GripVertical, Plus, Trash2, ArrowRight, X } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -11,10 +11,12 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import {
   useProjectWorkflows, useCreateStatus, useUpdateStatus, useDeleteStatus,
   useMigrateStatus, useCreateTransition, useDeleteTransition,
+  useCreateWorkflow, useDeleteWorkflow,
   type Workflow, type WorkflowStatus, type StatusCategory,
 } from './workflowApi'
 
@@ -30,16 +32,185 @@ interface Props { projectId: string }
 
 export function WorkflowEditor({ projectId }: Props) {
   const { data: workflows = [], isLoading } = useProjectWorkflows(projectId)
-  const workflow = workflows.find(w => w.is_default) ?? workflows[0]
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+  const createWorkflow = useCreateWorkflow(projectId)
+  const deleteWorkflow = useDeleteWorkflow(projectId)
+
+  const selected = (selectedId ? workflows.find(w => w.id === selectedId) : null)
+    ?? workflows.find(w => w.is_default)
+    ?? workflows[0]
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading workflow…</p>
-  if (!workflow) return <p className="text-sm text-muted-foreground">No workflow found.</p>
+  if (!selected) return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">No workflows yet.</p>
+      <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreateOpen(true)}>
+        <Plus className="h-3.5 w-3.5" /> New workflow
+      </Button>
+      <CreateWorkflowDialog
+        open={createOpen}
+        isPending={createWorkflow.isPending}
+        onConfirm={async name => {
+          const wf = await createWorkflow.mutateAsync(name)
+          setSelectedId(wf.id)
+          setCreateOpen(false)
+        }}
+        onCancel={() => setCreateOpen(false)}
+      />
+    </div>
+  )
+
+  const deleteTarget = workflows.find(w => w.id === deleteConfirmId)
 
   return (
-    <div className="space-y-8">
-      <StatusesEditor workflow={workflow} projectId={projectId} />
-      <TransitionsEditor workflow={workflow} projectId={projectId} />
+    <div className="space-y-6">
+      {/* Workflow tab bar */}
+      <div className="flex items-center gap-0 border-b">
+        {workflows.length > 1
+          ? workflows.map(wf => (
+            <div key={wf.id} className="flex items-center">
+              <button
+                onClick={() => setSelectedId(wf.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 -mb-px transition-colors',
+                  wf.id === selected.id
+                    ? 'border-primary text-foreground font-medium'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {wf.name}
+                {wf.is_default && (
+                  <span className="text-[10px] text-muted-foreground">(default)</span>
+                )}
+              </button>
+              <button
+                onClick={() => setDeleteConfirmId(wf.id)}
+                className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors -ml-1 mr-1"
+                title="Delete workflow"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))
+          : (
+            <span className="px-1 py-2 text-sm font-medium text-foreground">
+              {selected.name}
+              {selected.is_default && (
+                <span className="ml-1 text-[10px] text-muted-foreground">(default)</span>
+              )}
+            </span>
+          )
+        }
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" /> New workflow
+        </Button>
+      </div>
+
+      <StatusesEditor workflow={selected} projectId={projectId} />
+      <TransitionsEditor workflow={selected} projectId={projectId} />
+
+      <CreateWorkflowDialog
+        open={createOpen}
+        isPending={createWorkflow.isPending}
+        onConfirm={async name => {
+          const wf = await createWorkflow.mutateAsync(name)
+          setSelectedId(wf.id)
+          setCreateOpen(false)
+        }}
+        onCancel={() => setCreateOpen(false)}
+      />
+
+      {deleteTarget && (
+        <DeleteWorkflowDialog
+          workflow={deleteTarget}
+          isPending={deleteWorkflow.isPending}
+          onConfirm={async () => {
+            await deleteWorkflow.mutateAsync(deleteTarget.id)
+            if (selected.id === deleteTarget.id) setSelectedId(null)
+            setDeleteConfirmId(null)
+          }}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function CreateWorkflowDialog({
+  open, isPending, onConfirm, onCancel,
+}: {
+  open: boolean
+  isPending: boolean
+  onConfirm: (name: string) => Promise<void>
+  onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    await onConfirm(name.trim())
+    setName('')
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>New workflow</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Workflow name"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={!name.trim() || isPending}>
+              {isPending ? 'Creating…' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteWorkflowDialog({
+  workflow, isPending, onConfirm, onCancel,
+}: {
+  workflow: Workflow
+  isPending: boolean
+  onConfirm: () => Promise<void>
+  onCancel: () => void
+}) {
+  return (
+    <Dialog open onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Delete workflow</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Delete <strong>{workflow.name}</strong>? Tasks using this workflow will block deletion.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+          <Button variant="destructive" size="sm" disabled={isPending} onClick={onConfirm}>
+            {isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -86,7 +257,7 @@ function StatusesEditor({ workflow, projectId }: { workflow: Workflow; projectId
     } catch (err: unknown) {
       const code = (err as { response?: { data?: { detail?: { code?: string } } } })
         ?.response?.data?.detail?.code
-      if (code === 'STATUS_HAS_ACTIVE_ASSIGNMENTS') {
+      if (code === 'STATUS_HAS_ACTIVE_TASKS') {
         setMigrateFor(status)
       }
     }

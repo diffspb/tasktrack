@@ -12,7 +12,7 @@ from app.models.workflow import Status, StatusCategory, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.services import notification_service
 from app.services.permissions import require_project_access
-from app.services.workflow_service import validate_transition
+from app.services.workflow_service import get_workflow_for_task_type, validate_transition
 
 
 async def create_task(
@@ -23,15 +23,11 @@ async def create_task(
     from app.models.project import Project
     project = await session.get(Project, project_id)
 
+    task_type = await _resolve_task_type(session, data.task_type_key, project_id)
+
     workflow_id = data.workflow_id
     if workflow_id is None:
-        wf = await session.scalar(
-            select(Workflow).where(
-                Workflow.project_id == project_id, Workflow.is_default.is_(True)
-            )
-        )
-        if not wf:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "NO_DEFAULT_WORKFLOW"})
+        wf = await get_workflow_for_task_type(session, project_id, task_type.id)
         workflow_id = wf.id
 
     default_status = await session.scalar(
@@ -41,8 +37,6 @@ async def create_task(
     )
     if not default_status:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_NO_DEFAULT_STATUS"})
-
-    task_type = await _resolve_task_type(session, data.task_type_key, project_id)
 
     count = await session.scalar(
         select(func.count()).select_from(Task).where(Task.project_id == project_id)

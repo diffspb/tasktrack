@@ -369,7 +369,7 @@ async def test_delete_status_with_active_task(
 
     r = await client.delete(f"/api/v1/statuses/{todo['id']}")
     assert r.status_code == 409
-    assert r.json()["detail"]["code"] == "STATUS_HAS_ACTIVE_ASSIGNMENTS"
+    assert r.json()["detail"]["code"] == "STATUS_HAS_ACTIVE_TASKS"
 
 
 async def test_delete_workflow_with_tasks_blocked(

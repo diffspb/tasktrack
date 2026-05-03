@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
@@ -21,3 +21,10 @@ class TaskType(Base, UUIDMixin, TimestampMixin):
     color: Mapped[str | None] = mapped_column(String(20))
     icon: Mapped[str | None] = mapped_column(String(50))
     meta_schema: Mapped[dict | None] = mapped_column(JSONB)
+    default_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workflows.id", ondelete="SET NULL"), nullable=True
+    )
+
+    default_workflow: Mapped["Workflow | None"] = relationship(
+        "Workflow", foreign_keys=[default_workflow_id]
+    )
