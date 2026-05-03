@@ -338,3 +338,41 @@ async def test_create_project_auto_creates_workflow(client: AsyncClient):
     res_r = await client.get(f"/api/v1/projects/{project_id}/resolutions")
     assert res_r.status_code == 200
     assert len(res_r.json()) == 3
+
+
+async def test_get_project_task_types(client: AsyncClient):
+    r = await client.post("/api/v1/projects", json={"name": "TT Test", "key": "TTTEST"})
+    assert r.status_code == 201
+    project_id = r.json()["id"]
+
+    resp = await client.get(f"/api/v1/projects/{project_id}/task-types")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    # 5 system types always present
+    assert len(items) >= 5
+    keys = {t["key"] for t in items}
+    assert keys >= {"task", "bug", "story", "epic", "decision"}
+    for t in items:
+        assert "id" in t
+        assert "name" in t
+        assert "is_system" in t
+
+
+async def test_add_member_with_viewer_role(client: AsyncClient, db_session: AsyncSession):
+    viewer = User(
+        id=uuid.uuid4(), email="viewer@test.com", display_name="Viewer",
+        keycloak_id=f"kc-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    db_session.add(viewer)
+    await db_session.flush()
+
+    r = await client.post("/api/v1/projects", json={"name": "Viewer Test", "key": "VWTEST"})
+    assert r.status_code == 201
+    project_id = r.json()["id"]
+
+    add_r = await client.post(f"/api/v1/projects/{project_id}/members", json={
+        "user_id": str(viewer.id),
+        "role": "viewer",
+    })
+    assert add_r.status_code == 201
+    assert add_r.json()["role"] == "viewer"

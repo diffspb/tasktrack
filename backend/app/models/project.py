@@ -17,6 +17,7 @@ class ProjectMemberRole(str, enum.Enum):
     admin = "admin"
     manager = "manager"
     member = "member"
+    viewer = "viewer"
 
 
 class Project(Base, UUIDMixin, TimestampMixin):

@@ -7,14 +7,6 @@
 
 ---
 
-## Блокеры перед командным пилотом
-
-**`GET /projects/{id}/task-types` отсутствует в бэкенде.**
-Фронтенд (хук `useProjectTaskTypes`) вызывает этот endpoint при загрузке CreateTaskModal, фильтров и настроек типов. Бэкенд возвращает 404 — типы задач не загружаются. Реализация: `GET /projects/{project_id}/task-types` → системные типы (`is_system=true`) + кастомные типы проекта, отсортированные по позиции. Тест: `test_get_project_task_types` в `tests/test_projects.py`.
-
-**`ProjectMember.role` — роль `viewer` не реализована в бэкенде.**
-Frontend `ProjectSettings.tsx` предлагает роли `['admin', 'manager', 'member', 'viewer']`. Backend enum `ProjectMemberRole` содержит только `{admin, manager, member}`. При попытке добавить участника с ролью `viewer` бэкенд возвращает `422 Unprocessable Entity`. Исправить: добавить `viewer = "viewer"` в `ProjectMemberRole` и описать его права в матрице (`docs/13-permissions.md`).
-
 ---
 
 ## Отложено на post-MVP (после исследовательского запуска)

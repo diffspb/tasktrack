@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.models import (
-    Base, Notification, NotificationEntityType, NotificationEventType,
-    Project, ProjectMember, ProjectMemberRole, ProjectVisibility,
+    Base, BoardColumn, BoardColumnStatus, Notification, NotificationEntityType, NotificationEventType,
+    Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
     Resolution, Status, StatusCategory, Task, TaskPriority, TaskType,
     Transition, User, Workflow,
 )
@@ -52,12 +52,68 @@ async def seed(session: AsyncSession) -> None:
     session.add_all([admin, manager, dev1])
     await session.flush()
 
-    # System task types (project_id = NULL)
-    tt_task     = TaskType(key="task",     name="Задача",    is_system=True, icon="check-square", color="#6366f1")
-    tt_bug      = TaskType(key="bug",      name="Баг",       is_system=True, icon="bug",          color="#ef4444")
-    tt_story    = TaskType(key="story",    name="История",   is_system=True, icon="book-open",    color="#10b981")
-    tt_epic     = TaskType(key="epic",     name="Эпик",      is_system=True, icon="zap",          color="#f59e0b")
-    tt_decision = TaskType(key="decision", name="Decision",  is_system=True, icon="git-branch",   color="#8b5cf6")
+    # System workflows (project_id = NULL)
+    wf_task_story = Workflow(name="Task/Story", is_default=False)
+    wf_bug        = Workflow(name="Bug",        is_default=False)
+    wf_epic       = Workflow(name="Epic",       is_default=False)
+    wf_decision   = Workflow(name="Decision Process", is_default=False)
+    session.add_all([wf_task_story, wf_bug, wf_epic, wf_decision])
+    await session.flush()
+
+    # Statuses for system workflows
+    _i, _m, _f = StatusCategory.initial, StatusCategory.intermediate, StatusCategory.final
+
+    # Task/Story: To Do → In Progress → Review → Done
+    st_ts = [
+        Status(workflow_id=wf_task_story.id, name="To Do",       category=_i, is_default=True,  position=0),
+        Status(workflow_id=wf_task_story.id, name="In Progress", category=_m, is_default=False, position=1),
+        Status(workflow_id=wf_task_story.id, name="Review",      category=_m, is_default=False, position=2),
+        Status(workflow_id=wf_task_story.id, name="Done",        category=_f, is_default=False, position=3),
+    ]
+    # Bug: Open → In Progress → Review → Verified → Closed
+    st_bug = [
+        Status(workflow_id=wf_bug.id, name="Open",        category=_i, is_default=True,  position=0),
+        Status(workflow_id=wf_bug.id, name="In Progress", category=_m, is_default=False, position=1),
+        Status(workflow_id=wf_bug.id, name="Review",      category=_m, is_default=False, position=2),
+        Status(workflow_id=wf_bug.id, name="Verified",    category=_m, is_default=False, position=3),
+        Status(workflow_id=wf_bug.id, name="Closed",      category=_f, is_default=False, position=4),
+    ]
+    # Epic: Planning → Active → Done
+    st_epic = [
+        Status(workflow_id=wf_epic.id, name="Planning", category=_i, is_default=True,  position=0),
+        Status(workflow_id=wf_epic.id, name="Active",   category=_m, is_default=False, position=1),
+        Status(workflow_id=wf_epic.id, name="Done",     category=_f, is_default=False, position=2),
+    ]
+    # Decision Process: Open → Collecting → Awaiting Decision → Decided
+    st_dec = [
+        Status(workflow_id=wf_decision.id, name="Open",              category=_i, is_default=True,  position=0),
+        Status(workflow_id=wf_decision.id, name="Collecting",        category=_m, is_default=False, position=1),
+        Status(workflow_id=wf_decision.id, name="Awaiting Decision", category=_m, is_default=False, position=2),
+        Status(workflow_id=wf_decision.id, name="Decided",           category=_f, is_default=False, position=3),
+    ]
+    session.add_all(st_ts + st_bug + st_epic + st_dec)
+    await session.flush()
+
+    # Transitions for system workflows
+    def _linear_transitions(wf_id, statuses):
+        return [Transition(workflow_id=wf_id, from_status_id=statuses[i].id, to_status_id=statuses[i+1].id)
+                for i in range(len(statuses) - 1)]
+
+    session.add_all(
+        _linear_transitions(wf_task_story.id, st_ts) +
+        [Transition(workflow_id=wf_task_story.id, from_status_id=st_ts[1].id, to_status_id=st_ts[0].id)] +
+        _linear_transitions(wf_bug.id, st_bug) +
+        [Transition(workflow_id=wf_bug.id, from_status_id=st_bug[1].id, to_status_id=st_bug[0].id)] +
+        _linear_transitions(wf_epic.id, st_epic) +
+        _linear_transitions(wf_decision.id, st_dec)
+    )
+
+    # System task types (project_id = NULL) — linked to system workflows
+    tt_task     = TaskType(key="task",     name="Задача",   is_system=True, icon="check-square", color="#6366f1", default_workflow_id=wf_task_story.id)
+    tt_bug      = TaskType(key="bug",      name="Баг",      is_system=True, icon="bug",          color="#ef4444", default_workflow_id=wf_bug.id)
+    tt_story    = TaskType(key="story",    name="История",  is_system=True, icon="book-open",    color="#10b981", default_workflow_id=wf_task_story.id)
+    tt_epic     = TaskType(key="epic",     name="Эпик",     is_system=True, icon="zap",          color="#f59e0b", default_workflow_id=wf_epic.id)
+    tt_decision = TaskType(key="decision", name="Decision", is_system=True, icon="git-branch",   color="#8b5cf6", default_workflow_id=wf_decision.id)
     session.add_all([tt_task, tt_bug, tt_story, tt_epic, tt_decision])
     await session.flush()
 
@@ -93,6 +149,28 @@ async def seed(session: AsyncSession) -> None:
         Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=done.id),
         Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
         Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
+    ])
+
+    # ProjectTaskTypeConfig: all types in DEMO → project «Базовый» workflow
+    # (ensures tasks appear on the board; can be overridden in settings)
+    for tt in [tt_task, tt_bug, tt_story, tt_epic, tt_decision]:
+        session.add(ProjectTaskTypeConfig(
+            project_id=demo.id, task_type_id=tt.id, workflow_id=wf.id,
+        ))
+    await session.flush()
+
+    # Board columns for DEMO project
+    bc1 = BoardColumn(project_id=demo.id, name="To Do",       position=0)
+    bc2 = BoardColumn(project_id=demo.id, name="In Progress", position=1)
+    bc3 = BoardColumn(project_id=demo.id, name="Review",      position=2)
+    bc4 = BoardColumn(project_id=demo.id, name="Done",        position=3)
+    session.add_all([bc1, bc2, bc3, bc4])
+    await session.flush()
+    session.add_all([
+        BoardColumnStatus(board_column_id=bc1.id, status_id=todo.id),
+        BoardColumnStatus(board_column_id=bc2.id, status_id=inprog.id),
+        BoardColumnStatus(board_column_id=bc3.id, status_id=review.id),
+        BoardColumnStatus(board_column_id=bc4.id, status_id=done.id),
     ])
 
     res_done = Resolution(project_id=demo.id, name="Done", is_default=True, position=0)
@@ -213,7 +291,9 @@ async def seed(session: AsyncSession) -> None:
     ])
 
     await session.commit()
-    print("  → 3 пользователя, 5 системных типов задач, проект DEMO, воркфлоу «Базовый»")
+    print("  → 3 пользователя, 4 системных воркфлоу (Task/Story, Bug, Epic, Decision Process)")
+    print("  → 5 системных типов задач, привязанных к системным воркфлоу")
+    print("  → проект DEMO, воркфлоу «Базовый», 4 BoardColumn")
     print("  → 12 обычных задач + 2 подзадачи DEMO-13/14 для Decision-задачи DEMO-10")
     print("  → Solution-комментарии на подзадачах, уведомления для демонстрации колокольчика")
 

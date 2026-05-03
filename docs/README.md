@@ -22,7 +22,8 @@
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка | `mvp-research-launch` | 🔲 |
+| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | 🔲 |
+| 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
 Инфра: Docker обязателен. Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
 Архитектурные решения → **[decisions/](./decisions/)**.
@@ -69,6 +70,7 @@
 | [decisions/ADR-006](./decisions/ADR-006-phase2-model-decisions.md) | Решения по модели, принятые в Этапе 2 |
 | [decisions/ADR-007](./decisions/ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, токены |
 | [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment |
+| [decisions/ADR-009](./decisions/ADR-009-board-columns-fr001.md) | BoardColumn — независимый слой между воркфлоу и Kanban-бордой (FR-001) |
 
 ### Открытые хвосты
 

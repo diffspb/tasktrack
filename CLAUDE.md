@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **реализация MVP, Этап 8 (доводка)**. Alembic и Keycloak отложены на post-MVP — см. `docs/tech-debt.md`.
+Текущий этап: **Этап 9 завершён (FR-001)**. Следующий приоритет: Alembic + Keycloak (этап 8) перед `mvp-research-launch`. Отложенные работы — см. `docs/tech-debt.md`.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -85,9 +85,9 @@ docs/
 
 ## Реализация
 
-Реализация идёт поэтапно (8 этапов). Подробный план — `docs/18-implementation-plan.md`.
+Реализация идёт поэтапно. Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** 8 — доводка + Alembic
+**Текущий этап:** Alembic + Keycloak (блокеры перед `mvp-research-launch`)
 
 | Этап | Тег | Статус |
 |------|-----|--------|
@@ -99,7 +99,8 @@ docs/
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка | `mvp-research-launch` | 🔲 |
+| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | 🔲 |
+| 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
 ### Правила разработки
 
