@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TaskBoard } from '../TaskBoard'
 import * as api from '../api'
+import * as workflowApi from '@/features/projects/workflowApi'
 
 const PROJECT_ID = 'proj-1'
 const STUB_USER = '00000000-0000-0000-0000-000000000001'
@@ -80,7 +81,16 @@ const makeTasks = (): api.Task[] => [
   },
 ]
 
+const MOCK_BOARD_COLUMNS: workflowApi.BoardColumn[] = [
+  { id: 'col1', name: 'To Do',       position: 0, status_ids: ['s1'] },
+  { id: 'col2', name: 'In Progress', position: 1, status_ids: ['s2'] },
+  { id: 'col3', name: 'Done',        position: 2, status_ids: ['s3'] },
+]
+
 beforeEach(() => {
+  vi.spyOn(workflowApi, 'useBoardColumns').mockReturnValue(
+    { data: { items: MOCK_BOARD_COLUMNS }, isLoading: false, isError: false } as unknown as ReturnType<typeof workflowApi.useBoardColumns>,
+  )
   vi.spyOn(api, 'useProjectWorkflows').mockReturnValue(
     { data: MOCK_WORKFLOW, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectWorkflows>,
   )
@@ -89,6 +99,9 @@ beforeEach(() => {
   )
   vi.spyOn(api, 'useProjectMembers').mockReturnValue(
     { data: { items: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectMembers>,
+  )
+  vi.spyOn(api, 'useProjectResolutions').mockReturnValue(
+    { data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectResolutions>,
   )
 })
 

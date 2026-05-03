@@ -21,14 +21,13 @@ def _get_jwks_client() -> PyJWKClient:
     return _jwks_client
 
 
-async def get_token_payload(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict:
+def validate_token(token: str) -> dict:
+    """Validate a raw JWT string against Keycloak JWKS and return the payload."""
     try:
         client = _get_jwks_client()
-        signing_key = client.get_signing_key_from_jwt(credentials.credentials)
+        signing_key = client.get_signing_key_from_jwt(token)
         payload: dict = jwt.decode(
-            credentials.credentials,
+            token,
             signing_key.key,
             algorithms=["RS256"],
             audience=settings.keycloak_client_id,
@@ -39,3 +38,9 @@ async def get_token_payload(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {exc}",
         ) from exc
+
+
+async def get_token_payload(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    return validate_token(credentials.credentials)

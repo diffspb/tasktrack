@@ -48,29 +48,47 @@ const ERROR_MESSAGES: Record<string, string> = {
   PERMISSION_DENIED:               'Нет прав для этого действия',
 }
 
+const IS_STUB = import.meta.env.VITE_AUTH_STUB === 'true'
+
 export const api = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Dev "View as"
-api.interceptors.request.use(config => {
-  if (typeof window !== 'undefined') {
-    const email = window.localStorage.getItem(STUB_USER_KEY)
-    if (email) config.headers.set('X-Stub-User', email)
+api.interceptors.request.use(async config => {
+  if (IS_STUB) {
+    // Dev "View as" header
+    if (typeof window !== 'undefined') {
+      const email = window.localStorage.getItem(STUB_USER_KEY)
+      if (email) config.headers.set('X-Stub-User', email)
+    }
+  } else {
+    // OIDC: attach Bearer token
+    const { userManager } = await import('@/features/auth/oidc')
+    const user = await userManager.getUser()
+    if (user?.access_token) {
+      config.headers.set('Authorization', `Bearer ${user.access_token}`)
+    }
   }
   return config
 })
 
 api.interceptors.response.use(
   res => res,
-  err => {
+  async err => {
     if (!axios.isAxiosError(err)) {
       toast.error('Неизвестная ошибка')
       return Promise.reject(err)
     }
-    // Don't show toast for 401 — AuthProvider handles redirect
-    if (err.response?.status === 401) return Promise.reject(err)
+    if (err.response?.status === 401) {
+      if (!IS_STUB) {
+        // Redirect to Keycloak login on expired session
+        const { userManager } = await import('@/features/auth/oidc')
+        await userManager.signinRedirect()
+        return new Promise(() => {}) // pending — redirect happening
+      }
+      return Promise.reject(err)
+    }
 
     const detail = err.response?.data?.detail
     const code = typeof detail === 'object' ? detail?.code : undefined

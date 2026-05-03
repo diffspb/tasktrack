@@ -1,0 +1,15 @@
+services:
+  app:
+    env_file: .env.prod
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tasktrack:${POSTGRES_PASSWORD}@postgres:5432/tasktrack
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tasktrack.rule=Host(`tasktrack.busypage.ru`)"
+      - "traefik.http.routers.tasktrack.entrypoints=websecure"
+      - "traefik.http.routers.tasktrack.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tasktrack.middlewares=secure-headers@file"
+      - "traefik.http.services.tasktrack.loadbalancer.server.port=8000"
+
+  postgres:
+    env_file: .env.prod

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/shared/ui/Layout'
+import { AuthCallback } from '@/features/auth/AuthCallback'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { ProjectSettings } from '@/features/projects/ProjectSettings'
 import { TeamSettingsPage } from '@/features/projects/TeamSettingsPage'
@@ -11,6 +12,7 @@ import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
 
 export const router = createBrowserRouter([
+  { path: '/auth/callback', element: <AuthCallback /> },
   {
     path: '/',
     element: <Layout />,
