@@ -862,13 +862,13 @@ export function BoardColumnEditor({ projectId }: { projectId: string }) {
 - [x] 9. ProjectSettings → 3 под-страницы (Team / Workflow / Board); TaskTypeWorkflowTable
 - [x] 10. TaskBoard — рендер по board_column, drag подсветка только для разрешённых колонок
 - [x] 11. CreateTaskModal: подключён useProjectTaskTypes (типы грузятся из API, не хардкод)
-- [ ] 12. Smoke-тест ручной (7 шагов из плана)
+- [x] 12. Smoke-тест ручной — пройден пользователем
 
 ### Стадия 4 — ADR и навигация
 
-- [ ] ADR-009
-- [ ] docs/README.md, CLAUDE.md
-- [ ] Закрыть UX-долг item 5
+- [x] ADR-009 (BoardColumn vs прямой рендер по воркфлоу)
+- [x] docs/README.md, CLAUDE.md — этап 9 добавлен в таблицы
+- [x] UX-долг item 5 (drag подсветка) — закрыт в шаге 10
 
 ---
 

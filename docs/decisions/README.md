@@ -16,6 +16,7 @@
 | [ADR-006](./ADR-006-phase2-model-decisions.md) | Решения по модели данных, принятые в Этапе 2 | 2026-04-27 | Принято |
 | [ADR-007](./ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, цветовые токены | 2026-04-29 | Принято |
 | [ADR-008](./ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment | 2026-04-30 | Принято |
+| [ADR-009](./ADR-009-board-columns-fr001.md) | BoardColumn как независимый слой между воркфлоу и Kanban-бордой (FR-001) | 2026-05-03 | Принято |
 
 ## Шаблон
 
