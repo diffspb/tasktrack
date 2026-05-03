@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   useTask, useChildTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers,
-  useTransitionStatus, useUpdateTask,
+  useTransitionStatus, useUpdateTask, useTaskComments,
   type Task, type Status,
 } from './api'
 import { CommentSection } from './CommentSection'
@@ -29,12 +29,16 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const { data: members } = useProjectMembers(task.project_id)
   const { data: parentTask } = useTask(task.parent_task_id)
   const { data: childTasks = [] } = useChildTasks(task.project_id, task.id)
+  const { data: comments = [] } = useTaskComments(task.id)
   const transition = useTransitionStatus(task.project_id)
   const updateTask = useUpdateTask(task.id, task.project_id)
 
-  const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
-  const statuses: Status[] = [...(defaultWorkflow?.statuses ?? [])].sort((a, b) => a.position - b.position)
-  const transitions = defaultWorkflow?.transitions ?? []
+  // Use the task's own workflow, not the project default
+  const taskWorkflow = workflows?.find(w => w.id === task.workflow_id)
+    ?? workflows?.find(w => w.is_default)
+    ?? workflows?.[0]
+  const statuses: Status[] = [...(taskWorkflow?.statuses ?? [])].sort((a, b) => a.position - b.position)
+  const transitions = taskWorkflow?.transitions ?? []
   const currentStatus = statuses.find(s => s.id === task.current_status_id)
   const userById = new Map(members?.items.map(m => [m.user.id, m.user]) ?? [])
 
@@ -284,6 +288,32 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     </div>
   )
 
+  const debugBlock = (
+    <details className="border-t pt-4">
+      <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/50 hover:text-muted-foreground select-none">
+        Debug
+      </summary>
+      <div className="mt-3 space-y-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50 mb-1">Task</p>
+          <pre className="rounded-md bg-muted p-3 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+            {JSON.stringify(task, null, 2)}
+          </pre>
+        </div>
+        {comments.length > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50 mb-1">
+              Comments ({comments.length})
+            </p>
+            <pre className="rounded-md bg-muted p-3 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+              {JSON.stringify(comments, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </details>
+  )
+
   // ── Layout ────────────────────────────────────────────────────────────────
 
   if (mode === 'page') {
@@ -298,6 +328,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
             {resolutionBlock}
             {childrenBlock && <div className="border-t pt-5">{childrenBlock}</div>}
             {commentsBlock}
+            {debugBlock}
           </div>
           <div className="space-y-5">
             {assigneeBlock}
@@ -320,6 +351,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
       {assigneeBlock}
       {metaBlock}
       {commentsBlock}
+      {debugBlock}
     </div>
   )
 }
