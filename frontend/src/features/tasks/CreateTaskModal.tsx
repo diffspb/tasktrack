@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateTask, useProjectMembers, useProjectEpics, type Priority } from './api'
+import { useCreateTask, useProjectMembers, useProjectEpics, useProjectTaskTypes, type Priority } from './api'
 
 interface Props {
   open: boolean
@@ -13,7 +13,6 @@ interface Props {
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'critical']
-const TASK_TYPES = ['task', 'bug', 'story', 'epic', 'decision']
 
 export function CreateTaskModal({ open, projectId, onClose }: Props) {
   const [title, setTitle] = useState('')
@@ -26,6 +25,8 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
   const { data: epics = [] } = useProjectEpics(projectId)
+  const { data: taskTypesData } = useProjectTaskTypes(projectId)
+  const taskTypes = taskTypesData?.items ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,9 +81,14 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
                 onChange={e => setTypeKey(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                {TASK_TYPES.map(t => (
-                  <option key={t} value={t} className="capitalize">{t}</option>
-                ))}
+                {taskTypes.length > 0
+                  ? taskTypes.map(t => (
+                    <option key={t.key} value={t.key}>{t.name}</option>
+                  ))
+                  : ['task', 'bug', 'story', 'epic', 'decision'].map(t => (
+                    <option key={t} value={t} className="capitalize">{t}</option>
+                  ))
+                }
               </select>
             </div>
 

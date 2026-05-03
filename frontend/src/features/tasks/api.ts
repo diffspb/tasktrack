@@ -121,7 +121,7 @@ export function useProjectMembers(projectId: string | null | undefined) {
 }
 
 export function useProjectTaskTypes(projectId: string | null | undefined) {
-  return useQuery<TaskType[]>({
+  return useQuery<{ items: TaskType[] }>({
     queryKey: ['task-types', projectId],
     queryFn: () => api.get(`/projects/${projectId}/task-types`).then(r => r.data),
     enabled: !!projectId,

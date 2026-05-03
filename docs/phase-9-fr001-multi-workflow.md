@@ -861,7 +861,7 @@ export function BoardColumnEditor({ projectId }: { projectId: string }) {
 - [x] 8. BoardColumnEditor — DnD + маппинг статусов + предупреждение о немаппированных
 - [x] 9. ProjectSettings → 3 под-страницы (Team / Workflow / Board); TaskTypeWorkflowTable
 - [x] 10. TaskBoard — рендер по board_column, drag подсветка только для разрешённых колонок
-- [ ] 11. Проверить CreateTaskModal (useProjectTaskTypes теперь работает)
+- [x] 11. CreateTaskModal: подключён useProjectTaskTypes (типы грузятся из API, не хардкод)
 - [ ] 12. Smoke-тест ручной (7 шагов из плана)
 
 ### Стадия 4 — ADR и навигация
