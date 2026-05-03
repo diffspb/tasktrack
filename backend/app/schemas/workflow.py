@@ -69,6 +69,7 @@ class StatusCreate(BaseModel):
 
 class StatusUpdate(BaseModel):
     name: str | None = None
+    category: StatusCategory | None = None
     position: int | None = None
     is_default: bool | None = None
     color: str | None = None

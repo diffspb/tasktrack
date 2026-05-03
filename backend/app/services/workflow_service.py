@@ -138,8 +138,18 @@ async def update_status(
 
     if data.color is not None:
         s.color = data.color
+    if data.name is not None:
+        s.name = data.name
+    if data.position is not None:
+        s.position = data.position
+    if data.category is not None:
+        # If moving away from initial and this status is the default — clear it
+        if data.category != StatusCategory.initial and s.is_default:
+            s.is_default = False
+        s.category = data.category
     if data.is_default is not None:
-        if data.is_default and s.category != StatusCategory.initial:
+        effective_category = data.category if data.category is not None else s.category
+        if data.is_default and effective_category != StatusCategory.initial:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 {"code": "STATUS_DEFAULT_MUST_BE_INITIAL"},
@@ -147,10 +157,6 @@ async def update_status(
         if data.is_default:
             await _unset_default_status(session, s.workflow_id)
         s.is_default = data.is_default
-    if data.name is not None:
-        s.name = data.name
-    if data.position is not None:
-        s.position = data.position
 
     await session.commit()
     await session.refresh(s)

@@ -324,14 +324,29 @@ function SortableStatusRow({
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(status.name)
   const [color, setColor] = useState(status.color ?? '#6366f1')
+  const [category, setCategory] = useState<StatusCategory>(status.category)
+  const [isDefault, setIsDefault] = useState(status.is_default)
   const updateStatus = useUpdateStatus(projectId)
 
   const catMeta = CATEGORY_OPTS.find(c => c.value === status.category)
 
   async function saveEdit() {
-    if (name.trim() && (name !== status.name || color !== status.color)) {
-      await updateStatus.mutateAsync({ statusId: status.id, name: name.trim(), color })
+    const changes: Record<string, unknown> = { statusId: status.id }
+    if (name.trim() !== status.name) changes.name = name.trim()
+    if (color !== status.color) changes.color = color
+    if (category !== status.category) changes.category = category
+    if (isDefault !== status.is_default) changes.is_default = isDefault
+    if (Object.keys(changes).length > 1) {
+      await updateStatus.mutateAsync(changes as Parameters<typeof updateStatus.mutateAsync>[0])
     }
+    setEditing(false)
+  }
+
+  function cancelEdit() {
+    setName(status.name)
+    setColor(status.color ?? '#6366f1')
+    setCategory(status.category)
+    setIsDefault(status.is_default)
     setEditing(false)
   }
 
@@ -339,39 +354,68 @@ function SortableStatusRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn('flex items-center gap-2 rounded-lg border bg-background px-3 py-2',
+      className={cn('rounded-lg border bg-background px-3 py-2',
         isDragging && 'opacity-50 shadow-lg')}
     >
-      <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground/40 hover:text-muted-foreground shrink-0">
-        <GripVertical className="h-4 w-4" />
-      </button>
-
-      {/* Color dot */}
-      <div className="h-3 w-3 rounded-full shrink-0 border" style={{ background: color }} />
-
       {editing ? (
-        <div className="flex items-center gap-2 flex-1">
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
-            className="h-7 text-xs flex-1"
-            autoFocus
-          />
-          <div className="flex gap-1">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground/40 shrink-0">
+              <GripVertical className="h-4 w-4" />
+            </button>
+            <div className="h-3 w-3 rounded-full shrink-0 border" style={{ background: color }} />
+            <Input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }}
+              className="h-7 text-xs flex-1"
+              autoFocus
+            />
+            <select
+              value={category}
+              onChange={e => {
+                const v = e.target.value as StatusCategory
+                setCategory(v)
+                if (v !== 'initial') setIsDefault(false)
+              }}
+              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              {CATEGORY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 pl-9">
+            <span className="text-xs text-muted-foreground">Color:</span>
             {DEFAULT_COLORS.map(c => (
-              <button key={c} onClick={() => setColor(c)}
+              <button key={c} type="button" onClick={() => setColor(c)}
                 className={cn('h-5 w-5 rounded-full border-2 transition-all',
                   color === c ? 'border-foreground scale-110' : 'border-transparent')}
                 style={{ background: c }}
               />
             ))}
+            {category === 'initial' && (
+              <label className="ml-2 flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={e => setIsDefault(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-xs text-muted-foreground">Default</span>
+              </label>
+            )}
+            <div className="flex-1" />
+            <Button size="sm" className="h-6 px-2 text-xs" onClick={saveEdit} disabled={updateStatus.isPending}>
+              {updateStatus.isPending ? 'Saving…' : 'Save'}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={cancelEdit}>Cancel</Button>
           </div>
-          <Button size="sm" className="h-6 px-2 text-xs" onClick={saveEdit}>Save</Button>
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditing(false)}>Cancel</Button>
         </div>
       ) : (
-        <>
+        <div className="flex items-center gap-2">
+          <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground/40 hover:text-muted-foreground shrink-0">
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <div className="h-3 w-3 rounded-full shrink-0 border" style={{ background: status.color ?? '#6366f1' }} />
           <button className="flex-1 text-sm text-left hover:text-primary transition-colors" onClick={() => setEditing(true)}>
             {status.name}
           </button>
@@ -384,7 +428,7 @@ function SortableStatusRow({
           <button onClick={onDelete} className="rounded p-1 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-        </>
+        </div>
       )}
     </li>
   )
@@ -396,12 +440,16 @@ function AddStatusForm({ workflowId, projectId, nextPosition, onDone }: {
   const [name, setName] = useState('')
   const [category, setCategory] = useState<StatusCategory>('intermediate')
   const [color, setColor] = useState('#6366f1')
+  const [isDefault, setIsDefault] = useState(false)
   const createStatus = useCreateStatus(projectId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    await createStatus.mutateAsync({ workflowId, name: name.trim(), category, position: nextPosition, color })
+    await createStatus.mutateAsync({
+      workflowId, name: name.trim(), category,
+      position: nextPosition, color, is_default: isDefault,
+    })
     onDone()
   }
 
@@ -417,7 +465,11 @@ function AddStatusForm({ workflowId, projectId, nextPosition, onDone }: {
         />
         <select
           value={category}
-          onChange={e => setCategory(e.target.value as StatusCategory)}
+          onChange={e => {
+            const v = e.target.value as StatusCategory
+            setCategory(v)
+            if (v !== 'initial') setIsDefault(false)
+          }}
           className="h-7 rounded-md border border-input bg-background px-2 text-xs"
         >
           {CATEGORY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -432,6 +484,17 @@ function AddStatusForm({ workflowId, projectId, nextPosition, onDone }: {
             style={{ background: c }}
           />
         ))}
+        {category === 'initial' && (
+          <label className="ml-2 flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isDefault}
+              onChange={e => setIsDefault(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-xs text-muted-foreground">Default</span>
+          </label>
+        )}
         <div className="flex-1" />
         <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onDone}>Cancel</Button>
         <Button type="submit" size="sm" className="h-6 px-2 text-xs" disabled={!name.trim() || createStatus.isPending}>

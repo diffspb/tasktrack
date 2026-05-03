@@ -101,7 +101,9 @@ export function useUpdateStatus(projectId: string) {
     mutationFn: ({ statusId, ...data }: {
       statusId: string
       name?: string
+      category?: StatusCategory
       position?: number
+      is_default?: boolean
       color?: string
     }) => api.patch(`/statuses/${statusId}`, data).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows', projectId] }),
