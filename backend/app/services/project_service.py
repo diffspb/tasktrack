@@ -14,7 +14,6 @@ from app.schemas.project import ProjectCreate, ProjectMemberAdd, ProjectUpdate
 
 async def create_project(session: AsyncSession, data: ProjectCreate, owner: User) -> Project:
     from app.models.workflow import Status, StatusCategory, Transition, Workflow
-    from app.models.resolution import Resolution
 
     project = Project(
         name=data.name,
@@ -47,11 +46,6 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
             Transition(workflow_id=wf.id, from_status_id=todo.id,   to_status_id=done.id),
             Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
             Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
-        ])
-        session.add_all([
-            Resolution(project_id=project.id, name="Done",     is_default=True,  position=0),
-            Resolution(project_id=project.id, name="Won't Fix",                  position=1),
-            Resolution(project_id=project.id, name="Duplicate",                  position=2),
         ])
         await session.commit()
     except IntegrityError:

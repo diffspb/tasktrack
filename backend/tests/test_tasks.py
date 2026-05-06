@@ -21,7 +21,6 @@ async def _setup_project_and_workflow(session: AsyncSession, user: User) -> dict
     """
     from sqlalchemy import select
     from app.models.workflow import Workflow, Status, StatusCategory, Transition
-    from app.models.resolution import Resolution
 
     project = await project_service.create_project(
         session, ProjectCreate(name="Task Test", key=_rnd_key()), user
@@ -43,17 +42,12 @@ async def _setup_project_and_workflow(session: AsyncSession, user: User) -> dict
         session, wf.id, TransitionCreate(from_status_id=inprog.id, to_status_id=done.id), user
     )
 
-    resolution = await session.scalar(
-        select(Resolution).where(Resolution.project_id == project.id, Resolution.is_default == True)  # noqa: E712
-    )
-
     return {
         "project_id": str(project.id),
         "workflow_id": str(wf.id),
         "todo_id": str(todo.id),
         "inprog_id": str(inprog.id),
         "done_id": str(done.id),
-        "resolution_id": str(resolution.id),
     }
 
 
@@ -168,10 +162,9 @@ async def test_full_workflow(
     assert t1.status_code == 200
     assert t1.json()["current_status_id"] == ctx["inprog_id"]
 
-    # In Progress → Done (requires resolution)
+    # In Progress → Done
     t2 = await client.post(f"/api/v1/tasks/{task_id}/transition", json={
         "status_id": ctx["done_id"],
-        "resolution_id": ctx["resolution_id"],
     })
     assert t2.status_code == 200
     assert t2.json()["current_status_id"] == ctx["done_id"]
@@ -200,23 +193,6 @@ async def test_transition_not_allowed(
     })
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "WORKFLOW_TRANSITION_NOT_ALLOWED"
-
-
-async def test_resolution_required(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    ctx = await _setup_project_and_workflow(db_session, stub_user)
-    r = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
-        "title": "T", "assignee_id": str(stub_user.id),
-    })
-    task_id = r.json()["id"]
-    await client.post(f"/api/v1/tasks/{task_id}/transition", json={"status_id": ctx["inprog_id"]})
-
-    r = await client.post(f"/api/v1/tasks/{task_id}/transition", json={
-        "status_id": ctx["done_id"],  # no resolution_id
-    })
-    assert r.status_code == 400
-    assert r.json()["detail"]["code"] == "RESOLUTION_REQUIRED"
 
 
 async def test_transition_forbidden_for_non_assignee(

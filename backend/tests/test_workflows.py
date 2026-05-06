@@ -246,61 +246,6 @@ async def test_delete_default_workflow_blocked(
     assert r.json()["detail"]["code"] == "WORKFLOW_IS_DEFAULT"
 
 
-async def test_create_resolution_with_position(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    pid = await _make_project(db_session, stub_user)
-    r = await client.post(f"/api/v1/projects/{pid}/resolutions",
-                          json={"name": "Done", "is_default": True, "position": 0})
-    assert r.status_code == 201
-    data = r.json()
-    assert data["is_default"] is True
-    assert "created_at" in data
-
-
-async def test_resolution_default_upsert(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    pid = await _make_project(db_session, stub_user)
-    r1 = await client.post(f"/api/v1/projects/{pid}/resolutions",
-                           json={"name": "Done", "is_default": True})
-    r2 = await client.post(f"/api/v1/projects/{pid}/resolutions",
-                           json={"name": "Won't Fix", "is_default": True})
-
-    list_r = await client.get(f"/api/v1/projects/{pid}/resolutions")
-    defaults = [r for r in list_r.json() if r["is_default"]]
-    assert len(defaults) == 1
-    assert defaults[0]["id"] == r2.json()["id"]
-
-
-async def test_list_resolutions(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    pid = await _make_project(db_session, stub_user)
-    # project auto-creates 3 resolutions; add a custom one and verify it appears
-    await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Custom", "position": 10})
-
-    r = await client.get(f"/api/v1/projects/{pid}/resolutions")
-    assert r.status_code == 200
-    names = [res["name"] for res in r.json()]
-    assert "Custom" in names
-    assert "Done" in names
-
-
-async def test_delete_resolution(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    pid = await _make_project(db_session, stub_user)
-    r = await client.post(f"/api/v1/projects/{pid}/resolutions", json={"name": "Temp"})
-    rid = r.json()["id"]
-
-    del_r = await client.delete(f"/api/v1/resolutions/{rid}")
-    assert del_r.status_code == 204
-
-    list_r = await client.get(f"/api/v1/projects/{pid}/resolutions")
-    assert all(res["id"] != rid for res in list_r.json())
-
-
 async def test_status_color(client: AsyncClient, db_session: AsyncSession, stub_user: User):
     pid = await _make_project(db_session, stub_user)
     wf = await _make_workflow(client, pid)

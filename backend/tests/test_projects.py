@@ -335,9 +335,6 @@ async def test_create_project_auto_creates_workflow(client: AsyncClient):
     assert "In Progress" in status_names
     assert "Done" in status_names
 
-    res_r = await client.get(f"/api/v1/projects/{project_id}/resolutions")
-    assert res_r.status_code == 200
-    assert len(res_r.json()) == 3
 
 
 async def test_get_project_task_types(client: AsyncClient):
