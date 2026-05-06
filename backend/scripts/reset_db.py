@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.models import (
     Base, BoardColumn, BoardColumnStatus, Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
-    Resolution, Status, StatusCategory, Task, TaskPriority, TaskType,
+    Status, StatusCategory, Task, TaskPriority, TaskType,
     Transition, User, Workflow,
 )
 from app.models.comment import Comment
@@ -173,14 +173,6 @@ async def seed(session: AsyncSession) -> None:
         BoardColumnStatus(board_column_id=bc4.id, status_id=done.id),
     ])
 
-    res_done = Resolution(project_id=demo.id, name="Done", is_default=True, position=0)
-    session.add_all([
-        res_done,
-        Resolution(project_id=demo.id, name="Won't Fix",        position=1),
-        Resolution(project_id=demo.id, name="Duplicate",        position=2),
-        Resolution(project_id=demo.id, name="Cannot Reproduce", position=3),
-    ])
-    await session.flush()
 
     def task(n, title, type_=None, assignee=None, status=None, priority=TaskPriority.medium, description=None, parent=None, meta=None):
         return Task(
@@ -207,10 +199,8 @@ async def seed(session: AsyncSession) -> None:
                description="Пройти прототип, оставить комментарии в Figma")
     t6  = task(6,  "Обновить зависимости",                assignee=admin_id, status=review, priority=TaskPriority.low)
     t7  = task(7,  "Code review: модуль уведомлений",     assignee=admin_id, status=review, priority=TaskPriority.high)
-    t8  = task(8,  "Деплой на стейджинг",                 assignee=admin_id, status=done,  priority=TaskPriority.high,
-               meta={"resolution_id": str(res_done.id)})
-    t9  = task(9,  "Добавить тесты для task_service",     assignee=admin_id, status=done,
-               meta={"resolution_id": str(res_done.id)})
+    t8  = task(8,  "Деплой на стейджинг",                 assignee=admin_id, status=done,  priority=TaskPriority.high)
+    t9  = task(9,  "Добавить тесты для task_service",     assignee=admin_id, status=done)
 
     # Decision task — manager is the DM (assignee), blocked until subtasks are ready
     t10 = task(10, "Выбрать подход к авторизации",
@@ -224,8 +214,7 @@ async def seed(session: AsyncSession) -> None:
 
     # dev1 tasks
     t11 = task(11, "Оптимизировать запросы к БД",         assignee=dev1_id, status=inprog)
-    t12 = task(12, "Добавить индексы на tasks.project_id", assignee=dev1_id, status=done, priority=TaskPriority.low,
-               meta={"resolution_id": str(res_done.id)})
+    t12 = task(12, "Добавить индексы на tasks.project_id", assignee=dev1_id, status=done, priority=TaskPriority.low)
 
     session.add_all([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12])
     await session.flush()

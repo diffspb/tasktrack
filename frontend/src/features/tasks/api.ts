@@ -34,13 +34,6 @@ export interface Workflow {
   created_at: string
 }
 
-export interface Resolution {
-  id: string
-  name: string
-  is_default: boolean
-  position: number
-}
-
 export type Priority = 'low' | 'medium' | 'high' | 'critical'
 
 export interface Task {
@@ -100,14 +93,6 @@ export function useProjectWorkflows(projectId: string) {
   return useQuery<Workflow[]>({
     queryKey: ['workflows', projectId],
     queryFn: () => api.get(`/projects/${projectId}/workflows`).then(r => r.data),
-    enabled: !!projectId,
-  })
-}
-
-export function useProjectResolutions(projectId: string) {
-  return useQuery<Resolution[]>({
-    queryKey: ['resolutions', projectId],
-    queryFn: () => api.get(`/projects/${projectId}/resolutions`).then(r => r.data),
     enabled: !!projectId,
   })
 }
@@ -193,8 +178,8 @@ export function useUpdateTask(taskId: string, projectId: string) {
 export function useTransitionStatus(projectId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ taskId, status_id, resolution_id }: { taskId: string; status_id: string; resolution_id?: string }) =>
-      api.post(`/tasks/${taskId}/transition`, { status_id, resolution_id }).then(r => r.data),
+    mutationFn: ({ taskId, status_id }: { taskId: string; status_id: string }) =>
+      api.post(`/tasks/${taskId}/transition`, { status_id }).then(r => r.data),
     onSuccess: (updated: Task) => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.setQueryData(['task', updated.id], updated)

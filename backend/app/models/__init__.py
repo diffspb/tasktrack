@@ -5,7 +5,6 @@ from app.models.workflow import (
     BoardColumn, BoardColumnStatus, ProjectTaskTypeConfig,
     Status, StatusCategory, Transition, Workflow,
 )
-from app.models.resolution import Resolution
 from app.models.task_type import TaskType, SYSTEM_KEYS
 from app.models.task import Task, TaskLink, TaskLinkType, TaskPriority
 from app.models.comment import Comment
@@ -17,7 +16,6 @@ __all__ = [
     "Project", "ProjectMember", "ProjectMemberRole", "ProjectVisibility",
     "Workflow", "Status", "StatusCategory", "Transition",
     "BoardColumn", "BoardColumnStatus", "ProjectTaskTypeConfig",
-    "Resolution",
     "TaskType", "SYSTEM_KEYS",
     "Task", "TaskLink", "TaskLinkType", "TaskPriority",
     "Comment",

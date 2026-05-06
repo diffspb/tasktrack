@@ -33,7 +33,6 @@ async def get_workflow(ctx: Context, workflow_id: str) -> str:
     transitions (id, from_status_id, to_status_id, required_role).
 
     Status categories: "initial" | "intermediate" | "final".
-    Transitioning to a "final" status requires resolution_id.
     """
     async with McpSession(ctx) as (session, user):
         wid = parse_uuid(workflow_id, "workflow_id")

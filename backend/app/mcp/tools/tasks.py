@@ -255,16 +255,12 @@ async def transition_task_status(
     ctx: Context,
     task_id: str,
     target_status_id: str,
-    resolution_id: str | None = None,
 ) -> str:
     """
     Move a task to a different status following workflow transition rules.
 
     The agent must be the task's assignee to perform a transition.
     Only transitions listed in get_task.available_transitions are allowed.
-
-    When transitioning to a final status, resolution_id is required.
-    Get available resolutions from list_workflows or the project workflow info.
 
     For decision tasks: transitioning to final is blocked if any subtask
     lacks a solution comment (check is_decision_task and subtask_ids first).
@@ -274,8 +270,7 @@ async def transition_task_status(
     async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         sid = parse_uuid(target_status_id, "target_status_id")
-        rid = parse_uuid(resolution_id, "resolution_id") if resolution_id else None
 
-        data = TaskStatusTransition(status_id=sid, resolution_id=rid)
+        data = TaskStatusTransition(status_id=sid)
         task = await task_service.transition_status(session, tid, data, user)
         return json.dumps(await _enrich_task(session, task))

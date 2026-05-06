@@ -7,7 +7,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   // task / assignment
   TASK_NOT_FOUND:                  'Задача не найдена',
   ASSIGNMENT_NOT_FOUND:            'Назначение не найдено',
-  RESOLUTION_REQUIRED:             'Укажите резолюцию перед закрытием задачи',
   VERSION_CONFLICT:                'Данные изменились — обновите страницу',
   VERSION_REQUIRED:                'Не передан параметр version',
   WORKFLOW_TRANSITION_NOT_ALLOWED: 'Этот переход статуса недопустим',
@@ -43,7 +42,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   STATUS_NOT_IN_WORKFLOW:          'Статус не принадлежит этому воркфлоу',
   STATUS_WORKFLOW_MISMATCH:        'Статус принадлежит другому воркфлоу',
   TRANSITION_NOT_FOUND:            'Переход не найден',
-  RESOLUTION_NOT_FOUND:            'Резолюция не найдена',
   // generic
   PERMISSION_DENIED:               'Нет прав для этого действия',
 }

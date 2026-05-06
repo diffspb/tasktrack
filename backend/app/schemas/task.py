@@ -41,7 +41,6 @@ class TaskUpdate(BaseModel):
 
 class TaskStatusTransition(BaseModel):
     status_id: uuid.UUID
-    resolution_id: uuid.UUID | None = None
 
 
 class TaskResponse(BaseModel):

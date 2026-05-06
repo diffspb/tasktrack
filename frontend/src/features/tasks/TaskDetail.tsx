@@ -1,15 +1,12 @@
 import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
-import type { Task, Status, Resolution } from './api'
+import type { Task, Status } from './api'
 import { TaskView } from './TaskView'
 
 interface Props {
   task: Task | null
-  // statuses/transitions/resolutions kept for API compat with Board/Backlog
-  // (TaskView fetches them internally, but callers still pass them — ignored here)
   statuses?: Status[]
   transitions?: { from_status_id: string; to_status_id: string }[]
-  resolutions?: Resolution[]
   projectId: string
   currentUserId: string
   onClose: () => void

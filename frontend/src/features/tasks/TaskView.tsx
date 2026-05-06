@@ -4,7 +4,7 @@ import type { AxiosError } from 'axios'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
-  useTask, useChildTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers,
+  useTask, useChildTasks, useProjectWorkflows, useProjectMembers,
   useTransitionStatus, useUpdateTask, useTaskComments,
   type Task, type Status,
 } from './api'
@@ -25,7 +25,7 @@ interface Props {
 
 export function TaskView({ task, mode, currentUserId }: Props) {
   const { data: workflows } = useProjectWorkflows(task.project_id)
-  const { data: resolutions = [] } = useProjectResolutions(task.project_id)
+
   const { data: members } = useProjectMembers(task.project_id)
   const { data: parentTask } = useTask(task.parent_task_id)
   const { data: childTasks = [] } = useChildTasks(task.project_id, task.id)
@@ -43,8 +43,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const userById = new Map(members?.items.map(m => [m.user.id, m.user]) ?? [])
 
   const [confirmingTransition, setConfirmingTransition] = useState<string | null>(null)
-  const [pendingStatusId, setPendingStatusId] = useState<string | null>(null)
-  const [selectedRes, setSelectedRes] = useState<string>('')
+
   const [transitionError, setTransitionError] = useState<string | null>(null)
 
   const inFinalStatus = currentStatus?.category === 'final'
@@ -65,17 +64,13 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     .map(t => statuses.find(s => s.id === t.to_status_id))
     .filter((s): s is Status => !!s)
 
-  async function performTransition(statusId: string, resolutionId?: string) {
+  async function performTransition(statusId: string) {
     setTransitionError(null); setConfirmingTransition(null)
     try {
-      await transition.mutateAsync({ taskId: task.id, status_id: statusId, resolution_id: resolutionId })
-      setPendingStatusId(null)
+      await transition.mutateAsync({ taskId: task.id, status_id: statusId })
     } catch (err) {
       const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
-      if (code === 'RESOLUTION_REQUIRED') {
-        setPendingStatusId(statusId)
-        setSelectedRes(resolutions.find(r => r.is_default)?.id ?? '')
-      } else if (code === 'TASK_BLOCKED_BY_SUBTASKS') {
+      if (code === 'TASK_BLOCKED_BY_SUBTASKS') {
         setTransitionError('Task is blocked: subtasks are not resolved yet.')
       } else {
         setTransitionError('Transition not allowed.')
@@ -137,25 +132,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     </div>
   )
 
-  const resolutionBlock = pendingStatusId && (
-    <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 p-3 space-y-2.5">
-      <p className="text-sm font-medium">Choose a resolution</p>
-      <div className="flex flex-wrap gap-1.5">
-        {resolutions.map(r => (
-          <button key={r.id} type="button" onClick={() => setSelectedRes(r.id)}
-            className={cn('rounded-md border px-2.5 py-1 text-xs transition-colors',
-              selectedRes === r.id ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border text-muted-foreground')}>
-            {r.name}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={() => setPendingStatusId(null)}>Cancel</Button>
-        <Button size="sm" disabled={!selectedRes || transition.isPending}
-          onClick={() => performTransition(pendingStatusId, selectedRes)}>Confirm</Button>
-      </div>
-    </div>
-  )
+
 
   const descriptionBlock = (
     <div className="space-y-1.5">
@@ -325,7 +302,6 @@ export function TaskView({ task, mode, currentUserId }: Props) {
             {descriptionBlock}
             {transitionBlock}
             {confirmBackwardBlock}
-            {resolutionBlock}
             {childrenBlock && <div className="border-t pt-5">{childrenBlock}</div>}
             {commentsBlock}
             {debugBlock}
@@ -345,7 +321,6 @@ export function TaskView({ task, mode, currentUserId }: Props) {
       {titleBlock}
       {transitionBlock}
       {confirmBackwardBlock}
-      {resolutionBlock}
       {descriptionBlock}
       {childrenBlock}
       {assigneeBlock}

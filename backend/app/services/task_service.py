@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.task import Task, TaskPriority
 from app.models.task_type import TaskType
 from app.models.user import User
-from app.models.workflow import Status, StatusCategory, Workflow
+from app.models.workflow import Status, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.services import notification_service
 from app.services.permissions import require_project_access
@@ -209,17 +209,11 @@ async def transition_status(
             status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"}
         )
 
-    target = await session.get(Status, data.status_id)
-    if target and target.category == StatusCategory.final and data.resolution_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "RESOLUTION_REQUIRED"})
-
     # Decision-type task: blocked until all subtasks have solution_comment_id in meta.
     if task.task_type and task.task_type.key == "decision":
         await _check_decision_task_unblocked(session, task)
 
     task.current_status_id = data.status_id
-    if data.resolution_id:
-        task.meta = {**task.meta, "resolution_id": str(data.resolution_id)}
 
     await session.commit()
     return await _load_task(session, task.id)

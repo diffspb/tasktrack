@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers, type Task,
+  useProjectTasks, useProjectWorkflows, useProjectMembers, type Task,
 } from './api'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
@@ -21,7 +21,7 @@ export function TaskBacklog() {
 
   const { data: workflows } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading } = useProjectTasks(projectId ?? '')
-  const { data: resolutions = [] } = useProjectResolutions(projectId ?? '')
+
   const { data: members } = useProjectMembers(projectId ?? '')
 
   const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
@@ -90,7 +90,6 @@ export function TaskBacklog() {
         task={selectedTask}
         statuses={statuses}
         transitions={transitions}
-        resolutions={resolutions}
         projectId={projectId ?? ''}
         currentUserId={user?.id ?? ''}
         onClose={() => setSelectedTaskId(null)}

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks, useProjectWorkflows, useProjectResolutions, useProjectMembers,
+  useProjectTasks, useProjectWorkflows, useProjectMembers,
   useTransitionStatus, type Task,
 } from './api'
 import { useBoardColumns, type BoardColumn } from '@/features/projects/workflowApi'
@@ -55,7 +55,7 @@ export function TaskBoard() {
   const { data: boardColumnsData, isLoading: bcLoading } = useBoardColumns(projectId)
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
-  const { data: resolutions = [] } = useProjectResolutions(projectId ?? '')
+
   const { data: membersData } = useProjectMembers(projectId)
   const transition = useTransitionStatus(projectId ?? '')
 
@@ -120,9 +120,7 @@ export function TaskBoard() {
       await transition.mutateAsync({ taskId: task.id, status_id: targetStatusId })
     } catch (err) {
       const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
-      if (code === 'RESOLUTION_REQUIRED') {
-        setSelectedTaskId(task.id)
-      } else if (code === 'WORKFLOW_TRANSITION_NOT_ALLOWED') {
+      if (code === 'WORKFLOW_TRANSITION_NOT_ALLOWED') {
         showError('That transition is not allowed in this workflow.')
       } else if (code === 'TASK_BLOCKED_BY_SUBTASKS') {
         showError('Task is blocked: subtasks are not resolved yet.')
@@ -284,7 +282,6 @@ export function TaskBoard() {
         task={selectedTask}
         statuses={allStatuses}
         transitions={allTransitions}
-        resolutions={resolutions}
         projectId={projectId ?? ''}
         currentUserId={user?.id ?? ''}
         onClose={() => setSelectedTaskId(null)}

@@ -100,9 +100,7 @@ beforeEach(() => {
   vi.spyOn(api, 'useProjectMembers').mockReturnValue(
     { data: { items: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectMembers>,
   )
-  vi.spyOn(api, 'useProjectResolutions').mockReturnValue(
-    { data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectResolutions>,
-  )
+
 })
 
 describe('TaskBoard', () => {
