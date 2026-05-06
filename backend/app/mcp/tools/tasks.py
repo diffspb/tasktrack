@@ -1,6 +1,7 @@
 import json
 import uuid as _uuid
 
+from mcp.server.fastmcp.server import Context
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -60,6 +61,7 @@ async def _enrich_list(session, tasks: list[Task]) -> list[dict]:
 
 @svc_call
 async def list_tasks(
+    ctx: Context,
     project_id: str,
     status_name: str | None = None,
     assignee_id: str | None = None,
@@ -80,7 +82,7 @@ async def list_tasks(
     current_status_name, current_status_category, assignee_id, parent_task_id,
     due_date, version.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         pid = parse_uuid(project_id, "project_id")
         aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
         par = parse_uuid(parent_task_id, "parent_task_id") if parent_task_id else None
@@ -101,7 +103,7 @@ async def list_tasks(
 
 
 @svc_call
-async def get_task(task_id: str) -> str:
+async def get_task(ctx: Context, task_id: str) -> str:
     """
     Get complete task details by UUID.
 
@@ -113,27 +115,28 @@ async def get_task(task_id: str) -> str:
 
     Always call get_task before update_task to get the current version.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         task = await task_service.get_task(session, tid, user)
         return json.dumps(await _enrich_task(session, task))
 
 
 @svc_call
-async def get_task_by_key(key: str) -> str:
+async def get_task_by_key(ctx: Context, key: str) -> str:
     """
     Get complete task details by task key (e.g. "DEMO-10").
 
     Returns the same enriched response as get_task.
     Use this when you know the human-readable key rather than the UUID.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         task = await task_service.get_task_by_key(session, key.upper(), user)
         return json.dumps(await _enrich_task(session, task))
 
 
 @svc_call
 async def list_my_tasks(
+    ctx: Context,
     role: str | None = None,
     status_name: str | None = None,
     project_id: str | None = None,
@@ -147,7 +150,7 @@ async def list_my_tasks(
 
     Returns the same per-item fields as list_tasks.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         pid = parse_uuid(project_id, "project_id") if project_id else None
 
         resolved_status_id = None
@@ -165,6 +168,7 @@ async def list_my_tasks(
 
 @svc_call
 async def create_task(
+    ctx: Context,
     project_id: str,
     title: str,
     task_type_key: str = "task",
@@ -187,7 +191,7 @@ async def create_task(
     Returns the full enriched task response.
     """
     from datetime import date
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         pid = parse_uuid(project_id, "project_id")
         aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
         par = parse_uuid(parent_task_id, "parent_task_id") if parent_task_id else None
@@ -208,6 +212,7 @@ async def create_task(
 
 @svc_call
 async def update_task(
+    ctx: Context,
     task_id: str,
     version: int,
     title: str | None = None,
@@ -228,7 +233,7 @@ async def update_task(
     Returns the updated task with the incremented version.
     """
     from datetime import date
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
         dd = date.fromisoformat(due_date) if due_date else None
@@ -247,6 +252,7 @@ async def update_task(
 
 @svc_call
 async def transition_task_status(
+    ctx: Context,
     task_id: str,
     target_status_id: str,
     resolution_id: str | None = None,
@@ -265,7 +271,7 @@ async def transition_task_status(
 
     Returns the updated task.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         sid = parse_uuid(target_status_id, "target_status_id")
         rid = parse_uuid(resolution_id, "resolution_id") if resolution_id else None

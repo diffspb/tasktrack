@@ -1,5 +1,7 @@
 import json
 
+from mcp.server.fastmcp.server import Context
+
 from app.mcp.schemas.comment import comment_out
 from app.mcp.utils import McpSession, parse_uuid, svc_call
 from app.schemas.comment import CommentCreate
@@ -7,7 +9,7 @@ from app.services import comment_service
 
 
 @svc_call
-async def list_comments(task_id: str) -> str:
+async def list_comments(ctx: Context, task_id: str) -> str:
     """
     List all top-level comments on a task, including their replies.
 
@@ -17,7 +19,7 @@ async def list_comments(task_id: str) -> str:
     Label "solution" marks a subtask solution submission that unblocks
     a parent decision task.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         comments = await comment_service.list_comments(session, tid, user)
         return json.dumps([
@@ -28,6 +30,7 @@ async def list_comments(task_id: str) -> str:
 
 @svc_call
 async def add_comment(
+    ctx: Context,
     task_id: str,
     content: str,
     labels: list[str] | None = None,
@@ -42,7 +45,7 @@ async def add_comment(
 
     parent_comment_id: UUID of a top-level comment to reply to (max depth 1).
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         parent_id = parse_uuid(parent_comment_id, "parent_comment_id") if parent_comment_id else None
         data = CommentCreate(

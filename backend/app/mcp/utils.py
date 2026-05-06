@@ -2,12 +2,12 @@ import functools
 import uuid
 
 from fastapi import HTTPException
-from mcp.server.fastmcp import Context
+from mcp.server.fastmcp.server import Context
 from mcp.shared.exceptions import McpError
 from mcp.types import ErrorData, INVALID_PARAMS, INTERNAL_ERROR
 
 from app.core.db import SessionLocal
-from app.mcp.auth import get_agent_user, check_api_key
+from app.mcp.auth import extract_bearer, get_user_for_key
 
 
 def parse_uuid(value: str, field: str = "id") -> uuid.UUID:
@@ -18,17 +18,22 @@ def parse_uuid(value: str, field: str = "id") -> uuid.UUID:
 
 
 class McpSession:
-    """Async context manager: provides (session, agent_user) per tool call."""
+    """
+    Async context manager: provides (AsyncSession, User) per tool call.
 
-    def __init__(self, ctx: Context | None = None):
+    Resolves the agent user from the Authorization: Bearer header.
+    In dev mode (MCP_AGENT_USER_ID only, no MCP_AGENTS), the key is ignored.
+    """
+
+    def __init__(self, ctx: Context):
         self._ctx = ctx
 
-    async def __aenter__(self) -> tuple:
-        if self._ctx is not None:
-            await check_api_key(self._ctx)
+    async def __aenter__(self):
+        api_key = extract_bearer(self._ctx.request_context.request.headers)
+        user = get_user_for_key(api_key)
         self._session = SessionLocal()
         session = await self._session.__aenter__()
-        return session, get_agent_user()
+        return session, user
 
     async def __aexit__(self, *args) -> None:
         await self._session.__aexit__(*args)

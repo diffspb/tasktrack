@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
 
     # MCP server settings
-    mcp_agent_user_id: uuid.UUID | None = None
-    mcp_api_key: str | None = None
+    mcp_agent_user_id: uuid.UUID | None = None   # dev: single user, no key required
+    mcp_agents: str = ""                          # prod: "key1:uuid1,key2:uuid2"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

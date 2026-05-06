@@ -19,9 +19,8 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await create_tables()
     scheduler.start()
-    if settings.mcp_agent_user_id is not None:
-        from app.mcp.auth import resolve_agent_user
-        await resolve_agent_user()
+    from app.mcp.auth import resolve_all_agents
+    await resolve_all_agents()
     yield
     scheduler.shutdown()
 

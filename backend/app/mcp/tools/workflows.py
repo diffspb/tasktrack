@@ -1,12 +1,14 @@
 import json
 
+from mcp.server.fastmcp.server import Context
+
 from app.mcp.schemas.workflow import workflow_detail
 from app.mcp.utils import McpSession, parse_uuid, svc_call
 from app.services import workflow_service
 
 
 @svc_call
-async def list_workflows(project_id: str) -> str:
+async def list_workflows(ctx: Context, project_id: str) -> str:
     """
     List all workflows configured for a project.
 
@@ -15,14 +17,14 @@ async def list_workflows(project_id: str) -> str:
 
     Use status ids from here when calling transition_task_status.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         pid = parse_uuid(project_id, "project_id")
         workflows = await workflow_service.list_workflows(session, pid, user)
         return json.dumps([workflow_detail(wf) for wf in workflows])
 
 
 @svc_call
-async def get_workflow(workflow_id: str) -> str:
+async def get_workflow(ctx: Context, workflow_id: str) -> str:
     """
     Get full details of a specific workflow by UUID.
 
@@ -33,7 +35,7 @@ async def get_workflow(workflow_id: str) -> str:
     Status categories: "initial" | "intermediate" | "final".
     Transitioning to a "final" status requires resolution_id.
     """
-    async with McpSession() as (session, user):
+    async with McpSession(ctx) as (session, user):
         wid = parse_uuid(workflow_id, "workflow_id")
         wf = await workflow_service.get_workflow(session, wid, user)
         return json.dumps(workflow_detail(wf))
