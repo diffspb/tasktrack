@@ -17,6 +17,7 @@
 | [ADR-007](./ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, цветовые токены | 2026-04-29 | Принято |
 | [ADR-008](./ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment | 2026-04-30 | Принято |
 | [ADR-009](./ADR-009-board-columns-fr001.md) | BoardColumn как независимый слой между воркфлоу и Kanban-бордой (FR-001) | 2026-05-03 | Принято |
+| [ADR-010](./ADR-010-mcp-server.md) | MCP-сервер для агентов — встроенный SSE-транспорт, multi-agent auth | 2026-05-06 | Принято |
 
 ## Шаблон
 

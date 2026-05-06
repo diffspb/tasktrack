@@ -40,6 +40,7 @@
 | [glossary.md](./glossary.md) | Единый словарь терминов — источник правды |
 | [17-architecture.md](./17-architecture.md) | Архитектура реализации: структура репозитория, бэкенд, фронтенд, интеграция с инфрой |
 | [18-implementation-plan.md](./18-implementation-plan.md) | **План реализации MVP:** 8 этапов с целями, составом работ и тегами |
+| [configuration.md](./configuration.md) | **Все параметры конфигурации сервиса** — переменные окружения, MCP, Keycloak, примеры env-файлов |
 | [09-mvp.md](./09-mvp.md) | 5 MVP-сценариев + приоритизация всех историй (🟢/🟡/🔴) |
 | [02-roles.md](./02-roles.md) | Роли пользователей |
 | [03-user-stories.md](./03-user-stories.md) | Индекс user stories → `stories/` |
@@ -71,6 +72,7 @@
 | [decisions/ADR-007](./decisions/ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, токены |
 | [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment |
 | [decisions/ADR-009](./decisions/ADR-009-board-columns-fr001.md) | BoardColumn — независимый слой между воркфлоу и Kanban-бордой (FR-001) |
+| [decisions/ADR-010](./decisions/ADR-010-mcp-server.md) | MCP-сервер для агентов — встроенный SSE-транспорт, multi-agent auth |
 
 ### Открытые хвосты
 

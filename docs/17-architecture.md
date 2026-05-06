@@ -551,7 +551,75 @@ async def db_engine():
 
 ---
 
-## 7. Первые шаги до рабочего сценария S1
+## 7. MCP-сервер для AI-агентов
+
+Документирует реализованную поддержку Model Context Protocol (коммиты `5a574ad`, `00e717a`). Подробное обоснование решений — [ADR-010](./decisions/ADR-010-mcp-server.md).
+
+### Структура модуля
+
+```
+backend/app/mcp/
+  __init__.py
+  server.py          # FastMCP instance + регистрация 13 инструментов
+  auth.py            # resolve_all_agents(), get_user_for_key()
+  utils.py           # parse_uuid(), McpSession, svc_call()
+  tools/
+    projects.py      # list_projects, get_project
+    tasks.py         # list_tasks, get_task, get_task_by_key, list_my_tasks,
+                     # create_task, update_task, transition_task_status
+    comments.py      # list_comments, add_comment
+    workflows.py     # list_workflows, get_workflow
+  schemas/
+    task.py          # task_detail(), task_list_item() — обогащённые ответы
+    project.py       # project_detail(), project_list_item()
+    workflow.py      # workflow_detail()
+    comment.py       # comment_out()
+```
+
+### Монтирование в FastAPI
+
+```python
+# app/main.py
+from app.mcp.server import mcp
+app.mount("/mcp", mcp.sse_app())
+```
+
+MCP доступен по `GET /mcp/sse` (SSE-поток) и `POST /mcp/messages` (отправка вызовов).
+
+### Аутентификация агентов
+
+Не через Keycloak. Агенты используют статичных пользователей БД:
+
+```
+MCP_AGENT_USER_ID=<uuid>         # dev: один агент, ключ не требуется
+MCP_AGENTS=key1:uuid1,key2:uuid2 # prod: ключ → пользователь БД
+```
+
+Каждый инструмент принимает `ctx: Context` (fastmcp инжектирует автоматически). `McpSession(ctx)` извлекает Bearer-ключ из заголовка и возвращает соответствующего User.
+
+### Создание агент-пользователей
+
+```bash
+cd backend
+python scripts/bootstrap_agent_user.py --email pm-agent@tasktrack
+python scripts/bootstrap_agent_user.py --email exec-agent@tasktrack
+# Оба выводят UUID → добавить в MCP_AGENTS
+```
+
+### Обогащение ответов
+
+`get_task` и связанные инструменты возвращают поля сверх сырого ORM:
+- `current_status_name`, `current_status_category` — разрешаются через `session.get(Status, ...)`
+- `available_transitions` — дополнительный запрос `select(Transition).where(from_status_id == ...)`
+- `is_decision_task`, `subtask_ids`, `subtask_count`
+
+### Отложено (FR-MCP-001)
+
+Разные наборы инструментов для разных ролей агентов. Реализация: несколько FastMCP-инстанций (`/mcp/pm`, `/mcp/executor`) над общим кодом `tools/`.
+
+---
+
+## 8. Первые шаги до рабочего сценария S1
 
 S1: создать проект → создать задачу → назначить исполнителя → провести по воркфлоу → закрыть с резолюцией.
 
