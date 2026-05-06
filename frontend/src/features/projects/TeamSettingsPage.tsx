@@ -3,12 +3,18 @@ import { useParams } from 'react-router-dom'
 import { Trash2, UserPlus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/shared/api/client'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { UserSearchCombobox } from './UserSearchCombobox'
 import type { ProjectMember } from '@/features/tasks/api'
+
+interface UserOption {
+  id: string
+  email: string
+  display_name: string
+}
 
 const ROLES = ['admin', 'manager', 'member', 'viewer'] as const
 type Role = typeof ROLES[number]
@@ -52,7 +58,7 @@ export function TeamSettingsPage() {
   const addMember = useAddMember(projectId ?? '')
   const removeMember = useRemoveMember(projectId ?? '')
 
-  const [newUserId, setNewUserId] = useState('')
+  const [selectedUser, setSelectedUser] = useState<UserOption | null>(null)
   const [newRole, setNewRole] = useState<Role>('member')
   const [addError, setAddError] = useState<string | null>(null)
 
@@ -62,13 +68,13 @@ export function TeamSettingsPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!newUserId.trim()) return
+    if (!selectedUser) return
     setAddError(null)
     try {
-      await addMember.mutateAsync({ user_id: newUserId.trim(), role: newRole })
-      setNewUserId('')
+      await addMember.mutateAsync({ user_id: selectedUser.id, role: newRole })
+      setSelectedUser(null)
     } catch {
-      setAddError('Could not add member. Check the user ID.')
+      setAddError('Could not add member. User may already be in the project.')
     }
   }
 
@@ -124,16 +130,10 @@ export function TeamSettingsPage() {
           <p className="text-sm font-medium flex items-center gap-1.5">
             <UserPlus className="h-4 w-4" /> Add member
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="member-id" className="text-xs">User ID</Label>
-              <Input
-                id="member-id"
-                value={newUserId}
-                onChange={e => setNewUserId(e.target.value)}
-                placeholder="UUID"
-                className="h-8 text-xs font-mono"
-              />
+              <Label className="text-xs">User</Label>
+              <UserSearchCombobox value={selectedUser} onChange={setSelectedUser} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="member-role" className="text-xs">Role</Label>
@@ -148,7 +148,7 @@ export function TeamSettingsPage() {
             </div>
           </div>
           {addError && <p className="text-xs text-destructive">{addError}</p>}
-          <Button type="submit" size="sm" disabled={!newUserId.trim() || addMember.isPending} className="h-7 text-xs">
+          <Button type="submit" size="sm" disabled={!selectedUser || addMember.isPending} className="h-7 text-xs">
             {addMember.isPending ? 'Adding…' : 'Add'}
           </Button>
         </form>

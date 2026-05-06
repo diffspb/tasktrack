@@ -82,9 +82,9 @@ const makeTasks = (): api.Task[] => [
 ]
 
 const MOCK_BOARD_COLUMNS: workflowApi.BoardColumn[] = [
-  { id: 'col1', name: 'To Do',       position: 0, status_ids: ['s1'] },
-  { id: 'col2', name: 'In Progress', position: 1, status_ids: ['s2'] },
-  { id: 'col3', name: 'Done',        position: 2, status_ids: ['s3'] },
+  { id: 'col1', name: 'To Do',       position: 0, status_ids: ['s1'], project_id: PROJECT_ID, created_at: '2026-01-01', updated_at: '2026-01-01' },
+  { id: 'col2', name: 'In Progress', position: 1, status_ids: ['s2'], project_id: PROJECT_ID, created_at: '2026-01-01', updated_at: '2026-01-01' },
+  { id: 'col3', name: 'Done',        position: 2, status_ids: ['s3'], project_id: PROJECT_ID, created_at: '2026-01-01', updated_at: '2026-01-01' },
 ]
 
 beforeEach(() => {
