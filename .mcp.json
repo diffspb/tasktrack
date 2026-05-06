@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "tasktrack-dev": {
+      "type": "sse",
+      "url": "http://localhost:8000/mcp/sse"
+    },
+    "tasktrack": {
+      "type": "sse",
+      "url": "https://tasktrack.busypage.ru/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer <MCP_API_KEY>"
+      }
+    }
+  }
+}

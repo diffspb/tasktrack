@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,6 +17,10 @@ class Settings(BaseSettings):
     keycloak_realm: str = "home"
     keycloak_client_id: str = "tasktrack"
     cors_origins: list[str] = ["http://localhost:5173"]
+
+    # MCP server settings
+    mcp_agent_user_id: uuid.UUID | None = None
+    mcp_api_key: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod

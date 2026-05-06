@@ -19,6 +19,9 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await create_tables()
     scheduler.start()
+    if settings.mcp_agent_user_id is not None:
+        from app.mcp.auth import resolve_agent_user
+        await resolve_agent_user()
     yield
     scheduler.shutdown()
 
@@ -34,6 +37,9 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+from app.mcp.server import mcp  # noqa: E402
+app.mount("/mcp", mcp.sse_app())
 
 # Serve frontend SPA when built dist is present (production Docker image).
 # API routes registered above take priority; everything else falls through here.

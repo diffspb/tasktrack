@@ -1,4 +1,4 @@
-.PHONY: install db-start db-create reset dev test test-cov
+.PHONY: install db-start db-create reset dev test test-cov mcp-bootstrap
 
 install:
 	pip install -e ".[dev]"
@@ -27,3 +27,6 @@ test:
 
 test-cov:
 	pytest tests/ --cov=app --cov-report=term-missing
+
+mcp-bootstrap:
+	python scripts/bootstrap_agent_user.py
