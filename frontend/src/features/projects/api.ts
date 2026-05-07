@@ -40,6 +40,14 @@ export function useProject(projectId: string | null | undefined) {
   })
 }
 
+export function useProjectByKey(key: string | null | undefined) {
+  return useQuery<Project>({
+    queryKey: ['project-by-key', key?.toUpperCase()],
+    queryFn: () => api.get(`/projects/by-key/${key}`).then(r => r.data),
+    enabled: !!key,
+  })
+}
+
 export function useCreateProject() {
   const queryClient = useQueryClient()
   return useMutation({

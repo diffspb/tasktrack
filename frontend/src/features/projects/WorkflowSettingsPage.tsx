@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { useProjectByKey } from './api'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -93,7 +94,9 @@ function TaskTypeWorkflowTable({ projectId }: { projectId: string }) {
 }
 
 export function WorkflowSettingsPage() {
-  const { id: projectId } = useParams<{ id: string }>()
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: projectData } = useProjectByKey(projectKey)
+  const projectId = projectData?.id
   if (!projectId) return null
 
   return (

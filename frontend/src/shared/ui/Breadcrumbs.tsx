@@ -1,13 +1,13 @@
 import { Link, useMatch } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { useProject } from '@/features/projects/api'
+import { useProjectByKey } from '@/features/projects/api'
 
 export function Breadcrumbs() {
-  const projectMatch = useMatch('/projects/:id/*')
-  const projectId = projectMatch?.params.id
-  const { data: project } = useProject(projectId)
+  const projectMatch = useMatch('/projects/:projectKey/*')
+  const projectKey = projectMatch?.params.projectKey
+  const { data: project } = useProjectByKey(projectKey)
 
-  if (!projectId) {
+  if (!projectKey) {
     return <span className="text-sm font-medium text-muted-foreground">TaskTrack</span>
   }
 

@@ -55,6 +55,22 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
     return await _load_project(session, project.id)
 
 
+async def get_project_by_key(
+    session: AsyncSession, key: str, user: User
+) -> Project:
+    project = await session.scalar(
+        select(Project)
+        .options(selectinload(Project.members))
+        .where(Project.key == key.upper(), Project.deleted_at.is_(None))
+    )
+    if not project:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_NOT_FOUND"})
+    if project.visibility == ProjectVisibility.restricted:
+        if not await get_member(session, project.id, user.id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_NOT_FOUND"})
+    return project
+
+
 async def get_project(
     session: AsyncSession, project_id: uuid.UUID, user: User
 ) -> Project:

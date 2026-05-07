@@ -54,7 +54,7 @@ export function TaskPage() {
           </button>
           <span className="text-muted-foreground/40">/</span>
           <Link
-            to={`/projects/${task.project_id}/board`}
+            to={`/projects/${task.key.substring(0, task.key.lastIndexOf('-'))}/board`}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Board

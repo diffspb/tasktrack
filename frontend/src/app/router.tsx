@@ -19,10 +19,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'projects',             element: <ProjectList /> },
-      { path: 'projects/:id/board',   element: <TaskBoard /> },
-      { path: 'projects/:id/backlog', element: <TaskBacklog /> },
+      { path: 'projects/:projectKey/board',   element: <TaskBoard /> },
+      { path: 'projects/:projectKey/backlog', element: <TaskBacklog /> },
       {
-        path: 'projects/:id/settings',
+        path: 'projects/:projectKey/settings',
         element: <ProjectSettings />,
         children: [
           { index: true, element: <Navigate to="team" replace /> },
@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
           { path: 'board',    element: <BoardSettingsPage /> },
         ],
       },
-      { path: 'projects/:id/members', element: <Navigate to="../settings/team" replace /> },
+      { path: 'projects/:projectKey/members', element: <Navigate to="../settings/team" replace /> },
       { path: 'tasks/:key',           element: <TaskPage /> },
       { path: 'dashboard',            element: <Dashboard /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },

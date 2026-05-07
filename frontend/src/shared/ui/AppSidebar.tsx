@@ -6,7 +6,7 @@ import {
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { useProject } from '@/features/projects/api'
+import { useProjectByKey } from '@/features/projects/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 const LAST_PROJECT_KEY = 'tt_last_project'
@@ -24,22 +24,22 @@ const PROJECT_NAV = [
 
 export function AppSidebar() {
   const { user, stubUsers, switchStubUser } = useAuth()
-  const projectMatch = useMatch('/projects/:id/*')
-  const routeProjectId = projectMatch?.params.id
+  const projectMatch = useMatch('/projects/:projectKey/*')
+  const routeProjectKey = projectMatch?.params.projectKey
 
   // Remember last project; clear when user goes to /projects list
   const allProjectsMatch = useMatch('/projects')
   useEffect(() => {
-    if (routeProjectId) {
-      sessionStorage.setItem(LAST_PROJECT_KEY, routeProjectId)
+    if (routeProjectKey) {
+      sessionStorage.setItem(LAST_PROJECT_KEY, routeProjectKey)
     } else if (allProjectsMatch) {
       sessionStorage.removeItem(LAST_PROJECT_KEY)
     }
-  }, [routeProjectId, allProjectsMatch])
+  }, [routeProjectKey, allProjectsMatch])
 
   // Show project nav for current route OR last visited project
-  const projectId = routeProjectId ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
-  const { data: project } = useProject(projectId)
+  const projectKey = routeProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
+  const { data: project } = useProjectByKey(projectKey)
 
   return (
     <Sidebar>
@@ -70,7 +70,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {projectId && (
+        {projectKey && (
           <SidebarGroup>
             <SidebarGroupLabel className="flex items-center gap-1.5 truncate">
               <span className="truncate font-semibold text-foreground">
@@ -85,7 +85,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {PROJECT_NAV.map(item => (
                 <SidebarMenuItem key={item.suffix}>
-                  <NavLink to={`/projects/${projectId}/${item.suffix}`}>
+                  <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
                     {({ isActive }) => (
                       <SidebarMenuButton isActive={isActive}>
                         <item.icon />

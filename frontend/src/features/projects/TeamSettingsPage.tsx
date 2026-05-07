@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useProjectByKey } from './api'
 import { Trash2, UserPlus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -52,7 +53,9 @@ function useRemoveMember(projectId: string) {
 }
 
 export function TeamSettingsPage() {
-  const { id: projectId } = useParams<{ id: string }>()
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: projectData } = useProjectByKey(projectKey)
+  const projectId = projectData?.id
   const { user } = useAuth()
   const { data: membersData, isLoading } = useProjectMembers(projectId)
   const addMember = useAddMember(projectId ?? '')

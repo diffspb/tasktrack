@@ -1,8 +1,11 @@
 import { useParams } from 'react-router-dom'
+import { useProjectByKey } from './api'
 import { BoardColumnEditor } from './BoardColumnEditor'
 
 export function BoardSettingsPage() {
-  const { id: projectId } = useParams<{ id: string }>()
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: projectData } = useProjectByKey(projectKey)
+  const projectId = projectData?.id
   if (!projectId) return null
 
   return (

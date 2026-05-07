@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useProject } from './api'
+import { useProjectByKey } from './api'
 
 const TABS = [
   { to: 'team',     label: 'Team' },
@@ -10,8 +10,8 @@ const TABS = [
 ] as const
 
 export function ProjectSettings() {
-  const { id: projectId } = useParams<{ id: string }>()
-  const { data: project } = useProject(projectId)
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: project } = useProjectByKey(projectKey)
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">

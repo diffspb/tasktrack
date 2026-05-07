@@ -60,7 +60,7 @@ function ProjectCard({ project }: { project: Project }) {
             {project.members.length} member{project.members.length !== 1 ? 's' : ''}
           </span>
           <Button size="sm" variant="outline" className="h-7 text-xs"
-            onClick={() => navigate(`/projects/${project.id}/board`)}>
+            onClick={() => navigate(`/projects/${project.key}/board`)}>
             Open
           </Button>
         </div>
