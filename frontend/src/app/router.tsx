@@ -7,6 +7,7 @@ import { GeneralSettingsPage } from '@/features/projects/GeneralSettingsPage'
 import { TeamSettingsPage } from '@/features/projects/TeamSettingsPage'
 import { WorkflowSettingsPage } from '@/features/projects/WorkflowSettingsPage'
 import { BoardSettingsPage } from '@/features/projects/BoardSettingsPage'
+import { ViewsSettingsPage } from '@/features/projects/ViewsSettingsPage'
 import { ViewPage, ViewRedirect } from '@/features/projects/ViewPage'
 import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="general" replace /> },
           { path: 'general',  element: <GeneralSettingsPage /> },
+          { path: 'views',    element: <ViewsSettingsPage /> },
           { path: 'team',     element: <TeamSettingsPage /> },
           { path: 'workflow', element: <WorkflowSettingsPage /> },
           { path: 'board',    element: <BoardSettingsPage /> },

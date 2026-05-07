@@ -58,10 +58,10 @@ export function useUpdateView(viewId: string | undefined, projectId: string | un
   })
 }
 
-export function useDeleteView(viewId: string | undefined, projectId: string | undefined) {
+export function useDeleteView(projectId: string | undefined) {
   const qc = useQueryClient()
-  return useMutation<void>({
-    mutationFn: () => api.delete(`/views/${viewId}`).then(r => r.data),
+  return useMutation<void, unknown, string>({
+    mutationFn: (viewId: string) => api.delete(`/views/${viewId}`).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['views', projectId] }),
   })
 }

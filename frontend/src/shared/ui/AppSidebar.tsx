@@ -18,6 +18,7 @@ const MAX_SIDEBAR_PROJECTS = 5
 
 const SETTINGS_NAV = [
   { label: 'General',       suffix: 'settings/general' },
+  { label: 'Views',         suffix: 'settings/views' },
   { label: 'Team',          suffix: 'settings/team' },
   { label: 'Workflow',      suffix: 'settings/workflow' },
   { label: 'Board columns', suffix: 'settings/board' },
