@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProjects, type Project } from './api'
 import { CreateProjectModal } from './CreateProjectModal'
-import { Plus, Users, Lock, Globe } from 'lucide-react'
+import { Plus, Users, Lock, Globe, Settings } from 'lucide-react'
 
 const COLORS = [
   'oklch(0.52 0.16 252)', 'oklch(0.55 0.18 150)', 'oklch(0.58 0.18 30)',
@@ -62,6 +62,10 @@ function ProjectCard({ project }: { project: Project }) {
           <Button size="sm" variant="outline" className="h-7 text-xs"
             onClick={() => navigate(`/projects/${project.key}/board`)}>
             Open
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground"
+            onClick={() => navigate(`/projects/${project.key}/settings`)}>
+            <Settings className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
