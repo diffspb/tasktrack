@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useProjectByKey } from '@/features/projects/api'
 import type { AxiosError } from 'axios'
 import { Plus, Settings } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
   useProjectTasks, useProjectWorkflows, useProjectMembers,
@@ -14,6 +17,7 @@ import { TaskCard } from './TaskCard'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
+import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 
 function BoardSkeleton() {
   return (
@@ -43,7 +47,9 @@ function isDropTarget(
 }
 
 export function TaskBoard() {
-  const { id: projectId } = useParams<{ id: string }>()
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: projectData } = useProjectByKey(projectKey)
+  const projectId = projectData?.id
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -51,6 +57,22 @@ export function TaskBoard() {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [boardError, setBoardError] = useState<string | null>(null)
+
+  const [liveUpdates, setLiveUpdates] = useState(true)
+  const qc = useQueryClient()
+
+  useProjectEvents(liveUpdates ? (projectId ?? null) : null, (evt: TaskEvent) => {
+    if (!projectId) return
+    if (evt.type === 'task.created') {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
+    } else if (evt.type === 'task.updated' || evt.type === 'task.status_changed') {
+      qc.setQueryData<Task[]>(['tasks', projectId], old => old?.map(t => t.id === evt.task_id ? evt.task! : t))
+      qc.setQueryData(['task', evt.task_id], evt.task)
+      if (evt.task?.key) qc.setQueryData(['task-by-key', evt.task.key], evt.task)
+    } else if (evt.type === 'task.deleted') {
+      qc.setQueryData<Task[]>(['tasks', projectId], old => old?.filter(t => t.id !== evt.task_id))
+    }
+  })
 
   const { data: boardColumnsData, isLoading: bcLoading } = useBoardColumns(projectId)
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
@@ -142,7 +164,7 @@ export function TaskBoard() {
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-sm text-muted-foreground">
         <p>No board columns configured for this project.</p>
         <Link
-          to={`/projects/${projectId}/settings/board`}
+          to={`/projects/${projectKey}/settings/board`}
           className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <Settings className="h-3.5 w-3.5" />
@@ -160,6 +182,21 @@ export function TaskBoard() {
           <TaskFilterBar filter={filter} onChange={setFilter} taskCount={activeTasks.length} />
           <div className="flex-1" />
           {boardError && <span className="text-sm text-destructive">{boardError}</span>}
+          <button
+            onClick={() => setLiveUpdates(v => !v)}
+            className={cn(
+              'text-xs flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors',
+              liveUpdates
+                ? 'border-primary/30 bg-primary/5 text-primary'
+                : 'border-muted text-muted-foreground hover:border-input',
+            )}
+          >
+            <span className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              liveUpdates ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40',
+            )} />
+            {liveUpdates ? 'Live' : 'Paused'}
+          </button>
           <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
             Create task

@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useProjectByKey } from '@/features/projects/api'
 import { Plus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
   useProjectTasks, useProjectWorkflows, useProjectMembers, type Task,
@@ -11,13 +14,33 @@ import {
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
+import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 
 export function TaskBacklog() {
-  const { id: projectId } = useParams<{ id: string }>()
+  const { projectKey } = useParams<{ projectKey: string }>()
+  const { data: projectData } = useProjectByKey(projectKey)
+  const projectId = projectData?.id
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set())
+
+  const qc = useQueryClient()
+  useProjectEvents(projectId ?? null, (evt: TaskEvent) => {
+    if (!projectId) return
+    if (evt.type === 'task.created') {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
+    } else if (evt.type === 'task.updated' || evt.type === 'task.status_changed') {
+      qc.setQueryData<Task[]>(['tasks', projectId], old => old?.map(t => t.id === evt.task_id ? evt.task! : t))
+      qc.setQueryData(['task', evt.task_id], evt.task)
+      if (evt.task?.key) qc.setQueryData(['task-by-key', evt.task.key], evt.task)
+      setFlashIds(s => new Set(s).add(evt.task_id))
+      setTimeout(() => setFlashIds(s => { const n = new Set(s); n.delete(evt.task_id); return n }), 2000)
+    } else if (evt.type === 'task.deleted') {
+      qc.setQueryData<Task[]>(['tasks', projectId], old => old?.filter(t => t.id !== evt.task_id))
+    }
+  })
 
   const { data: workflows } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading } = useProjectTasks(projectId ?? '')
@@ -78,6 +101,7 @@ export function TaskBacklog() {
                   statusCategory={statusById.get(t.current_status_id)?.category}
                   assigneeName={t.assignee_id ? userById.get(t.assignee_id)?.display_name : undefined}
                   epicKey={t.parent_task_id ? taskById.get(t.parent_task_id)?.key : undefined}
+                  isFlashing={flashIds.has(t.id)}
                   onClick={() => setSelectedTaskId(t.id)}
                 />
               ))}
@@ -105,13 +129,14 @@ export function TaskBacklog() {
 }
 
 function BacklogRow({
-  task, statusName, statusCategory, assigneeName, epicKey, onClick,
+  task, statusName, statusCategory, assigneeName, epicKey, isFlashing, onClick,
 }: {
   task: Task
   statusName: string
   statusCategory?: 'initial' | 'intermediate' | 'final'
   assigneeName?: string
   epicKey?: string
+  isFlashing?: boolean
   onClick: () => void
 }) {
   const typeKey = task.task_type?.key ?? 'task'
@@ -122,7 +147,13 @@ function BacklogRow({
 
   return (
     <li>
-      <div className="flex items-center gap-3 px-5 py-2.5 hover:bg-muted/40 transition-colors cursor-pointer" onClick={onClick}>
+      <div
+        className={cn(
+          'flex items-center gap-3 px-5 py-2.5 hover:bg-muted/40 transition-all duration-500 cursor-pointer',
+          isFlashing && 'ring-2 ring-inset ring-primary/40 bg-primary/5',
+        )}
+        onClick={onClick}
+      >
         <Link
           to={`/tasks/${task.key}`}
           onClick={e => e.stopPropagation()}

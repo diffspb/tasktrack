@@ -1,6 +1,9 @@
+import asyncio
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +20,7 @@ from app.schemas.project import (
 )
 from app.schemas.task_type import TaskTypeResponse
 from app.schemas.workflow import BoardColumnCreate, BoardColumnResponse, SetTaskTypeWorkflow, TaskTypeConfigResponse
+from app.core.events import event_bus
 from app.services import project_service, workflow_service
 from app.services.permissions import require_project_access
 
@@ -38,6 +42,15 @@ async def list_projects(
     user: User = Depends(get_current_user),
 ):
     return await project_service.list_projects(session, user)
+
+
+@router.get("/by-key/{key}", response_model=ProjectResponse)
+async def get_project_by_key(
+    key: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await project_service.get_project_by_key(session, key, user)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -173,6 +186,39 @@ async def list_board_columns(
         id=c.id, project_id=c.project_id, name=c.name, position=c.position,
         status_ids=c.status_ids, created_at=c.created_at, updated_at=c.updated_at,
     ) for c in columns]}
+
+
+# ── SSE event stream ──────────────────────────────────────────────────────────
+
+@router.get("/{project_id}/events", tags=["events"])
+async def project_events(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    await require_project_access(session, project_id, user)
+
+    async def generate():
+        async with event_bus.subscribe(str(project_id)) as queue:
+            yield "event: connected\ndata: {}\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"event: {event['type']}\ndata: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                except asyncio.CancelledError:
+                    break
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/{project_id}/board-columns", status_code=status.HTTP_201_CREATED)
