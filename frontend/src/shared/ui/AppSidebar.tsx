@@ -1,20 +1,17 @@
 import { useEffect } from 'react'
-import { Zap, LayoutDashboard, Kanban, List, Settings } from 'lucide-react'
+import { Zap, LayoutDashboard, Kanban, List, Settings, ChevronRight } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarSeparator,
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { useProjectByKey } from '@/features/projects/api'
+import { useProjects, useProjectByKey } from '@/features/projects/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 const LAST_PROJECT_KEY = 'tt_last_project'
-
-const TOP_NAV = [
-  { to: '/projects', icon: List, label: 'All Projects' },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-]
+const MAX_SIDEBAR_PROJECTS = 5
 
 const PROJECT_NAV = [
   { icon: Kanban,   label: 'Board',    suffix: 'board' },
@@ -22,13 +19,25 @@ const PROJECT_NAV = [
   { icon: Settings, label: 'Settings', suffix: 'settings' },
 ]
 
+const PROJECT_COLORS = [
+  'oklch(0.52 0.16 252)', 'oklch(0.55 0.18 150)', 'oklch(0.58 0.18 30)',
+  'oklch(0.52 0.18 290)', 'oklch(0.58 0.14 55)',  'oklch(0.50 0.16 200)',
+]
+
+function projectColor(key: string) {
+  let h = 0
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) & 0xffff
+  return PROJECT_COLORS[h % PROJECT_COLORS.length]
+}
+
 export function AppSidebar() {
   const { user, stubUsers, switchStubUser } = useAuth()
+  const { data: projects } = useProjects()
+
   const projectMatch = useMatch('/projects/:projectKey/*')
   const routeProjectKey = projectMatch?.params.projectKey
-
-  // Remember last project; clear when user goes to /projects list
   const allProjectsMatch = useMatch('/projects')
+
   useEffect(() => {
     if (routeProjectKey) {
       sessionStorage.setItem(LAST_PROJECT_KEY, routeProjectKey)
@@ -37,9 +46,10 @@ export function AppSidebar() {
     }
   }, [routeProjectKey, allProjectsMatch])
 
-  // Show project nav for current route OR last visited project
   const projectKey = routeProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
   const { data: project } = useProjectByKey(projectKey)
+
+  const sidebarProjects = (projects ?? []).slice(0, MAX_SIDEBAR_PROJECTS)
 
   return (
     <Sidebar>
@@ -53,50 +63,90 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Projects list */}
         <SidebarGroup>
+          <SidebarGroupLabel>Projects</SidebarGroupLabel>
           <SidebarMenu>
-            {TOP_NAV.map(item => (
-              <SidebarMenuItem key={item.to}>
-                <NavLink to={item.to}>
-                  {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <item.icon />
-                      <span>{item.label}</span>
+            {sidebarProjects.map(p => (
+              <SidebarMenuItem key={p.id}>
+                <NavLink to={`/projects/${p.key}/board`}>
+                  {() => (
+                    <SidebarMenuButton isActive={projectKey === p.key}>
+                      <div
+                        className="h-4 w-4 rounded shrink-0"
+                        style={{ background: projectColor(p.key) }}
+                      />
+                      <span className="truncate">{p.name}</span>
+                      <span className="ml-auto font-mono text-[10px] text-muted-foreground/50 shrink-0">
+                        {p.key}
+                      </span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
               </SidebarMenuItem>
             ))}
+            <SidebarMenuItem>
+              <NavLink to="/projects">
+                {({ isActive }) => (
+                  <SidebarMenuButton isActive={isActive} className="text-muted-foreground">
+                    <ChevronRight className="h-4 w-4" />
+                    <span>All projects</span>
+                  </SidebarMenuButton>
+                )}
+              </NavLink>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
+        <SidebarSeparator />
+
+        {/* Personal section */}
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <NavLink to="/dashboard">
+                {({ isActive }) => (
+                  <SidebarMenuButton isActive={isActive}>
+                    <LayoutDashboard />
+                    <span>My Dashboard</span>
+                  </SidebarMenuButton>
+                )}
+              </NavLink>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Current project nav */}
         {projectKey && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center gap-1.5 truncate">
-              <span className="truncate font-semibold text-foreground">
-                {project?.name ?? '…'}
-              </span>
-              {project && (
-                <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">
-                  {project.key}
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="flex items-center gap-1.5 truncate">
+                <span className="truncate font-semibold text-foreground">
+                  {project?.name ?? '…'}
                 </span>
-              )}
-            </SidebarGroupLabel>
-            <SidebarMenu>
-              {PROJECT_NAV.map(item => (
-                <SidebarMenuItem key={item.suffix}>
-                  <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
-                    {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    )}
-                  </NavLink>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
+                {project && (
+                  <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">
+                    {project.key}
+                  </span>
+                )}
+              </SidebarGroupLabel>
+              <SidebarMenu>
+                {PROJECT_NAV.map(item => (
+                  <SidebarMenuItem key={item.suffix}>
+                    <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
+                      {({ isActive }) => (
+                        <SidebarMenuButton isActive={isActive}>
+                          <item.icon />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      )}
+                    </NavLink>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          </>
         )}
       </SidebarContent>
 
