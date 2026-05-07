@@ -3,7 +3,33 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.workflow import StatusCategory
+from app.models.workflow import StatusCategory, ViewType
+
+
+# ── Views ─────────────────────────────────────────────────────────────────────
+
+class ViewCreate(BaseModel):
+    name: str
+    type: ViewType
+    position: int | None = None
+
+
+class ViewUpdate(BaseModel):
+    name: str | None = None
+    position: int | None = None
+
+
+class ViewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    type: ViewType
+    position: int
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 # ── Board columns ─────────────────────────────────────────────────────────────
@@ -22,7 +48,7 @@ class BoardColumnResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    project_id: uuid.UUID
+    view_id: uuid.UUID
     name: str
     position: int
     status_ids: list[uuid.UUID] = []

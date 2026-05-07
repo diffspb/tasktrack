@@ -13,7 +13,7 @@ from app.schemas.project import ProjectCreate, ProjectMemberAdd, ProjectUpdate
 
 
 async def create_project(session: AsyncSession, data: ProjectCreate, owner: User) -> Project:
-    from app.models.workflow import Status, StatusCategory, Transition, Workflow
+    from app.models.workflow import Status, StatusCategory, Transition, View, ViewType, Workflow
 
     project = Project(
         name=data.name,
@@ -47,6 +47,10 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
             Transition(workflow_id=wf.id, from_status_id=inprog.id, to_status_id=todo.id),
             Transition(workflow_id=wf.id, from_status_id=review.id, to_status_id=inprog.id),
         ])
+
+        # Auto-create default views
+        session.add(View(project_id=project.id, name="Board",   type=ViewType.kanban,  position=0, is_default=True))
+        session.add(View(project_id=project.id, name="Backlog", type=ViewType.backlog, position=1))
         await session.commit()
     except IntegrityError:
         await session.rollback()

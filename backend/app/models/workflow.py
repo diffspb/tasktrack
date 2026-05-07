@@ -13,6 +13,31 @@ class StatusCategory(str, enum.Enum):
     final = "final"
 
 
+class ViewType(str, enum.Enum):
+    kanban = "kanban"
+    backlog = "backlog"
+
+
+class View(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = "views"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[ViewType] = mapped_column(
+        SQLEnum(ViewType, native_enum=False, length=20), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    columns: Mapped[list["BoardColumn"]] = relationship(
+        "BoardColumn", back_populates="view", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_views_project_position", "project_id", "position"),)
+
+
 class Workflow(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "workflows"
 
@@ -85,17 +110,18 @@ class ProjectTaskTypeConfig(Base, UUIDMixin, TimestampMixin):
 class BoardColumn(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "board_columns"
 
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    view_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("views.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    view: Mapped["View"] = relationship("View", back_populates="columns")
     statuses: Mapped[list["BoardColumnStatus"]] = relationship(
         "BoardColumnStatus", back_populates="column", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_board_columns_project_position", "project_id", "position"),)
+    __table_args__ = (Index("ix_board_columns_view_position", "view_id", "position"),)
 
     @property
     def status_ids(self) -> list[uuid.UUID]:
@@ -110,7 +136,7 @@ class BoardColumnStatus(Base):
     )
     status_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("statuses.id", ondelete="CASCADE"), primary_key=True,
-        unique=True,
+        # unique=True removed — same status can appear in columns of different views
     )
 
     column: Mapped["BoardColumn"] = relationship("BoardColumn", back_populates="statuses")

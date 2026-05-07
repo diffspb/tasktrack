@@ -19,7 +19,7 @@ from app.schemas.project import (
     ProjectUpdate,
 )
 from app.schemas.task_type import TaskTypeResponse
-from app.schemas.workflow import BoardColumnCreate, BoardColumnResponse, SetTaskTypeWorkflow, TaskTypeConfigResponse
+from app.schemas.workflow import SetTaskTypeWorkflow, TaskTypeConfigResponse
 from app.core.events import event_bus
 from app.services import project_service, workflow_service
 from app.services.permissions import require_project_access
@@ -172,22 +172,6 @@ async def reset_task_type_workflow(
     await workflow_service.reset_task_type_workflow(session, project_id, task_type_id, current_user)
 
 
-# ── Board columns ─────────────────────────────────────────────────────────────
-
-@router.get("/{project_id}/board-columns")
-async def list_board_columns(
-    project_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    await require_project_access(session, project_id, current_user)
-    columns = await workflow_service.get_board_columns(session, project_id)
-    return {"items": [BoardColumnResponse(
-        id=c.id, project_id=c.project_id, name=c.name, position=c.position,
-        status_ids=c.status_ids, created_at=c.created_at, updated_at=c.updated_at,
-    ) for c in columns]}
-
-
 # ── SSE event stream ──────────────────────────────────────────────────────────
 
 @router.get("/{project_id}/events", tags=["events"])
@@ -221,15 +205,3 @@ async def project_events(
     )
 
 
-@router.post("/{project_id}/board-columns", status_code=status.HTTP_201_CREATED)
-async def create_board_column(
-    project_id: uuid.UUID,
-    data: BoardColumnCreate,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    col = await workflow_service.create_board_column(session, project_id, data, current_user)
-    return BoardColumnResponse(
-        id=col.id, project_id=col.project_id, name=col.name, position=col.position,
-        status_ids=col.status_ids, created_at=col.created_at, updated_at=col.updated_at,
-    )

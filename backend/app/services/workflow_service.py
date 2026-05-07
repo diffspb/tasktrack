@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.workflow import (
     BoardColumn, BoardColumnStatus, ProjectTaskTypeConfig,
-    Status, StatusCategory, Transition, Workflow,
+    Status, StatusCategory, Transition, View, ViewType, Workflow,
 )
 from app.models.user import User
 from app.schemas.workflow import (
@@ -18,6 +18,8 @@ from app.schemas.workflow import (
     StatusCreate,
     StatusUpdate,
     TransitionCreate,
+    ViewCreate,
+    ViewUpdate,
     WorkflowCreate,
     WorkflowUpdate,
 )
@@ -400,25 +402,97 @@ async def reset_task_type_workflow(
         await session.commit()
 
 
+# --- Views ---
+
+async def list_views(
+    session: AsyncSession, project_id: uuid.UUID, user: User
+) -> list[View]:
+    await require_project_access(session, project_id, user)
+    result = await session.scalars(
+        select(View)
+        .where(View.project_id == project_id)
+        .order_by(View.position)
+    )
+    return list(result.all())
+
+
+async def get_view(session: AsyncSession, view_id: uuid.UUID, user: User) -> View:
+    v = await session.get(View, view_id)
+    if not v:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "VIEW_NOT_FOUND"})
+    await require_project_access(session, v.project_id, user)
+    return v
+
+
+async def create_view(
+    session: AsyncSession, project_id: uuid.UUID, data: ViewCreate, user: User
+) -> View:
+    await require_manager(session, project_id, user)
+    if data.position is None:
+        count = await session.scalar(
+            select(func.count()).select_from(View).where(View.project_id == project_id)
+        )
+        position = count or 0
+    else:
+        position = data.position
+    v = View(project_id=project_id, name=data.name, type=data.type, position=position)
+    session.add(v)
+    await session.commit()
+    await session.refresh(v)
+    return v
+
+
+async def update_view(
+    session: AsyncSession, view_id: uuid.UUID, data: ViewUpdate, user: User
+) -> View:
+    v = await session.get(View, view_id)
+    if not v:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "VIEW_NOT_FOUND"})
+    await require_manager(session, v.project_id, user)
+    if data.name is not None:
+        v.name = data.name
+    if data.position is not None:
+        v.position = data.position
+    await session.commit()
+    await session.refresh(v)
+    return v
+
+
+async def delete_view(
+    session: AsyncSession, view_id: uuid.UUID, user: User
+) -> None:
+    v = await session.get(View, view_id)
+    if not v:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "VIEW_NOT_FOUND"})
+    await require_manager(session, v.project_id, user)
+    if v.is_default:
+        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VIEW_IS_DEFAULT"})
+    await session.delete(v)
+    await session.commit()
+
+
 # --- Board columns ---
 
 async def get_board_columns(
-    session: AsyncSession, project_id: uuid.UUID
+    session: AsyncSession, view_id: uuid.UUID
 ) -> list[BoardColumn]:
     result = await session.scalars(
         select(BoardColumn)
         .options(selectinload(BoardColumn.statuses))
-        .where(BoardColumn.project_id == project_id)
+        .where(BoardColumn.view_id == view_id)
         .order_by(BoardColumn.position)
     )
     return list(result.all())
 
 
 async def create_board_column(
-    session: AsyncSession, project_id: uuid.UUID, data: BoardColumnCreate, user: User,
+    session: AsyncSession, view_id: uuid.UUID, data: BoardColumnCreate, user: User,
 ) -> BoardColumn:
-    await require_manager(session, project_id, user)
-    col = BoardColumn(project_id=project_id, name=data.name, position=data.position)
+    v = await session.get(View, view_id)
+    if not v:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "VIEW_NOT_FOUND"})
+    await require_manager(session, v.project_id, user)
+    col = BoardColumn(view_id=view_id, name=data.name, position=data.position)
     session.add(col)
     await session.commit()
     return await _load_board_column(session, col.id)
@@ -428,7 +502,8 @@ async def update_board_column(
     session: AsyncSession, column_id: uuid.UUID, data: BoardColumnUpdate, user: User,
 ) -> BoardColumn:
     col = await _get_board_column_or_404(session, column_id)
-    await require_manager(session, col.project_id, user)
+    v = await session.get(View, col.view_id)
+    await require_manager(session, v.project_id, user)
     if data.name is not None:
         col.name = data.name
     if data.position is not None:
@@ -441,7 +516,8 @@ async def delete_board_column(
     session: AsyncSession, column_id: uuid.UUID, user: User,
 ) -> None:
     col = await _get_board_column_or_404(session, column_id)
-    await require_manager(session, col.project_id, user)
+    v = await session.get(View, col.view_id)
+    await require_manager(session, v.project_id, user)
     await session.delete(col)
     await session.commit()
 
@@ -450,10 +526,18 @@ async def add_status_to_column(
     session: AsyncSession, column_id: uuid.UUID, status_id: uuid.UUID, user: User,
 ) -> BoardColumn:
     col = await _get_board_column_or_404(session, column_id)
-    await require_manager(session, col.project_id, user)
+    v = await session.get(View, col.view_id)
+    await require_manager(session, v.project_id, user)
 
+    # Check status is not already mapped in another column of the same view
+    sibling_col_ids = await session.scalars(
+        select(BoardColumn.id).where(BoardColumn.view_id == col.view_id)
+    )
     existing = await session.scalar(
-        select(BoardColumnStatus).where(BoardColumnStatus.status_id == status_id)
+        select(BoardColumnStatus).where(
+            BoardColumnStatus.status_id == status_id,
+            BoardColumnStatus.board_column_id.in_(list(sibling_col_ids.all())),
+        )
     )
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "STATUS_ALREADY_MAPPED"})
@@ -467,7 +551,8 @@ async def remove_status_from_column(
     session: AsyncSession, column_id: uuid.UUID, status_id: uuid.UUID, user: User,
 ) -> None:
     col = await _get_board_column_or_404(session, column_id)
-    await require_manager(session, col.project_id, user)
+    v = await session.get(View, col.view_id)
+    await require_manager(session, v.project_id, user)
     mapping = await session.scalar(
         select(BoardColumnStatus).where(
             BoardColumnStatus.board_column_id == column_id,
