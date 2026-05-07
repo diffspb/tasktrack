@@ -44,6 +44,7 @@ export function AppSidebar() {
   const projectMatch = useMatch('/projects/:projectKey/*')
   const routeProjectKey = projectMatch?.params.projectKey
   const allProjectsMatch = useMatch('/projects')
+  const settingsMatch = useMatch('/projects/:projectKey/settings/*')
 
   useEffect(() => {
     if (routeProjectKey) {
@@ -160,7 +161,7 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   )}
                 </NavLink>
-                <SidebarMenuSub>
+                {settingsMatch && <SidebarMenuSub>
                   {SETTINGS_NAV.map(item => (
                     <SidebarMenuSubItem key={item.suffix}>
                       <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
@@ -172,7 +173,7 @@ export function AppSidebar() {
                       </NavLink>
                     </SidebarMenuSubItem>
                   ))}
-                </SidebarMenuSub>
+                </SidebarMenuSub>}
               </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
