@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
-from app.core.events import event_bus, make_task_event
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskStatusTransition, TaskUpdate
 from app.services import task_service
@@ -24,9 +23,7 @@ async def create_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    task = await task_service.create_task(session, project_id, data, user)
-    event_bus.publish(str(project_id), make_task_event("task.created", task, str(project_id)))
-    return task
+    return await task_service.create_task(session, project_id, data, user)
 
 
 @router.get("/projects/{project_id}/tasks", response_model=list[TaskResponse], tags=["tasks"])
@@ -75,9 +72,7 @@ async def update_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    task = await task_service.update_task(session, task_id, data, user)
-    event_bus.publish(str(task.project_id), make_task_event("task.updated", task, str(task.project_id)))
-    return task
+    return await task_service.update_task(session, task_id, data, user)
 
 
 @router.post(
@@ -91,9 +86,7 @@ async def transition_status(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    task = await task_service.transition_status(session, task_id, data, user)
-    event_bus.publish(str(task.project_id), make_task_event("task.status_changed", task, str(task.project_id)))
-    return task
+    return await task_service.transition_status(session, task_id, data, user)
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tasks"])
@@ -102,7 +95,4 @@ async def delete_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    task = await task_service.get_task(session, task_id, user)
-    project_id = str(task.project_id)
     await task_service.delete_task(session, task_id, user)
-    event_bus.publish(project_id, {"type": "task.deleted", "project_id": project_id, "task_id": str(task_id)})

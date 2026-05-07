@@ -10,6 +10,7 @@ from app.models.task_type import TaskType
 from app.models.user import User
 from app.models.workflow import Status, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
+from app.core.events import event_bus, make_task_event
 from app.services import notification_service
 from app.services.permissions import require_project_access
 from app.services.workflow_service import get_workflow_for_task_type, validate_transition
@@ -65,7 +66,9 @@ async def create_task(
         await notification_service.notify_task_assigned(session, task)
 
     await session.commit()
-    return await _load_task(session, task.id)
+    loaded = await _load_task(session, task.id)
+    event_bus.publish(str(project_id), make_task_event("task.created", loaded, str(project_id)))
+    return loaded
 
 
 async def get_task(
@@ -179,7 +182,9 @@ async def update_task(
         await notification_service.notify_task_assigned(session, task)
 
     await session.commit()
-    return await _load_task(session, task.id)
+    loaded = await _load_task(session, task.id)
+    event_bus.publish(str(loaded.project_id), make_task_event("task.updated", loaded, str(loaded.project_id)))
+    return loaded
 
 
 async def delete_task(
@@ -187,8 +192,11 @@ async def delete_task(
 ) -> None:
     from datetime import UTC, datetime
     task = await get_task(session, task_id, user)
+    project_id = str(task.project_id)
+    task_id_str = str(task.id)
     task.deleted_at = datetime.now(UTC)
     await session.commit()
+    event_bus.publish(project_id, {"type": "task.deleted", "project_id": project_id, "task_id": task_id_str})
 
 
 async def transition_status(
@@ -216,7 +224,9 @@ async def transition_status(
     task.current_status_id = data.status_id
 
     await session.commit()
-    return await _load_task(session, task.id)
+    loaded = await _load_task(session, task.id)
+    event_bus.publish(str(loaded.project_id), make_task_event("task.status_changed", loaded, str(loaded.project_id)))
+    return loaded
 
 
 # --- Internal helpers ---
