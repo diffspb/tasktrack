@@ -25,6 +25,12 @@
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | 🔲 |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
+**Внеочередные фичи (post-phase-9):**
+- ✅ MCP-сервер для агентов (`GET /mcp/sse`, multi-agent auth через `MCP_AGENTS`)
+- ✅ Поиск пользователей при добавлении участника проекта (autocomplete combobox)
+- ✅ SSE онлайн-обновления задач (борд + бэклог, переключатель Live/Paused)
+- ✅ Ключ проекта в URL вместо UUID (`/projects/DEMO/board`)
+
 Инфра: Docker обязателен. Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
 Архитектурные решения → **[decisions/](./decisions/)**.
 
