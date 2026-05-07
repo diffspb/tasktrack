@@ -12,7 +12,7 @@ from app.models import (
     Base, BoardColumn, BoardColumnStatus, Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
     Status, StatusCategory, Task, TaskPriority, TaskType,
-    Transition, User, Workflow,
+    Transition, User, View, ViewType, Workflow,
 )
 from app.models.comment import Comment
 
@@ -159,11 +159,17 @@ async def seed(session: AsyncSession) -> None:
         ))
     await session.flush()
 
-    # Board columns for DEMO project
-    bc1 = BoardColumn(project_id=demo.id, name="To Do",       position=0)
-    bc2 = BoardColumn(project_id=demo.id, name="In Progress", position=1)
-    bc3 = BoardColumn(project_id=demo.id, name="Review",      position=2)
-    bc4 = BoardColumn(project_id=demo.id, name="Done",        position=3)
+    # Views for DEMO project
+    kanban_view = View(project_id=demo.id, name="Board",   type=ViewType.kanban,  position=0, is_default=True)
+    backlog_view = View(project_id=demo.id, name="Backlog", type=ViewType.backlog, position=1)
+    session.add_all([kanban_view, backlog_view])
+    await session.flush()
+
+    # Board columns for the kanban view
+    bc1 = BoardColumn(view_id=kanban_view.id, name="To Do",       position=0)
+    bc2 = BoardColumn(view_id=kanban_view.id, name="In Progress", position=1)
+    bc3 = BoardColumn(view_id=kanban_view.id, name="Review",      position=2)
+    bc4 = BoardColumn(view_id=kanban_view.id, name="Done",        position=3)
     session.add_all([bc1, bc2, bc3, bc4])
     await session.flush()
     session.add_all([
