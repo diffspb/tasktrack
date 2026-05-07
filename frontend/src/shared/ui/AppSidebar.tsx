@@ -86,7 +86,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
             ))}
             <SidebarMenuItem>
-              <NavLink to="/projects">
+              <NavLink to="/projects" end>
                 {({ isActive }) => (
                   <SidebarMenuButton isActive={isActive} className="text-muted-foreground">
                     <ChevronRight className="h-4 w-4" />
