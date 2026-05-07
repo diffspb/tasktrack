@@ -180,9 +180,24 @@ export function useTransitionStatus(projectId: string) {
   return useMutation({
     mutationFn: ({ taskId, status_id }: { taskId: string; status_id: string }) =>
       api.post(`/tasks/${taskId}/transition`, { status_id }).then(r => r.data),
+    onMutate: async ({ taskId, status_id }) => {
+      await qc.cancelQueries({ queryKey: ['tasks', projectId] })
+      const previous = qc.getQueryData<Task[]>(['tasks', projectId])
+      qc.setQueryData<Task[]>(['tasks', projectId], old =>
+        old?.map(t => t.id === taskId ? { ...t, current_status_id: status_id } : t)
+      )
+      return { previous }
+    },
     onSuccess: (updated: Task) => {
-      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
+      qc.setQueryData<Task[]>(['tasks', projectId], old =>
+        old?.map(t => t.id === updated.id ? updated : t)
+      )
       qc.setQueryData(['task', updated.id], updated)
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['tasks', projectId], context.previous)
+      }
     },
   })
 }
