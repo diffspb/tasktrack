@@ -5,7 +5,7 @@ export interface View {
   id: string
   project_id: string
   name: string
-  type: 'kanban' | 'backlog'
+  type: 'kanban' | 'backlog' | 'epic_tree'
   position: number
   is_default: boolean
   created_at: string

@@ -14,8 +14,9 @@ class StatusCategory(str, enum.Enum):
 
 
 class ViewType(str, enum.Enum):
-    kanban = "kanban"
-    backlog = "backlog"
+    kanban     = "kanban"
+    backlog    = "backlog"
+    epic_tree  = "epic_tree"
 
 
 class View(Base, UUIDMixin, TimestampMixin):

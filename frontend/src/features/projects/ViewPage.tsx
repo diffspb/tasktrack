@@ -4,6 +4,7 @@ import { useProjectByKey } from './api'
 import { useView, useProjectViews } from './viewsApi'
 import { TaskBoard } from '@/features/tasks/TaskBoard'
 import { TaskBacklog } from '@/features/tasks/TaskBacklog'
+import { EpicTreeView } from '@/features/tasks/EpicTreeView'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { View } from './viewsApi'
 
@@ -45,6 +46,9 @@ export function ViewPage() {
   }
   if (view.type === 'backlog') {
     return <TaskBacklog viewId={view.id} projectId={view.project_id} />
+  }
+  if (view.type === 'epic_tree') {
+    return <EpicTreeView viewId={view.id} projectId={view.project_id} />
   }
 
   return null

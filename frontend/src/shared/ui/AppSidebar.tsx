@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Zap, LayoutDashboard, Kanban, List, Settings, ChevronRight } from 'lucide-react'
+import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -24,8 +24,9 @@ const SETTINGS_NAV = [
 ]
 
 const VIEW_ICONS: Record<View['type'], React.ElementType> = {
-  kanban:  Kanban,
-  backlog: List,
+  kanban:    Kanban,
+  backlog:   List,
+  epic_tree: Network,
 }
 
 const PROJECT_COLORS = [
