@@ -100,7 +100,8 @@ export function WorkflowSettingsPage() {
   if (!projectId) return null
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-3xl mx-auto p-6 space-y-8">
+      <h1 className="text-xl font-semibold">Workflow</h1>
       {/* Task type workflow mapping */}
       <section className="space-y-3">
         <div>

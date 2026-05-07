@@ -115,6 +115,8 @@ async def update_project(
         project.name = data.name
     if data.description is not None:
         project.description = data.description
+    if data.visibility is not None:
+        project.visibility = data.visibility
     project.version += 1
 
     await session.commit()

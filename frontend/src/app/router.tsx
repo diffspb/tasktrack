@@ -3,6 +3,7 @@ import { Layout } from '@/shared/ui/Layout'
 import { AuthCallback } from '@/features/auth/AuthCallback'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { ProjectSettings } from '@/features/projects/ProjectSettings'
+import { GeneralSettingsPage } from '@/features/projects/GeneralSettingsPage'
 import { TeamSettingsPage } from '@/features/projects/TeamSettingsPage'
 import { WorkflowSettingsPage } from '@/features/projects/WorkflowSettingsPage'
 import { BoardSettingsPage } from '@/features/projects/BoardSettingsPage'
@@ -25,7 +26,8 @@ export const router = createBrowserRouter([
         path: 'projects/:projectKey/settings',
         element: <ProjectSettings />,
         children: [
-          { index: true, element: <Navigate to="team" replace /> },
+          { index: true, element: <Navigate to="general" replace /> },
+          { path: 'general',  element: <GeneralSettingsPage /> },
           { path: 'team',     element: <TeamSettingsPage /> },
           { path: 'workflow', element: <WorkflowSettingsPage /> },
           { path: 'board',    element: <BoardSettingsPage /> },

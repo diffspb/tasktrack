@@ -9,13 +9,11 @@ export function BoardSettingsPage() {
   if (!projectId) return null
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h2 className="text-base font-semibold">Board columns</h2>
-        <p className="text-sm text-muted-foreground">
-          Map workflow statuses to board columns. Tasks appear in the column that contains their current status.
-        </p>
-      </div>
+    <div className="max-w-3xl mx-auto p-6 space-y-3">
+      <h1 className="text-xl font-semibold">Board columns</h1>
+      <p className="text-sm text-muted-foreground">
+        Map workflow statuses to board columns. Tasks appear in the column that contains their current status.
+      </p>
       <BoardColumnEditor projectId={projectId} />
     </div>
   )

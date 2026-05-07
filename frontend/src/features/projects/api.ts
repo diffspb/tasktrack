@@ -55,3 +55,34 @@ export function useCreateProject() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
   })
 }
+
+export interface ProjectUpdate {
+  name?: string
+  description?: string | null
+  visibility?: Project['visibility']
+  version: number
+}
+
+export function useUpdateProject(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<Project, unknown, ProjectUpdate>({
+    mutationFn: data => api.patch(`/projects/${projectId}`, data).then(r => r.data),
+    onSuccess: updated => {
+      qc.setQueryData(['project', projectId], updated)
+      qc.setQueryData(['project-by-key', updated.key.toUpperCase()], updated)
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
+export function useArchiveProject(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<Project>({
+    mutationFn: () => api.post(`/projects/${projectId}/archive`).then(r => r.data),
+    onSuccess: updated => {
+      qc.setQueryData(['project', projectId], updated)
+      qc.setQueryData(['project-by-key', updated.key.toUpperCase()], updated)
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}

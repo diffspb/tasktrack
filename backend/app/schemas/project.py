@@ -27,6 +27,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    visibility: ProjectVisibility | None = None
     version: int
 
 

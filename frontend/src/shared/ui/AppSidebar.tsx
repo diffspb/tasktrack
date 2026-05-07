@@ -4,6 +4,7 @@ import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/features/auth/AuthProvider'
@@ -14,9 +15,15 @@ const LAST_PROJECT_KEY = 'tt_last_project'
 const MAX_SIDEBAR_PROJECTS = 5
 
 const PROJECT_NAV = [
-  { icon: Kanban,   label: 'Board',    suffix: 'board' },
-  { icon: List,     label: 'Backlog',  suffix: 'backlog' },
-  { icon: Settings, label: 'Settings', suffix: 'settings' },
+  { icon: Kanban, label: 'Board',   suffix: 'board' },
+  { icon: List,   label: 'Backlog', suffix: 'backlog' },
+]
+
+const SETTINGS_NAV = [
+  { label: 'General',       suffix: 'settings/general' },
+  { label: 'Team',          suffix: 'settings/team' },
+  { label: 'Workflow',      suffix: 'settings/workflow' },
+  { label: 'Board columns', suffix: 'settings/board' },
 ]
 
 const PROJECT_COLORS = [
@@ -133,17 +140,40 @@ export function AppSidebar() {
               </SidebarGroupLabel>
               <SidebarMenu>
                 {PROJECT_NAV.map(item => (
-                  <SidebarMenuItem key={item.suffix}>
-                    <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
-                      {({ isActive }) => (
-                        <SidebarMenuButton isActive={isActive}>
-                          <item.icon />
-                          <span>{item.label}</span>
-                        </SidebarMenuButton>
-                      )}
-                    </NavLink>
-                  </SidebarMenuItem>
-                ))}
+                <SidebarMenuItem key={item.suffix}>
+                  <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
+                    {({ isActive }) => (
+                      <SidebarMenuButton isActive={isActive}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    )}
+                  </NavLink>
+                </SidebarMenuItem>
+              ))}
+              <SidebarMenuItem>
+                <NavLink to={`/projects/${projectKey}/settings`}>
+                  {({ isActive }) => (
+                    <SidebarMenuButton isActive={isActive}>
+                      <Settings />
+                      <span>Settings</span>
+                    </SidebarMenuButton>
+                  )}
+                </NavLink>
+                <SidebarMenuSub>
+                  {SETTINGS_NAV.map(item => (
+                    <SidebarMenuSubItem key={item.suffix}>
+                      <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
+                        {({ isActive }) => (
+                          <SidebarMenuSubButton isActive={isActive}>
+                            {item.label}
+                          </SidebarMenuSubButton>
+                        )}
+                      </NavLink>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
           </>
