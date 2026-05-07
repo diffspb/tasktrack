@@ -59,14 +59,16 @@ function ProjectCard({ project }: { project: Project }) {
             <Users className="h-3.5 w-3.5" />
             {project.members.length} member{project.members.length !== 1 ? 's' : ''}
           </span>
-          <Button size="sm" variant="outline" className="h-7 text-xs"
-            onClick={() => navigate(`/projects/${project.key}/board`)}>
-            Open
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground"
-            onClick={() => navigate(`/projects/${project.key}/settings`)}>
-            <Settings className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" className="h-7 text-xs"
+              onClick={() => navigate(`/projects/${project.key}/board`)}>
+              Open
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground"
+              onClick={() => navigate(`/projects/${project.key}/settings`)}>
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
