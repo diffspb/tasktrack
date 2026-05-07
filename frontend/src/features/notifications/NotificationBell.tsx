@@ -39,8 +39,7 @@ export function NotificationBell() {
     if (n.task_id) {
       try {
         const task = await api.get(`/tasks/${n.task_id}`).then(r => r.data)
-        const projectKey = task.key.substring(0, task.key.lastIndexOf('-'))
-        navigate(`/projects/${projectKey}/backlog`)
+        navigate(`/tasks/${task.key}`)
       } catch {
         // Task no longer accessible — just close the popover.
       }
