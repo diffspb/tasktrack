@@ -9,15 +9,12 @@ import {
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjects, useProjectByKey } from '@/features/projects/api'
+import { useProjectViews } from '@/features/projects/viewsApi'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import type { View } from '@/features/projects/viewsApi'
 
 const LAST_PROJECT_KEY = 'tt_last_project'
 const MAX_SIDEBAR_PROJECTS = 5
-
-const PROJECT_NAV = [
-  { icon: Kanban, label: 'Board',   suffix: 'board' },
-  { icon: List,   label: 'Backlog', suffix: 'backlog' },
-]
 
 const SETTINGS_NAV = [
   { label: 'General',       suffix: 'settings/general' },
@@ -25,6 +22,11 @@ const SETTINGS_NAV = [
   { label: 'Workflow',      suffix: 'settings/workflow' },
   { label: 'Board columns', suffix: 'settings/board' },
 ]
+
+const VIEW_ICONS: Record<View['type'], React.ElementType> = {
+  kanban:  Kanban,
+  backlog: List,
+}
 
 const PROJECT_COLORS = [
   'oklch(0.52 0.16 252)', 'oklch(0.55 0.18 150)', 'oklch(0.58 0.18 30)',
@@ -42,9 +44,11 @@ export function AppSidebar() {
   const { data: projects } = useProjects()
 
   const projectMatch = useMatch('/projects/:projectKey/*')
+  const viewMatch    = useMatch('/projects/:projectKey/views/:viewId')
   const routeProjectKey = projectMatch?.params.projectKey
+  const routeViewId     = viewMatch?.params.viewId
   const allProjectsMatch = useMatch('/projects')
-  const settingsMatch = useMatch('/projects/:projectKey/settings/*')
+  const settingsMatch    = useMatch('/projects/:projectKey/settings/*')
 
   useEffect(() => {
     if (routeProjectKey) {
@@ -56,6 +60,7 @@ export function AppSidebar() {
 
   const projectKey = routeProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
   const { data: project } = useProjectByKey(projectKey)
+  const { data: views }   = useProjectViews(project?.id)
 
   const sidebarProjects = (projects ?? []).slice(0, MAX_SIDEBAR_PROJECTS)
 
@@ -80,10 +85,7 @@ export function AppSidebar() {
                 <NavLink to={`/projects/${p.key}/board`}>
                   {() => (
                     <SidebarMenuButton isActive={projectKey === p.key}>
-                      <div
-                        className="h-4 w-4 rounded shrink-0"
-                        style={{ background: projectColor(p.key) }}
-                      />
+                      <div className="h-4 w-4 rounded shrink-0" style={{ background: projectColor(p.key) }} />
                       <span className="truncate">{p.name}</span>
                       <span className="ml-auto font-mono text-[10px] text-muted-foreground/50 shrink-0">
                         {p.key}
@@ -140,41 +142,49 @@ export function AppSidebar() {
                 )}
               </SidebarGroupLabel>
               <SidebarMenu>
-                {PROJECT_NAV.map(item => (
-                <SidebarMenuItem key={item.suffix}>
-                  <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
+                {/* Dynamic views list */}
+                {(views ?? []).map(v => {
+                  const Icon = VIEW_ICONS[v.type] ?? List
+                  return (
+                    <SidebarMenuItem key={v.id}>
+                      <NavLink to={`/projects/${projectKey}/views/${v.id}`}>
+                        {() => (
+                          <SidebarMenuButton isActive={routeViewId === v.id}>
+                            <Icon />
+                            <span>{v.name}</span>
+                          </SidebarMenuButton>
+                        )}
+                      </NavLink>
+                    </SidebarMenuItem>
+                  )
+                })}
+
+                {/* Settings with sub-items */}
+                <SidebarMenuItem>
+                  <NavLink to={`/projects/${projectKey}/settings`}>
                     {({ isActive }) => (
                       <SidebarMenuButton isActive={isActive}>
-                        <item.icon />
-                        <span>{item.label}</span>
+                        <Settings />
+                        <span>Settings</span>
                       </SidebarMenuButton>
                     )}
                   </NavLink>
-                </SidebarMenuItem>
-              ))}
-              <SidebarMenuItem>
-                <NavLink to={`/projects/${projectKey}/settings`}>
-                  {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <Settings />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
+                  {settingsMatch && (
+                    <SidebarMenuSub>
+                      {SETTINGS_NAV.map(item => (
+                        <SidebarMenuSubItem key={item.suffix}>
+                          <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
+                            {({ isActive }) => (
+                              <SidebarMenuSubButton isActive={isActive}>
+                                {item.label}
+                              </SidebarMenuSubButton>
+                            )}
+                          </NavLink>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
                   )}
-                </NavLink>
-                {settingsMatch && <SidebarMenuSub>
-                  {SETTINGS_NAV.map(item => (
-                    <SidebarMenuSubItem key={item.suffix}>
-                      <NavLink to={`/projects/${projectKey}/${item.suffix}`}>
-                        {({ isActive }) => (
-                          <SidebarMenuSubButton isActive={isActive}>
-                            {item.label}
-                          </SidebarMenuSubButton>
-                        )}
-                      </NavLink>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>}
-              </SidebarMenuItem>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
           </>

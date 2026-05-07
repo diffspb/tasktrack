@@ -7,8 +7,7 @@ import { GeneralSettingsPage } from '@/features/projects/GeneralSettingsPage'
 import { TeamSettingsPage } from '@/features/projects/TeamSettingsPage'
 import { WorkflowSettingsPage } from '@/features/projects/WorkflowSettingsPage'
 import { BoardSettingsPage } from '@/features/projects/BoardSettingsPage'
-import { TaskBoard } from '@/features/tasks/TaskBoard'
-import { TaskBacklog } from '@/features/tasks/TaskBacklog'
+import { ViewPage, ViewRedirect } from '@/features/projects/ViewPage'
 import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
 
@@ -19,9 +18,10 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'projects',             element: <ProjectList /> },
-      { path: 'projects/:projectKey/board',   element: <TaskBoard /> },
-      { path: 'projects/:projectKey/backlog', element: <TaskBacklog /> },
+      { path: 'projects',                              element: <ProjectList /> },
+      { path: 'projects/:projectKey/views/:viewId',    element: <ViewPage /> },
+      { path: 'projects/:projectKey/board',            element: <ViewRedirect type="kanban" /> },
+      { path: 'projects/:projectKey/backlog',          element: <ViewRedirect type="backlog" /> },
       {
         path: 'projects/:projectKey/settings',
         element: <ProjectSettings />,

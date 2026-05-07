@@ -7,7 +7,7 @@ export type StatusCategory = 'initial' | 'intermediate' | 'final'
 
 export interface BoardColumn {
   id: string
-  project_id: string
+  view_id: string
   name: string
   position: number
   status_ids: string[]
@@ -173,55 +173,55 @@ export function useDeleteWorkflow(projectId: string) {
 
 // ── Board columns ─────────────────────────────────────────────────────────────
 
-export function useBoardColumns(projectId: string | undefined) {
+export function useBoardColumns(viewId: string | null | undefined) {
   return useQuery<{ items: BoardColumn[] }>({
-    queryKey: ['board-columns', projectId],
-    queryFn: () => api.get(`/projects/${projectId}/board-columns`).then(r => r.data),
-    enabled: !!projectId,
+    queryKey: ['board-columns', viewId],
+    queryFn: () => api.get(`/views/${viewId}/columns`).then(r => r.data),
+    enabled: !!viewId,
   })
 }
 
-export function useCreateBoardColumn(projectId: string) {
+export function useCreateBoardColumn(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ name, position }: { name: string; position: number }) =>
-      api.post(`/projects/${projectId}/board-columns`, { name, position }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', projectId] }),
+      api.post(`/views/${viewId}/columns`, { name, position }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', viewId] }),
   })
 }
 
-export function useUpdateBoardColumn(projectId: string) {
+export function useUpdateBoardColumn(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ columnId, name, position }: { columnId: string; name?: string; position?: number }) =>
       api.patch(`/board-columns/${columnId}`, { name, position }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', viewId] }),
   })
 }
 
-export function useDeleteBoardColumn(projectId: string) {
+export function useDeleteBoardColumn(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (columnId: string) => api.delete(`/board-columns/${columnId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', viewId] }),
   })
 }
 
-export function useAddStatusToColumn(projectId: string) {
+export function useAddStatusToColumn(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ columnId, statusId }: { columnId: string; statusId: string }) =>
       api.post(`/board-columns/${columnId}/statuses`, { status_id: statusId }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', viewId] }),
   })
 }
 
-export function useRemoveStatusFromColumn(projectId: string) {
+export function useRemoveStatusFromColumn(viewId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ columnId, statusId }: { columnId: string; statusId: string }) =>
       api.delete(`/board-columns/${columnId}/statuses/${statusId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['board-columns', viewId] }),
   })
 }
 

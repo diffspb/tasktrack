@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { useProjectByKey } from '@/features/projects/api'
+import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -16,10 +15,12 @@ import { CreateTaskModal } from './CreateTaskModal'
 import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
 import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 
-export function TaskBacklog() {
-  const { projectKey } = useParams<{ projectKey: string }>()
-  const { data: projectData } = useProjectByKey(projectKey)
-  const projectId = projectData?.id
+interface TaskBacklogProps {
+  viewId: string
+  projectId: string
+}
+
+export function TaskBacklog({ viewId: _viewId, projectId }: TaskBacklogProps) {
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)

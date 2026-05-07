@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { useProjectByKey } from '@/features/projects/api'
+import { Link, useParams } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { Plus, Settings } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -46,10 +45,13 @@ function isDropTarget(
   )
 }
 
-export function TaskBoard() {
+interface TaskBoardProps {
+  viewId: string
+  projectId: string
+}
+
+export function TaskBoard({ viewId, projectId }: TaskBoardProps) {
   const { projectKey } = useParams<{ projectKey: string }>()
-  const { data: projectData } = useProjectByKey(projectKey)
-  const projectId = projectData?.id
   const { user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -74,7 +76,7 @@ export function TaskBoard() {
     }
   })
 
-  const { data: boardColumnsData, isLoading: bcLoading } = useBoardColumns(projectId)
+  const { data: boardColumnsData, isLoading: bcLoading } = useBoardColumns(viewId)
   const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
 

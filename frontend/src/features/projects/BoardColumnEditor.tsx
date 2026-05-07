@@ -20,16 +20,16 @@ import {
   type BoardColumn,
 } from './workflowApi'
 
-interface Props { projectId: string }
+interface Props { viewId: string; projectId: string }
 
-export function BoardColumnEditor({ projectId }: Props) {
-  const { data: boardData, isLoading: bcLoading } = useBoardColumns(projectId)
+export function BoardColumnEditor({ viewId, projectId }: Props) {
+  const { data: boardData, isLoading: bcLoading } = useBoardColumns(viewId)
   const { data: workflows = [], isLoading: wfLoading } = useProjectWorkflows(projectId)
-  const createCol = useCreateBoardColumn(projectId)
-  const updateCol = useUpdateBoardColumn(projectId)
-  const deleteCol = useDeleteBoardColumn(projectId)
-  const addStatus = useAddStatusToColumn(projectId)
-  const removeStatus = useRemoveStatusFromColumn(projectId)
+  const createCol = useCreateBoardColumn(viewId)
+  const updateCol = useUpdateBoardColumn(viewId)
+  const deleteCol = useDeleteBoardColumn(viewId)
+  const addStatus = useAddStatusToColumn(viewId)
+  const removeStatus = useRemoveStatusFromColumn(viewId)
 
   const [addingName, setAddingName] = useState('')
   const [addStatusColId, setAddStatusColId] = useState<string | null>(null)
