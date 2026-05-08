@@ -47,20 +47,27 @@ export function AppSidebar() {
 
   const projectMatch = useMatch('/projects/:projectKey/*')
   const viewMatch    = useMatch('/projects/:projectKey/views/:viewId')
+  const taskMatch    = useMatch('/tasks/:taskKey')
   const routeProjectKey = projectMatch?.params.projectKey
   const routeViewId     = viewMatch?.params.viewId
   const allProjectsMatch = useMatch('/projects')
   const settingsMatch    = useMatch('/projects/:projectKey/settings/*')
 
+  const taskProjectKey = taskMatch?.params.taskKey
+    ? taskMatch.params.taskKey.substring(0, taskMatch.params.taskKey.lastIndexOf('-'))
+    : undefined
+
   useEffect(() => {
     if (routeProjectKey) {
       sessionStorage.setItem(LAST_PROJECT_KEY, routeProjectKey)
+    } else if (taskProjectKey) {
+      sessionStorage.setItem(LAST_PROJECT_KEY, taskProjectKey)
     } else if (allProjectsMatch) {
       sessionStorage.removeItem(LAST_PROJECT_KEY)
     }
-  }, [routeProjectKey, allProjectsMatch])
+  }, [routeProjectKey, taskProjectKey, allProjectsMatch])
 
-  const projectKey = routeProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
+  const projectKey = routeProjectKey ?? taskProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
   const { data: project } = useProjectByKey(projectKey)
   const { data: views }   = useProjectViews(project?.id)
 

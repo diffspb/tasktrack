@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AxiosError } from 'axios'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -9,19 +9,24 @@ import { useCreateTask, useProjectMembers, useProjectEpics, useProjectTaskTypes,
 interface Props {
   open: boolean
   projectId: string
+  parentTaskId?: string
   onClose: () => void
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'critical']
 
-export function CreateTaskModal({ open, projectId, onClose }: Props) {
+export function CreateTaskModal({ open, projectId, parentTaskId, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [description, setDescription] = useState('')
   const [typeKey, setTypeKey] = useState('task')
   const [assigneeId, setAssigneeId] = useState('')
-  const [parentEpicId, setParentEpicId] = useState('')
+  const [parentEpicId, setParentEpicId] = useState(parentTaskId ?? '')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) setParentEpicId(parentTaskId ?? '')
+  }, [open, parentTaskId])
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
   const { data: epics = [] } = useProjectEpics(projectId)
@@ -128,7 +133,7 @@ export function CreateTaskModal({ open, projectId, onClose }: Props) {
             </div>
           </div>
 
-          {typeKey !== 'epic' && (
+          {typeKey !== 'epic' && !parentTaskId && (
             <div className="space-y-1.5">
               <Label htmlFor="task-epic">Epic <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <select

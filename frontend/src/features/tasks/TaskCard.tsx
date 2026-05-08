@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import type { Task } from './api'
+import { TaskTypeIcon } from './TaskTypeIcon'
 
 const PRIORITY_COLORS: Record<string, string> = {
   low:      'oklch(0.65 0.08 240)',
@@ -48,17 +49,12 @@ export function TaskCard({ task, assigneeName, epicKey, isDragging, onClick, onD
 
       <div className="pl-1.5 space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <span
-            className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase"
-            style={{ background: typeColor + '22', color: typeColor }}
-          >
-            {typeKey}
-          </span>
+          <TaskTypeIcon typeKey={typeKey} color={typeColor} size={13} />
           {/* Key is a link to the full task page — stops propagation to avoid opening sheet */}
           <Link
             to={`/tasks/${task.key}`}
             onClick={e => e.stopPropagation()}
-            className="font-mono text-[11px] font-semibold text-muted-foreground/70 hover:text-primary hover:underline transition-colors"
+            className="text-[11px] font-semibold text-muted-foreground hover:text-primary hover:underline transition-colors"
           >
             {task.key}
           </Link>

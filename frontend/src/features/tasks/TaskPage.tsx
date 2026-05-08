@@ -1,19 +1,23 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useProject } from '@/features/projects/api'
 import { useTaskByKey } from './api'
 import { TaskView } from './TaskView'
 
 export function TaskPage() {
   const { key } = useParams<{ key: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const canGoBack = location.key !== 'default'
   const { user } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const { data: task, isLoading, error } = useTaskByKey(key)
+  const { data: project } = useProject(task?.project_id)
 
   function copyLink() {
     navigator.clipboard.writeText(window.location.href)
@@ -42,29 +46,27 @@ export function TaskPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto w-full px-6 py-6 space-y-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
+      <div className="w-full px-6 xl:px-10 py-6 space-y-5">
+        {/* Breadcrumb + actions row */}
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          {canGoBack && (
+            <>
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 hover:text-foreground transition-colors shrink-0"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+              <span className="text-muted-foreground/40">/</span>
+            </>
+          )}
+          <span>{project?.name ?? '…'}</span>
           <span className="text-muted-foreground/40">/</span>
-          <Link
-            to={`/projects/${task.key.substring(0, task.key.lastIndexOf('-'))}/board`}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Board
-          </Link>
-          <span className="text-muted-foreground/40">/</span>
-          <span className="font-mono text-sm font-semibold text-muted-foreground">{task.key}</span>
-          <div className="flex-1" />
+          <span className="font-semibold text-foreground">{task.key}</span>
           <button
             onClick={copyLink}
-            className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs hover:text-foreground transition-colors shrink-0"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? 'Copied' : 'Copy link'}

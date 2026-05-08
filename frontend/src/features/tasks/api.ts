@@ -148,7 +148,10 @@ export function useCreateTask(projectId: string) {
   return useMutation({
     mutationFn: (data: CreateTaskInput) =>
       api.post(`/projects/${projectId}/tasks`, data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['child-tasks', projectId] })
+    },
   })
 }
 
@@ -193,6 +196,7 @@ export function useTransitionStatus(projectId: string) {
         old?.map(t => t.id === updated.id ? updated : t)
       )
       qc.setQueryData(['task', updated.id], updated)
+      qc.setQueryData(['task-by-key', updated.key], updated)
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {

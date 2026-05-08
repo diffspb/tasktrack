@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 import type { Task, Status } from './api'
 import { TaskView } from './TaskView'
+import { TaskTypeIcon } from './TaskTypeIcon'
 
 interface Props {
   task: Task | null
@@ -21,15 +22,13 @@ export function TaskDetail({ task, currentUserId, onClose }: Props) {
     <div className="w-[460px] shrink-0 border-l bg-background flex flex-col overflow-hidden">
       {/* Panel header */}
       <div className="flex items-center gap-2 border-b px-4 py-2.5 shrink-0">
+        <TaskTypeIcon typeKey={typeKey} color={task.task_type?.color} size={14} />
         <Link
           to={`/tasks/${task.key}`}
-          className="font-mono text-xs font-semibold text-muted-foreground hover:text-primary hover:underline transition-colors"
+          className="text-xs font-semibold text-muted-foreground hover:text-primary hover:underline transition-colors"
         >
           {task.key}
         </Link>
-        <span className="text-xs text-muted-foreground/50 capitalize bg-muted rounded px-1.5 py-0.5">
-          {typeKey}
-        </span>
         <div className="flex-1" />
         <button
           onClick={onClose}

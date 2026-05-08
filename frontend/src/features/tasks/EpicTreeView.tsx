@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, ChevronDown } from 'lucide-react'
+import { TaskTypeIcon } from './TaskTypeIcon'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjectTasks, useProjectWorkflows, useProjectMembers, type Task } from './api'
 import { useProjectEvents, type TaskEvent } from './useProjectEvents'
@@ -201,22 +202,22 @@ export function EpicTreeView({ viewId: _viewId, projectId }: Props) {
                       ) : null}
                     </div>
 
-                    {/* type color dot */}
+                    {/* type icon */}
                     <div
                       style={{ width: ICON_COL, flexShrink: 0 }}
                       className="flex items-center justify-center"
                     >
-                      <div
-                        className="h-2 w-2 rounded-sm"
-                        style={{ background: typeColor }}
-                        title={task.task_type?.name ?? 'task'}
+                      <TaskTypeIcon
+                        typeKey={task.task_type?.key ?? 'task'}
+                        color={typeColor}
+                        size={13}
                       />
                     </div>
 
                     {/* key + title */}
                     <Link
                       to={`/tasks/${task.key}`}
-                      className="font-mono text-[11px] font-semibold text-muted-foreground/70 hover:text-primary transition-colors shrink-0"
+                      className="text-[11px] font-semibold text-muted-foreground hover:text-primary transition-colors shrink-0"
                     >
                       {task.key}
                     </Link>

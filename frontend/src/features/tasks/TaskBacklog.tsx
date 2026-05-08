@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
+import { TaskTypeIcon } from './TaskTypeIcon'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -158,11 +159,13 @@ function BacklogRow({
         <Link
           to={`/tasks/${task.key}`}
           onClick={e => e.stopPropagation()}
-          className="font-mono text-xs font-semibold text-muted-foreground/70 hover:text-primary hover:underline w-20 shrink-0 transition-colors"
+          className="text-xs font-semibold text-muted-foreground hover:text-primary hover:underline w-20 shrink-0 transition-colors"
         >
           {task.key}
         </Link>
-        <span className="text-xs text-muted-foreground/60 capitalize w-14 shrink-0">{typeKey}</span>
+        <div className="w-14 shrink-0 flex items-center">
+          <TaskTypeIcon typeKey={typeKey} color={task.task_type?.color} size={14} />
+        </div>
         <span className="flex-1 text-sm truncate">
           {epicKey && (
             <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mr-1.5 shrink-0">
