@@ -373,3 +373,31 @@ async def test_add_member_with_viewer_role(client: AsyncClient, db_session: Asyn
     })
     assert add_r.status_code == 201
     assert add_r.json()["role"] == "viewer"
+
+
+# ── GET /projects/by-key/{key} ────────────────────────────────────────────────
+
+async def test_get_project_by_key(client: AsyncClient):
+    r = await client.post("/api/v1/projects", json={"name": "ByKey Test", "key": "BKTEST1"})
+    assert r.status_code == 201
+    project_id = r.json()["id"]
+
+    r2 = await client.get("/api/v1/projects/by-key/BKTEST1")
+    assert r2.status_code == 200
+    assert r2.json()["id"] == project_id
+    assert r2.json()["key"] == "BKTEST1"
+
+
+async def test_get_project_by_key_case_insensitive(client: AsyncClient):
+    r = await client.post("/api/v1/projects", json={"name": "Case Test", "key": "CASETEST"})
+    assert r.status_code == 201
+
+    # Lowercase lookup should still find it (service normalises to uppercase)
+    r2 = await client.get("/api/v1/projects/by-key/casetest")
+    assert r2.status_code == 200
+    assert r2.json()["key"] == "CASETEST"
+
+
+async def test_get_project_by_key_not_found(client: AsyncClient):
+    r = await client.get("/api/v1/projects/by-key/DOESNOTEXIST")
+    assert r.status_code == 404
