@@ -8,6 +8,7 @@ interface User {
   id: string
   email: string
   display_name: string
+  is_superuser: boolean
 }
 
 interface AuthCtx {

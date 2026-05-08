@@ -20,6 +20,7 @@ class UserMeResponse(BaseModel):
     id: uuid.UUID
     email: str
     display_name: str
+    is_superuser: bool
 
 
 @router.get("/users/me", response_model=UserMeResponse)

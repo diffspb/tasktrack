@@ -11,6 +11,8 @@ import { ViewsSettingsPage } from '@/features/projects/ViewsSettingsPage'
 import { ViewPage, ViewRedirect } from '@/features/projects/ViewPage'
 import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
+import { GlobalSettingsLayout } from '@/features/admin/GlobalSettingsLayout'
+import { LinkTypesSettingsPage } from '@/features/admin/LinkTypesSettingsPage'
 
 export const router = createBrowserRouter([
   { path: '/auth/callback', element: <AuthCallback /> },
@@ -36,8 +38,16 @@ export const router = createBrowserRouter([
         ],
       },
       { path: 'projects/:projectKey/members', element: <Navigate to="../settings/team" replace /> },
-      { path: 'tasks/:key',           element: <TaskPage /> },
-      { path: 'dashboard',            element: <Dashboard /> },
+      { path: 'tasks/:key',  element: <TaskPage /> },
+      { path: 'dashboard',   element: <Dashboard /> },
+      {
+        path: 'admin/settings',
+        element: <GlobalSettingsLayout />,
+        children: [
+          { index: true, element: <Navigate to="link-types" replace /> },
+          { path: 'link-types', element: <LinkTypesSettingsPage /> },
+        ],
+      },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },

@@ -6,7 +6,8 @@ from app.models.workflow import (
     Status, StatusCategory, Transition, View, ViewType, Workflow,
 )
 from app.models.task_type import TaskType, SYSTEM_KEYS
-from app.models.task import Task, TaskLink, TaskLinkType, TaskPriority
+from app.models.link_type import LinkType
+from app.models.task import Task, TaskLink, TaskPriority
 from app.models.comment import Comment
 from app.models.notification import Notification, NotificationEntityType, NotificationEventType
 
@@ -18,7 +19,8 @@ __all__ = [
     "View", "ViewType",
     "BoardColumn", "BoardColumnStatus", "ProjectTaskTypeConfig",
     "TaskType", "SYSTEM_KEYS",
-    "Task", "TaskLink", "TaskLinkType", "TaskPriority",
+    "LinkType",
+    "Task", "TaskLink", "TaskPriority",
     "Comment",
     "Notification", "NotificationEntityType", "NotificationEventType",
 ]

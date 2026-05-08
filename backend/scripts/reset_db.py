@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.models import (
-    Base, BoardColumn, BoardColumnStatus, Notification, NotificationEntityType, NotificationEventType,
+    Base, BoardColumn, BoardColumnStatus, LinkType, Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
     Status, StatusCategory, Task, TaskPriority, TaskType,
     Transition, User, View, ViewType, Workflow,
@@ -23,7 +23,11 @@ async def reset() -> None:
 
     engine = create_async_engine(settings.database_url)
     async with engine.begin() as conn:
-        # Drop all objects including ones unknown to current models
+        # Terminate other connections so DROP SCHEMA doesn't deadlock
+        await conn.execute(text(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+        ))
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
@@ -46,10 +50,20 @@ async def seed(session: AsyncSession) -> None:
     manager_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
     dev1_id    = uuid.UUID("00000000-0000-0000-0000-000000000003")
 
-    admin   = User(id=admin_id,   email="admin@localhost",   display_name="Admin",   keycloak_id=str(admin_id))
+    admin   = User(id=admin_id,   email="admin@localhost",   display_name="Admin",   keycloak_id=str(admin_id),   is_superuser=True)
     manager = User(id=manager_id, email="manager@localhost", display_name="Manager", keycloak_id=str(manager_id))
     dev1    = User(id=dev1_id,    email="dev1@localhost",    display_name="Dev 1",   keycloak_id=str(dev1_id))
     session.add_all([admin, manager, dev1])
+    await session.flush()
+
+    # Global link types
+    session.add_all([
+        LinkType(name="blocks",     outward_name="blocks",     inward_name="is blocked by",     is_directed=True,  color="#ef4444", constraint={"type": "blocking"},                             position=0),
+        LinkType(name="depends_on", outward_name="depends on", inward_name="is dependency of",  is_directed=True,  color="#f59e0b", constraint={"type": "sequential", "mode": "finish_to_start"}, position=1),
+        LinkType(name="relates_to", outward_name="relates to", inward_name="relates to",        is_directed=False, color="#6366f1", constraint=None,                                             position=2),
+        LinkType(name="duplicates", outward_name="duplicates", inward_name="is duplicated by",  is_directed=True,  color="#8b5cf6", constraint=None,                                             position=3),
+        LinkType(name="clones",     outward_name="clones",     inward_name="is cloned by",      is_directed=True,  color="#10b981", constraint=None,                                             position=4),
+    ])
     await session.flush()
 
     # System workflows (project_id = NULL)

@@ -16,11 +16,6 @@ class TaskPriority(str, enum.Enum):
     critical = "critical"
 
 
-class TaskLinkType(str, enum.Enum):
-    blocks = "blocks"
-    relates_to = "relates_to"
-    duplicates = "duplicates"
-
 
 class Task(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "tasks"
@@ -73,7 +68,9 @@ class TaskLink(Base, UUIDMixin, TimestampMixin):
     target_task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
     )
-    link_type: Mapped[TaskLinkType] = mapped_column(
-        SQLEnum(TaskLinkType, native_enum=False, length=20), nullable=False
+    link_type_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("link_types.id", ondelete="RESTRICT"), nullable=False
     )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+    link_type: Mapped["LinkType"] = relationship("LinkType")  # noqa: F821
