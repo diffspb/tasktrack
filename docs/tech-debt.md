@@ -37,6 +37,15 @@
 **`_count_active_assignments()` — вводящее в заблуждение имя.**
 Функция в `workflow_service.py` считает `Task.current_status_id`, а не Assignment-записи (которых нет). Переименовать в `_count_tasks_in_status()`.
 
+**MCP-сервер: неполное покрытие операций.**
+Текущий набор инструментов закрывает основной сценарий «AI-агент = исполнитель» (CRUD задач, комментарии, переходы, связи, поиск задач/пользователей, edit комментария — добавлено 2026-05-09). Не реализовано через MCP, хотя есть в REST:
+- `delete_task` (soft-delete) — `DELETE /tasks/{id}`
+- `delete_comment` — `DELETE /comments/{id}`
+- Notifications: `list_notifications`, `mark_read`, `mark_all_read` — `/notifications/*`. Без них агент не видит новых упоминаний/назначений.
+- Project events / activity log — `GET /projects/{id}/events`. Полезно для понимания контекста изменений.
+
+Управление проектами, members, workflow CUD остаётся через UI/REST по дизайну — MCP-доступ не нужен.
+
 ---
 
 ## Непокрытые тесты

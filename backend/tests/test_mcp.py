@@ -42,6 +42,8 @@ def _patch_session(db_session: AsyncSession, user: User):
         "app.mcp.tools.projects.McpSession",
         "app.mcp.tools.tasks.McpSession",
         "app.mcp.tools.workflows.McpSession",
+        "app.mcp.tools.comments.McpSession",
+        "app.mcp.tools.users.McpSession",
     ]
 
     stack = ExitStack()
@@ -284,3 +286,87 @@ async def test_mcp_get_workflow(db_session: AsyncSession, stub_user: User):
     assert result["id"] == wf_id
     status_names = [s["name"] for s in result["statuses"]]
     assert "To Do" in status_names
+
+
+# ── search_tasks ──────────────────────────────────────────────────────────────
+
+async def test_mcp_search_tasks(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.tasks import search_tasks
+
+    p = await project_service.create_project(
+        db_session, ProjectCreate(name="SearchProj", key=uuid.uuid4().hex[:8].upper()), stub_user
+    )
+    await task_service.create_task(
+        db_session, p.id, TaskCreate(title="Deploy production pipeline"), stub_user,
+    )
+    await task_service.create_task(
+        db_session, p.id, TaskCreate(title="Refactor cache layer"), stub_user,
+    )
+    await db_session.commit()
+
+    with _patch_session(db_session, stub_user):
+        result = json.loads(await search_tasks(_fake_ctx(), query="production"))
+
+    assert isinstance(result, list)
+    titles = [r["title"] for r in result]
+    assert "Deploy production pipeline" in titles
+    assert "Refactor cache layer" not in titles
+    hit = next(r for r in result if r["title"] == "Deploy production pipeline")
+    assert hit["project"]["key"] == p.key
+    assert "<b>" in hit["highlight"]
+
+
+async def test_mcp_search_tasks_empty_query(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.tasks import search_tasks
+
+    with _patch_session(db_session, stub_user):
+        result = json.loads(await search_tasks(_fake_ctx(), query=""))
+    assert result == []
+
+
+# ── search_users ──────────────────────────────────────────────────────────────
+
+async def test_mcp_search_users(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.users import search_users
+
+    with _patch_session(db_session, stub_user):
+        # stub_user.email is something like "stub@local.test"; partial match.
+        result = json.loads(await search_users(_fake_ctx(), query=stub_user.email[:3]))
+
+    ids = [u["id"] for u in result]
+    assert str(stub_user.id) in ids
+
+
+async def test_mcp_search_users_empty_query(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.users import search_users
+
+    with _patch_session(db_session, stub_user):
+        result = json.loads(await search_users(_fake_ctx(), query="   "))
+    assert result == []
+
+
+async def test_mcp_search_users_no_match(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.users import search_users
+
+    with _patch_session(db_session, stub_user):
+        result = json.loads(await search_users(_fake_ctx(), query="nonexistent_xyz_12345"))
+    assert result == []
+
+
+# ── update_comment ────────────────────────────────────────────────────────────
+
+async def test_mcp_update_comment(db_session: AsyncSession, stub_user: User):
+    from app.mcp.tools.comments import add_comment, update_comment
+
+    ctx = await _setup(db_session, stub_user)
+    with _patch_session(db_session, stub_user):
+        created = json.loads(await add_comment(
+            _fake_ctx(), task_id=ctx["task_id"], content="initial",
+        ))
+        updated = json.loads(await update_comment(
+            _fake_ctx(), comment_id=created["id"], content="edited",
+        ))
+
+    assert updated["id"] == created["id"]
+    assert updated["content"] == "edited"
+    assert updated["edited_at"] is not None

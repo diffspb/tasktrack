@@ -4,7 +4,7 @@ from mcp.server.fastmcp.server import Context
 
 from app.mcp.schemas.comment import comment_out
 from app.mcp.utils import McpSession, parse_uuid, svc_call
-from app.schemas.comment import CommentCreate
+from app.schemas.comment import CommentCreate, CommentUpdate
 from app.services import comment_service
 
 
@@ -54,4 +54,25 @@ async def add_comment(
             parent_comment_id=parent_id,
         )
         comment = await comment_service.create_comment(session, tid, data, user)
+        return json.dumps(comment_out(comment))
+
+
+@svc_call
+async def update_comment(
+    ctx: Context,
+    comment_id: str,
+    content: str,
+) -> str:
+    """
+    Edit the text of an existing comment.
+
+    Only the comment's author may edit it. Sets edited_at to the current time.
+    Labels and parent_comment_id cannot be changed — repost if needed.
+
+    Returns the updated comment.
+    """
+    async with McpSession(ctx) as (session, user):
+        cid = parse_uuid(comment_id, "comment_id")
+        data = CommentUpdate(content=content)
+        comment = await comment_service.update_comment(session, cid, data, user)
         return json.dumps(comment_out(comment))

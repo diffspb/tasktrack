@@ -10,7 +10,7 @@ from app.mcp.utils import McpSession, parse_uuid, svc_call
 from app.models.task import Task
 from app.models.workflow import Status, Transition, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
-from app.services import task_link_service, task_service
+from app.services import search_service, task_link_service, task_service
 
 
 # --- helpers ---
@@ -279,3 +279,47 @@ async def transition_task_status(
         data = TaskStatusTransition(status_id=sid)
         task = await task_service.transition_status(session, tid, data, user)
         return json.dumps(await _enrich_task(session, task, user))
+
+
+@svc_call
+async def search_tasks(
+    ctx: Context,
+    query: str,
+    project_id: str | None = None,
+    limit: int = 20,
+) -> str:
+    """
+    Full-text search tasks by title and description (Postgres tsvector, russian config).
+
+    Honors project visibility — only tasks the agent can see are returned.
+    Results are ranked by relevance.
+
+    query: search text, e.g. "deploy production".
+    project_id: optional UUID — restrict to one project.
+    limit: max results, 1-50, default 20.
+
+    Each item: id, key, title, current_status_id,
+    project: {id, key, name},
+    highlight: HTML snippet with <b>...</b> around matched terms.
+    """
+    async with McpSession(ctx) as (session, user):
+        pid = parse_uuid(project_id, "project_id") if project_id else None
+        capped = min(max(limit, 1), 50)
+        items = await search_service.search_tasks(
+            session, q=query, user=user, project_id=pid, limit=capped,
+        )
+        return json.dumps([
+            {
+                "id": str(i["id"]),
+                "key": i["key"],
+                "title": i["title"],
+                "current_status_id": i["current_status_id"],
+                "project": {
+                    "id": str(i["project"]["id"]),
+                    "key": i["project"]["key"],
+                    "name": i["project"]["name"],
+                },
+                "highlight": i["highlight"],
+            }
+            for i in items
+        ])
