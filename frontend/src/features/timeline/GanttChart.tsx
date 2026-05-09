@@ -38,9 +38,10 @@ interface Props {
   tasks: Task[]
   projects: Project[]
   viewMode: ViewMode
+  viewDate?: Date
 }
 
-export function GanttChart({ tasks, projects, viewMode }: Props) {
+export function GanttChart({ tasks, projects, viewMode, viewDate }: Props) {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
@@ -184,10 +185,11 @@ export function GanttChart({ tasks, projects, viewMode }: Props) {
           {unscheduled} task{unscheduled !== 1 ? 's' : ''} without a start date are not shown.
         </p>
       )}
-      <div className="rounded-lg border overflow-hidden">
+      <div className="rounded-lg border" style={{ overflowX: 'auto' }}>
         <Gantt
           tasks={ganttTasks}
           viewMode={viewMode}
+          viewDate={viewDate}
           locale="en-GB"
           listCellWidth="200px"
           columnWidth={viewMode === ViewMode.Week ? 120 : 65}
