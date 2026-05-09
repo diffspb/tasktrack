@@ -329,13 +329,16 @@ export function useTaskLinks(taskId: string | null | undefined) {
   })
 }
 
-export function useCreateTaskLink(taskId: string) {
+export function useCreateTaskLink(viewTaskId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { target_task_id: string; link_type_id: string }) =>
-      api.post(`/tasks/${taskId}/links`, data).then(r => r.data),
+    mutationFn: (data: { source_task_id: string; target_task_id: string; link_type_id: string }) =>
+      api.post(`/tasks/${data.source_task_id}/links`, {
+        target_task_id: data.target_task_id,
+        link_type_id: data.link_type_id,
+      }).then(r => r.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['task-links', taskId] })
+      qc.invalidateQueries({ queryKey: ['task-links', viewTaskId] })
       qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
     },
   })

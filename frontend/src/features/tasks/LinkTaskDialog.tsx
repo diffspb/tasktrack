@@ -3,14 +3,16 @@ import { Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TaskSearchPopover } from '@/shared/ui/TaskSearchPopover'
-import { useLinkTypes, useCreateTaskLink, type Task, type TaskLinkTask } from './api'
+import { useLinkTypes, useCreateTaskLink, type Task } from './api'
 import { TaskTypeIcon, TYPE_COLORS } from './TaskTypeIcon'
+
+type Direction = 'outward' | 'inward'
+type ChoiceKey = `${string}:${Direction}`
 
 interface Props {
   open: boolean
   onClose: () => void
   taskId: string
-  /** Exclude the task itself and already-linked tasks from search */
   excludeIds?: Set<string>
 }
 
@@ -19,60 +21,68 @@ export function LinkTaskDialog({ open, onClose, taskId, excludeIds }: Props) {
   const createLink = useCreateTaskLink(taskId)
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [linkTypeId, setLinkTypeId] = useState<string>('')
+  const [choiceKey, setChoiceKey]       = useState<ChoiceKey | ''>('')
 
   const activeLinkTypes = linkTypes.filter(lt => lt.is_active)
 
+  // Build flat option list: each directed type yields outward + inward rows;
+  // undirected types yield only one row.
+  const options = activeLinkTypes.flatMap(lt => {
+    const rows: { key: ChoiceKey; label: string; color: string }[] = [
+      { key: `${lt.id}:outward`, label: lt.outward_name, color: lt.color ?? '#6366f1' },
+    ]
+    if (lt.is_directed) {
+      rows.push({ key: `${lt.id}:inward`, label: lt.inward_name, color: lt.color ?? '#6366f1' })
+    }
+    return rows
+  })
+
+  const selectedOpt = options.find(o => o.key === choiceKey)
+
   async function handleSubmit() {
-    if (!selectedTask || !linkTypeId) return
-    await createLink.mutateAsync({ target_task_id: selectedTask.id, link_type_id: linkTypeId })
-    setSelectedTask(null)
-    setLinkTypeId('')
-    onClose()
+    if (!selectedTask || !choiceKey) return
+    const [linkTypeId, dir] = choiceKey.split(':') as [string, Direction]
+    await createLink.mutateAsync(
+      dir === 'outward'
+        ? { source_task_id: taskId,          target_task_id: selectedTask.id, link_type_id: linkTypeId }
+        : { source_task_id: selectedTask.id, target_task_id: taskId,          link_type_id: linkTypeId },
+    )
+    resetAndClose()
   }
 
-  function handleClose() {
+  function resetAndClose() {
     setSelectedTask(null)
-    setLinkTypeId('')
+    setChoiceKey('')
     onClose()
   }
-
-  const selectedType = activeLinkTypes.find(lt => lt.id === linkTypeId)
 
   return (
-    <Dialog open={open} onOpenChange={v => !v && handleClose()}>
+    <Dialog open={open} onOpenChange={v => !v && resetAndClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Link task</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-1">
-          {/* Link type selector */}
+          {/* Link type + direction — dropdown */}
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">Link type</p>
-            <div className="flex flex-wrap gap-1.5">
-              {activeLinkTypes.map(lt => (
-                <button
-                  key={lt.id}
-                  onClick={() => setLinkTypeId(lt.id)}
-                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors"
-                  style={
-                    linkTypeId === lt.id
-                      ? { background: lt.color ?? '#6366f1', color: '#fff', borderColor: 'transparent' }
-                      : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }
-                  }
-                >
-                  <Link2 className="h-3 w-3" />
-                  {lt.outward_name}
-                </button>
+            <select
+              value={choiceKey}
+              onChange={e => setChoiceKey(e.target.value as ChoiceKey | '')}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+            >
+              <option value="">Select link type…</option>
+              {options.map(opt => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Target task picker */}
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
-              {selectedType ? `Task to "${selectedType.outward_name}"` : 'Target task'}
+              {selectedOpt ? `"${selectedOpt.label}"` : 'Task'}
             </p>
             {selectedTask ? (
               <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/20">
@@ -104,12 +114,20 @@ export function LinkTaskDialog({ open, onClose, taskId, excludeIds }: Props) {
             )}
           </div>
 
-          {/* Actions */}
+          {/* Preview */}
+          {selectedTask && selectedOpt && (
+            <p className="text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
+              This task{' '}
+              <span className="font-medium text-foreground">{selectedOpt.label}</span>{' '}
+              <span className="font-mono">{selectedTask.key}</span>
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={resetAndClose}>Cancel</Button>
             <Button
               size="sm"
-              disabled={!selectedTask || !linkTypeId || createLink.isPending}
+              disabled={!selectedTask || !choiceKey || createLink.isPending}
               onClick={handleSubmit}
             >
               Add link
