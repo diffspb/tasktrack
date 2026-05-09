@@ -1,13 +1,14 @@
 from mcp.server.fastmcp import FastMCP
 
-from app.mcp.tools import comments, projects, tasks, workflows
+from app.mcp.tools import comments, links, projects, tasks, workflows
 
 mcp = FastMCP(
     name="tasktrack",
     instructions=(
-        "TaskTrack MCP server. Tools for managing projects, tasks, comments, and workflows. "
+        "TaskTrack MCP server. Tools for managing projects, tasks, comments, workflows, and task links. "
         "Start with list_projects to discover available projects and their IDs. "
-        "Always call get_task before update_task to obtain the current version field."
+        "Always call get_task before update_task to obtain the current version field. "
+        "Task links (relations) are included in get_task/get_task_by_key response under 'links'."
     ),
 )
 
@@ -31,3 +32,7 @@ mcp.add_tool(comments.add_comment)
 # Workflows (read-only)
 mcp.add_tool(workflows.list_workflows)
 mcp.add_tool(workflows.get_workflow)
+
+# Task links
+mcp.add_tool(links.create_task_link)
+mcp.add_tool(links.delete_task_link)

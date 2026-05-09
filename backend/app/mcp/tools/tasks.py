@@ -10,20 +10,21 @@ from app.mcp.utils import McpSession, parse_uuid, svc_call
 from app.models.task import Task
 from app.models.workflow import Status, Transition, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
-from app.services import task_service
+from app.services import task_link_service, task_service
 
 
 # --- helpers ---
 
-async def _enrich_task(session, task: Task) -> dict:
-    """Load status + available transitions and return full MCP task dict."""
+async def _enrich_task(session, task: Task, user=None) -> dict:
+    """Load status, transitions, links and return full MCP task dict."""
     status = await session.get(Status, task.current_status_id)
     transitions = list((await session.scalars(
         select(Transition)
         .where(Transition.from_status_id == task.current_status_id)
         .options(selectinload(Transition.to_status))
     )).all())
-    return task_detail(task, status, transitions)
+    links = await task_link_service.get_task_links(session, task.id, user) if user else []
+    return task_detail(task, status, transitions, links)
 
 
 async def _resolve_status_id(
@@ -118,7 +119,7 @@ async def get_task(ctx: Context, task_id: str) -> str:
     async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         task = await task_service.get_task(session, tid, user)
-        return json.dumps(await _enrich_task(session, task))
+        return json.dumps(await _enrich_task(session, task, user))
 
 
 @svc_call
@@ -131,7 +132,7 @@ async def get_task_by_key(ctx: Context, key: str) -> str:
     """
     async with McpSession(ctx) as (session, user):
         task = await task_service.get_task_by_key(session, key.upper(), user)
-        return json.dumps(await _enrich_task(session, task))
+        return json.dumps(await _enrich_task(session, task, user))
 
 
 @svc_call
@@ -207,7 +208,7 @@ async def create_task(
             due_date=dd,
         )
         task = await task_service.create_task(session, pid, data, user)
-        return json.dumps(await _enrich_task(session, task))
+        return json.dumps(await _enrich_task(session, task, user))
 
 
 @svc_call
@@ -247,7 +248,7 @@ async def update_task(
             due_date=dd,
         )
         task = await task_service.update_task(session, tid, data, user)
-        return json.dumps(await _enrich_task(session, task))
+        return json.dumps(await _enrich_task(session, task, user))
 
 
 @svc_call
@@ -273,4 +274,4 @@ async def transition_task_status(
 
         data = TaskStatusTransition(status_id=sid)
         task = await task_service.transition_status(session, tid, data, user)
-        return json.dumps(await _enrich_task(session, task))
+        return json.dumps(await _enrich_task(session, task, user))

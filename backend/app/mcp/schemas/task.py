@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from app.models.task import Task
+from app.models.task import Task, TaskLink
 from app.models.workflow import Status, Transition
 
 
@@ -25,10 +25,26 @@ def task_list_item(task: Task, status: Status | None) -> dict[str, Any]:
     }
 
 
+def _format_link(link: TaskLink, task_id: uuid.UUID) -> dict[str, Any]:
+    is_source = link.source_task_id == task_id
+    other = link.target_task if is_source else link.source_task
+    lt = link.link_type
+    return {
+        "link_id": str(link.id),
+        "direction": "outward" if is_source else "inward",
+        "relation": lt.outward_name if is_source else lt.inward_name,
+        "link_type_name": lt.name,
+        "task_id": str(other.id),
+        "task_key": other.key,
+        "task_title": other.title,
+    }
+
+
 def task_detail(
     task: Task,
     status: Status,
     transitions: list[Transition],
+    links: list[TaskLink] | None = None,
 ) -> dict[str, Any]:
     is_decision = bool(task.task_type and task.task_type.key == "decision")
     subtask_ids = [str(st.id) for st in (task.subtasks or []) if st.deleted_at is None]
@@ -67,4 +83,5 @@ def task_detail(
         "subtask_ids": subtask_ids,
         "available_transitions": available,
         "is_decision_task": is_decision,
+        "links": [_format_link(l, task.id) for l in (links or [])],
     }
