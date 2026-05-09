@@ -64,6 +64,15 @@ class ProjectMembersListResponse(BaseModel):
     items: list[ProjectMemberWithUser]
 
 
+class ProjectImportRequest(BaseModel):
+    """Body for POST /projects/import."""
+
+    data: dict
+    new_key: str
+    include_comments: bool = True
+    reset_statuses: bool = False
+
+
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

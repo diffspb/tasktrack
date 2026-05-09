@@ -3,7 +3,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from app.models.task_type import TaskType
 from app.models.user import User
 from app.schemas.project import (
     ProjectCreate,
+    ProjectImportRequest,
     ProjectMemberAdd,
     ProjectMemberResponse,
     ProjectMembersListResponse,
@@ -21,7 +22,7 @@ from app.schemas.project import (
 from app.schemas.task_type import TaskTypeResponse
 from app.schemas.workflow import SetTaskTypeWorkflow, TaskTypeConfigResponse
 from app.core.events import event_bus
-from app.services import project_service, workflow_service
+from app.services import project_export_service, project_service, workflow_service
 from app.services.permissions import require_project_access
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -170,6 +171,42 @@ async def reset_task_type_workflow(
     current_user: User = Depends(get_current_user),
 ):
     await workflow_service.reset_task_type_workflow(session, project_id, task_type_id, current_user)
+
+
+# ── Export / Import ───────────────────────────────────────────────────────────
+
+@router.get("/{project_id}/export")
+async def export_project(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Export a project with all its workflows, tasks, links and comments to JSON."""
+    data = await project_export_service.export_project(session, project_id, user)
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": f'attachment; filename="project-{project_id}.json"'},
+    )
+
+
+@router.post("/import", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+async def import_project(
+    body: ProjectImportRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """
+    Import a project from an export JSON.
+
+    new_key: the project key for the imported project (must be unique).
+    include_comments: whether to restore task comments (default true).
+    reset_statuses: if true, all tasks are placed in the initial workflow status
+                    instead of restoring the original status (default false).
+    """
+    return await project_export_service.import_project(
+        session, body.data, body.new_key,
+        body.include_comments, body.reset_statuses, user,
+    )
 
 
 # ── SSE event stream ──────────────────────────────────────────────────────────
