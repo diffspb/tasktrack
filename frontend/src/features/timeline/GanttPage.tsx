@@ -7,7 +7,7 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { type Task } from '@/features/tasks/api'
 import { TaskDetail } from '@/features/tasks/TaskDetail'
 import { TaskSearchPopover } from '@/shared/ui/TaskSearchPopover'
-import { useGanttChart, useGanttTasks, useAddTaskToGantt, useRemoveTaskFromGantt } from './ganttApi'
+import { useGanttChart, useGanttTasks, useGanttLinks, useAddTaskToGantt, useRemoveTaskFromGantt } from './ganttApi'
 import { GanttChart } from './GanttChart'
 
 function addMonths(d: Date, n: number): Date {
@@ -43,6 +43,7 @@ export function GanttPage() {
 
   const { data: gantt, isLoading: ganttLoading } = useGanttChart(ganttId)
   const { data: tasks = [], isLoading: tasksLoading } = useGanttTasks(ganttId)
+  const { data: links = [] } = useGanttLinks(ganttId)
   const removeTask = useRemoveTaskFromGantt(ganttId!)
   const addTask    = useAddTaskToGantt(ganttId!)
 
@@ -128,6 +129,7 @@ export function GanttPage() {
             ) : (
               <GanttChart
                 tasks={tasks}
+                links={links}
                 viewMode={viewMode}
                 viewDate={viewDate}
                 selectedTaskId={selectedTask?.id ?? null}

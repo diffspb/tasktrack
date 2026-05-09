@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_session
 from app.models.user import User
 from app.schemas.gantt import GanttChartAddTask, GanttChartCreate, GanttChartResponse, GanttChartUpdate
-from app.schemas.task import TaskResponse
+from app.schemas.task import TaskLinkResponse, TaskResponse
 from app.services import gantt_service
 
 router = APIRouter(tags=["gantt"])
@@ -64,6 +64,15 @@ async def get_gantt_tasks(
     _user: User = Depends(get_current_user),
 ):
     return await gantt_service.get_gantt_tasks(session, gantt_id)
+
+
+@router.get("/gantt/{gantt_id}/links", response_model=list[TaskLinkResponse])
+async def get_gantt_links(
+    gantt_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _user: User = Depends(get_current_user),
+):
+    return await gantt_service.get_gantt_links(session, gantt_id)
 
 
 @router.post("/gantt/{gantt_id}/tasks", status_code=status.HTTP_204_NO_CONTENT)

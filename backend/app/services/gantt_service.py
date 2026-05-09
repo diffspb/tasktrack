@@ -1,12 +1,12 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.gantt import GanttChart, GanttChartTask
-from app.models.task import Task
+from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.schemas.gantt import GanttChartCreate, GanttChartUpdate
 from app.services.permissions import require_project_access
@@ -153,3 +153,49 @@ async def get_gantt_tasks(
         .order_by(Task.parent_task_id.nulls_first(), Task.created_at)
     )
     return list(tasks.all())
+
+
+async def get_gantt_links(
+    session: AsyncSession, gantt_id: uuid.UUID
+) -> list[TaskLink]:
+    """Return all TaskLinks where both source and target are in the gantt's task tree."""
+    await get_gantt_chart(session, gantt_id)
+
+    cte_sql = text("""
+        WITH RECURSIVE gantt_tree AS (
+            SELECT t.id
+            FROM tasks t
+            JOIN gantt_chart_tasks gct ON gct.task_id = t.id
+            WHERE gct.gantt_id = :gantt_id AND t.deleted_at IS NULL
+
+            UNION
+
+            SELECT t.id
+            FROM tasks t
+            JOIN gantt_tree g ON t.parent_task_id = g.id
+            WHERE t.deleted_at IS NULL
+        )
+        SELECT id FROM gantt_tree
+    """)
+    ids_result = await session.execute(cte_sql, {"gantt_id": str(gantt_id)})
+    task_ids = [row[0] for row in ids_result]
+
+    if not task_ids:
+        return []
+
+    links = await session.scalars(
+        select(TaskLink)
+        .options(
+            selectinload(TaskLink.link_type),
+            selectinload(TaskLink.source_task).selectinload(Task.task_type),
+            selectinload(TaskLink.target_task).selectinload(Task.task_type),
+        )
+        .where(
+            and_(
+                TaskLink.source_task_id.in_(task_ids),
+                TaskLink.target_task_id.in_(task_ids),
+            )
+        )
+        .order_by(TaskLink.created_at)
+    )
+    return list(links.all())

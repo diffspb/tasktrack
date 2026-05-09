@@ -318,6 +318,7 @@ export interface TaskLink {
   source_task: TaskLinkTask
   target_task: TaskLinkTask
   link_type_id: string
+  link_type: LinkType
   created_at: string
 }
 
@@ -340,6 +341,7 @@ export function useCreateTaskLink(viewTaskId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task-links', viewTaskId] })
       qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
+      qc.invalidateQueries({ queryKey: ['gantt-links'] })
     },
   })
 }
@@ -351,6 +353,7 @@ export function useDeleteTaskLink(taskId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task-links', taskId] })
       qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
+      qc.invalidateQueries({ queryKey: ['gantt-links'] })
     },
   })
 }

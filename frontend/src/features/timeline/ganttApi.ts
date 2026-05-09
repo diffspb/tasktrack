@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/shared/api/client'
-import type { Task } from '@/features/tasks/api'
+import type { Task, TaskLink } from '@/features/tasks/api'
 
 export interface GanttChart {
   id: string
@@ -79,5 +79,13 @@ export function useRemoveTaskFromGantt(ganttId: string) {
   return useMutation({
     mutationFn: (taskId: string) => api.delete(`/gantt/${ganttId}/tasks/${taskId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['gantt-tasks', ganttId] }),
+  })
+}
+
+export function useGanttLinks(ganttId: string | null | undefined) {
+  return useQuery<TaskLink[]>({
+    queryKey: ['gantt-links', ganttId],
+    queryFn: () => api.get(`/gantt/${ganttId}/links`).then(r => r.data),
+    enabled: !!ganttId,
   })
 }

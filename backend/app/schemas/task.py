@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.task import TaskPriority
+from app.schemas.link_type import LinkTypeResponse
 
 
 class TaskTypeResponse(BaseModel):
@@ -68,6 +69,7 @@ class TaskLinkResponse(BaseModel):
     source_task: TaskMinimal
     target_task: TaskMinimal
     link_type_id: uuid.UUID
+    link_type: LinkTypeResponse
     created_at: datetime
 
 

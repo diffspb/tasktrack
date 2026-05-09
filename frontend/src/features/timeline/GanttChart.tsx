@@ -6,7 +6,7 @@ import type { Task as GanttTask } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
 import { cn } from '@/lib/utils'
 import { TaskTypeIcon } from '@/features/tasks/TaskTypeIcon'
-import type { Task } from '@/features/tasks/api'
+import type { Task, TaskLink } from '@/features/tasks/api'
 
 const TYPE_COLORS: Record<string, string> = {
   bug:      '#ef4444',
@@ -158,6 +158,7 @@ function makeListComponents(
 
 interface Props {
   tasks: Task[]
+  links?: TaskLink[]
   viewMode: ViewMode
   viewDate?: Date
   onTaskSelect?: (task: Task) => void
@@ -166,7 +167,7 @@ interface Props {
   containerWidth?: number
 }
 
-export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTaskId, containerWidth }: Props) {
+export function GanttChart({ tasks, links = [], viewMode, viewDate, onTaskSelect, selectedTaskId, containerWidth }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [listWidth, setListWidth] = useState(LIST_DEFAULT)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -232,8 +233,34 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
     for (const root of roots) {
       if (taskMap.has(root.id)) addTask(root, undefined, 0)
     }
+
+    // Compute dependencies from links — only directed links with a constraint get arrows.
+    // "blocking"  (A blocks B):        B.dependencies.push(A) — B waits for A to finish
+    // "sequential" (A depends_on B):   A.dependencies.push(B) — A waits for B to finish
+    const visibleIds = new Set(ganttTasks.map(g => g.id))
+    for (const link of links) {
+      const lt = link.link_type
+      if (!lt.constraint || !lt.is_directed) continue
+      const constraintType = (lt.constraint as { type?: string }).type
+      let dependentId: string | undefined
+      let upstreamId: string | undefined
+      if (constraintType === 'blocking') {
+        dependentId = link.target_task.id
+        upstreamId  = link.source_task.id
+      } else if (constraintType === 'sequential') {
+        dependentId = link.source_task.id
+        upstreamId  = link.target_task.id
+      }
+      if (!dependentId || !upstreamId) continue
+      if (!visibleIds.has(dependentId) || !visibleIds.has(upstreamId)) continue
+      const gt = ganttTasks.find(g => g.id === dependentId)
+      if (gt) {
+        gt.dependencies = [...(gt.dependencies ?? []), upstreamId]
+      }
+    }
+
     return { ganttTasks, taskMeta }
-  }, [tasks, collapsed])
+  }, [tasks, links, collapsed])
 
   // Dynamic column width: fill the available chart area
   const columnWidth = useMemo(() => {
@@ -274,6 +301,8 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
         barFill={65}
         barCornerRadius={4}
         todayColor="rgba(99,102,241,0.15)"
+        arrowColor="oklch(0.6 0 0 / 0.5)"
+        arrowIndent={12}
         fontFamily="inherit"
         fontSize="12px"
         TaskListHeader={CustomListHeader}
