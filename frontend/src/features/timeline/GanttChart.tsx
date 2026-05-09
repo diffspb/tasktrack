@@ -241,9 +241,11 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
 
   // Dynamic column width: fill the available chart area
   const columnWidth = useMemo(() => {
-    const chartArea = wrapperWidth - listWidth
+    // 16px = gantt-task-react VerticalScroll flex item (1rem, flex-shrink:0)
+    // +6 padding columns instead of +4 to buffer library's own preStepsCount
+    const chartArea = wrapperWidth - listWidth - 16
     if (chartArea <= 0) return viewMode === ViewMode.Week ? 120 : 65
-    const periods = countPeriods(ganttTasks, viewMode) + 4 // +4 padding columns
+    const periods = countPeriods(ganttTasks, viewMode) + 6
     const minCol  = viewMode === ViewMode.Week ? 60 : 45
     return Math.max(minCol, Math.floor(chartArea / periods))
   }, [wrapperWidth, listWidth, ganttTasks, viewMode])
