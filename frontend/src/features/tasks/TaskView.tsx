@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AxiosError } from 'axios'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -469,18 +469,30 @@ export function TaskView({ task, mode, currentUserId }: Props) {
               defaultValue={task.start_date ?? ''}
               className="text-xs border rounded px-1.5 py-0.5 bg-background"
               onChange={async e => {
+                const val = e.target.value
                 setEditingStartDate(false)
-                await update.mutateAsync({ start_date: e.target.value || null, version: task.version })
+                await updateTask.mutateAsync({ start_date: val || null, version: task.version })
               }}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingStartDate(false) }}
               onBlur={() => setEditingStartDate(false)}
             />
           ) : (
-            <button
-              className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
-              onClick={() => setEditingStartDate(true)}
-            >
-              {task.start_date ? fmtDate(task.start_date) : <span className="italic">Not set</span>}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
+                onClick={() => setEditingStartDate(true)}
+              >
+                {task.start_date ? fmtDate(task.start_date) : <span className="italic">Not set</span>}
+              </button>
+              {task.start_date && (
+                <button
+                  className="text-muted-foreground/40 hover:text-muted-foreground"
+                  onClick={() => updateTask.mutateAsync({ start_date: null, version: task.version })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -494,18 +506,30 @@ export function TaskView({ task, mode, currentUserId }: Props) {
               defaultValue={task.due_date ?? ''}
               className="text-xs border rounded px-1.5 py-0.5 bg-background"
               onChange={async e => {
+                const val = e.target.value
                 setEditingDueDate(false)
-                await update.mutateAsync({ due_date: e.target.value || null, version: task.version })
+                await updateTask.mutateAsync({ due_date: val || null, version: task.version })
               }}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingDueDate(false) }}
               onBlur={() => setEditingDueDate(false)}
             />
           ) : (
-            <button
-              className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
-              onClick={() => setEditingDueDate(true)}
-            >
-              {task.due_date ? fmtDate(task.due_date) : <span className="italic">Not set</span>}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
+                onClick={() => setEditingDueDate(true)}
+              >
+                {task.due_date ? fmtDate(task.due_date) : <span className="italic">Not set</span>}
+              </button>
+              {task.due_date && (
+                <button
+                  className="text-muted-foreground/40 hover:text-muted-foreground"
+                  onClick={() => updateTask.mutateAsync({ due_date: null, version: task.version })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

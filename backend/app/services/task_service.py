@@ -201,22 +201,15 @@ async def update_task(
 
     old_assignee = task.assignee_id
 
-    if data.title is not None:
-        task.title = data.title
-    if data.description is not None:
-        task.description = data.description
-    if data.priority is not None:
-        task.priority = data.priority
-    if data.assignee_id is not None:
-        task.assignee_id = data.assignee_id
-    if data.start_date is not None:
-        task.start_date = data.start_date
-    if data.due_date is not None:
-        task.due_date = data.due_date
-    if data.duration_days is not None:
-        task.duration_days = data.duration_days
-    if data.meta is not None:
-        task.meta = {**task.meta, **data.meta}
+    fs = data.model_fields_set
+    if 'title'        in fs and data.title is not None: task.title = data.title
+    if 'description'  in fs: task.description  = data.description
+    if 'priority'     in fs and data.priority is not None: task.priority = data.priority
+    if 'assignee_id'  in fs: task.assignee_id  = data.assignee_id
+    if 'start_date'   in fs: task.start_date   = data.start_date
+    if 'due_date'     in fs: task.due_date      = data.due_date
+    if 'duration_days' in fs: task.duration_days = data.duration_days
+    if 'meta'         in fs and data.meta is not None: task.meta = {**task.meta, **data.meta}
     task.version += 1
 
     if data.assignee_id and data.assignee_id != old_assignee and data.assignee_id != user.id:
