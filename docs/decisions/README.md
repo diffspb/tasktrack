@@ -18,6 +18,8 @@
 | [ADR-008](./ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment | 2026-04-30 | Принято |
 | [ADR-009](./ADR-009-board-columns-fr001.md) | BoardColumn как независимый слой между воркфлоу и Kanban-бордой (FR-001) | 2026-05-03 | Принято |
 | [ADR-010](./ADR-010-mcp-server.md) | MCP-сервер для агентов — встроенный SSE-транспорт, multi-agent auth | 2026-05-06 | Принято |
+| [ADR-011](./ADR-011-epic-tree-view.md) | Epic Tree View — древовидный список задач по эпикам | 2026-05-09 | Принято |
+| [ADR-012](./ADR-012-gantt-charts.md) | Диаграммы Ганта — именованные кросс-проектные таймлайны | 2026-05-09 | Принято |
 
 ## Шаблон
 
