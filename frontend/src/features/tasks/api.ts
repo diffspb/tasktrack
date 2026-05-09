@@ -53,6 +53,7 @@ export interface Task {
   meta: Record<string, unknown>
   start_date: string | null
   due_date: string | null
+  duration_days: number | null
   version: number
   deleted_at: string | null
   created_at: string

@@ -15,6 +15,7 @@ from app.models import (
     Transition, User, View, ViewType, Workflow,
 )
 from app.models.comment import Comment
+from app.models.gantt import GanttChart, GanttChartTask
 
 
 async def reset() -> None:
@@ -320,12 +321,29 @@ async def seed(session: AsyncSession) -> None:
         ),
     ])
 
+    # Sample Gantt charts with some tasks
+    gantt1 = GanttChart(owner_id=admin_id, name="Q2 Roadmap", description="Основные задачи второго квартала", position=0)
+    gantt2 = GanttChart(owner_id=manager_id, name="DevOps Sprint", description="Инфраструктурные задачи", position=1)
+    session.add_all([gantt1, gantt2])
+    await session.flush()
+
+    # Add root tasks to gantts (children will be pulled recursively via CTE)
+    session.add_all([
+        GanttChartTask(gantt_id=gantt1.id, task_id=t1.id,  position=0),
+        GanttChartTask(gantt_id=gantt1.id, task_id=t4.id,  position=1),
+        GanttChartTask(gantt_id=gantt1.id, task_id=t10.id, position=2),  # includes subtasks t13, t14
+        GanttChartTask(gantt_id=gantt2.id, task_id=t8.id,  position=0),
+        GanttChartTask(gantt_id=gantt2.id, task_id=t11.id, position=1),
+        GanttChartTask(gantt_id=gantt2.id, task_id=t12.id, position=2),
+    ])
+
     await session.commit()
     print("  → 3 пользователя, 4 системных воркфлоу (Task/Story, Bug, Epic, Decision Process)")
     print("  → 5 системных типов задач, привязанных к системным воркфлоу")
     print("  → проект DEMO, воркфлоу «Базовый», 4 BoardColumn")
     print("  → 12 обычных задач + 2 подзадачи DEMO-13/14 для Decision-задачи DEMO-10")
     print("  → Solution-комментарии на подзадачах, уведомления для демонстрации колокольчика")
+    print("  → 2 Gantt chart: Q2 Roadmap, DevOps Sprint")
 
 
 if __name__ == "__main__":

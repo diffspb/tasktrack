@@ -10,11 +10,13 @@ import {
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjects, useProjectByKey } from '@/features/projects/api'
 import { useProjectViews } from '@/features/projects/viewsApi'
+import { useGanttCharts } from '@/features/timeline/ganttApi'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import type { View } from '@/features/projects/viewsApi'
 
 const LAST_PROJECT_KEY = 'tt_last_project'
 const MAX_SIDEBAR_PROJECTS = 5
+const MAX_SIDEBAR_GANTTS = 5
 
 const SETTINGS_NAV = [
   { label: 'General',       suffix: 'settings/general' },
@@ -70,8 +72,12 @@ export function AppSidebar() {
   const projectKey = routeProjectKey ?? taskProjectKey ?? sessionStorage.getItem(LAST_PROJECT_KEY) ?? undefined
   const { data: project } = useProjectByKey(projectKey)
   const { data: views }   = useProjectViews(project?.id)
+  const { data: ganttCharts } = useGanttCharts()
+  const ganttMatch = useMatch('/timeline/:ganttId/*')
+  const currentGanttId = ganttMatch?.params.ganttId
 
   const sidebarProjects = (projects ?? []).slice(0, MAX_SIDEBAR_PROJECTS)
+  const sidebarGantts   = (ganttCharts ?? []).slice(0, MAX_SIDEBAR_GANTTS)
 
   return (
     <Sidebar>
@@ -132,12 +138,33 @@ export function AppSidebar() {
                 )}
               </NavLink>
             </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* Gantt charts */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Timelines</SidebarGroupLabel>
+          <SidebarMenu>
+            {sidebarGantts.map(g => (
+              <SidebarMenuItem key={g.id}>
+                <NavLink to={`/timeline/${g.id}`}>
+                  {() => (
+                    <SidebarMenuButton isActive={currentGanttId === g.id}>
+                      <GanttChartSquare className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{g.name}</span>
+                    </SidebarMenuButton>
+                  )}
+                </NavLink>
+              </SidebarMenuItem>
+            ))}
             <SidebarMenuItem>
-              <NavLink to="/timeline">
+              <NavLink to="/timeline" end>
                 {({ isActive }) => (
-                  <SidebarMenuButton isActive={isActive}>
-                    <GanttChartSquare />
-                    <span>Timeline</span>
+                  <SidebarMenuButton isActive={isActive} className="text-muted-foreground">
+                    <ChevronRight className="h-4 w-4" />
+                    <span>All timelines</span>
                   </SidebarMenuButton>
                 )}
               </NavLink>

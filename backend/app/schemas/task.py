@@ -27,6 +27,7 @@ class TaskCreate(BaseModel):
     parent_task_id: uuid.UUID | None = None
     start_date: date | None = None
     due_date: date | None = None
+    duration_days: int | None = None
     meta: dict = Field(default_factory=dict)
 
 
@@ -37,6 +38,7 @@ class TaskUpdate(BaseModel):
     assignee_id: uuid.UUID | None = None
     start_date: date | None = None
     due_date: date | None = None
+    duration_days: int | None = None
     meta: dict | None = None
     version: int
 
@@ -64,6 +66,7 @@ class TaskResponse(BaseModel):
     meta: dict
     start_date: date | None
     due_date: date | None
+    duration_days: int | None
     version: int
     deleted_at: datetime | None
     created_at: datetime

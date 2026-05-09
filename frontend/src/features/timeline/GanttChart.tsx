@@ -4,7 +4,6 @@ import { Gantt, ViewMode } from 'gantt-task-react'
 import type { Task as GanttTask } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
 import type { Task } from '@/features/tasks/api'
-import type { Project } from '@/features/projects/api'
 
 const TYPE_COLORS: Record<string, string> = {
   bug:      '#ef4444',
@@ -14,14 +13,8 @@ const TYPE_COLORS: Record<string, string> = {
   task:     '#6366f1',
 }
 
-const PROJECT_COLORS = [
-  '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6',
-]
-
-function projectColor(key: string): string {
-  let h = 0
-  for (const c of key) h = (h * 31 + c.charCodeAt(0)) & 0xffff
-  return PROJECT_COLORS[h % PROJECT_COLORS.length]
+function addDays(d: Date, n: number): Date {
+  return new Date(d.getTime() + n * 86_400_000)
 }
 
 function toDate(s: string): Date {
@@ -30,193 +23,140 @@ function toDate(s: string): Date {
   return d
 }
 
-function addDay(d: Date, n = 1): Date {
-  return new Date(d.getTime() + n * 86_400_000)
+/** Resolve effective start date: start_date ?? created_at */
+function resolveStart(task: Task): Date {
+  return toDate(task.start_date ?? task.created_at)
+}
+
+/**
+ * Resolve effective end date using priority:
+ * 1. start + duration_days
+ * 2. task.due_date
+ * 3. max(children end dates) recursively
+ * 4. start + 1 day
+ */
+function resolveEnd(task: Task, allTasks: Task[]): Date {
+  const start = resolveStart(task)
+
+  if (task.duration_days) {
+    return addDays(start, task.duration_days)
+  }
+
+  if (task.due_date) {
+    const end = toDate(task.due_date)
+    return end > start ? end : addDays(start, 1)
+  }
+
+  const children = allTasks.filter(t => t.parent_task_id === task.id)
+  if (children.length > 0) {
+    const maxEnd = new Date(Math.max(...children.map(c => resolveEnd(c, allTasks).getTime())))
+    if (maxEnd > start) return maxEnd
+  }
+
+  return addDays(start, 1)
 }
 
 interface Props {
   tasks: Task[]
-  projects: Project[]
   viewMode: ViewMode
   viewDate?: Date
 }
 
-export function GanttChart({ tasks, projects, viewMode, viewDate }: Props) {
+export function GanttChart({ tasks, viewMode, viewDate }: Props) {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const ganttTasks = useMemo<GanttTask[]>(() => {
     const rows: GanttTask[] = []
 
-    for (const project of projects) {
-      const projectTasks = tasks.filter(t => t.project_id === project.id)
-      if (!projectTasks.length) continue
+    // Group: root tasks first, then their children
+    const roots = tasks.filter(t => !tasks.some(p => p.id === t.parent_task_id))
+    const taskMap = new Map(tasks.map(t => [t.id, t]))
 
-      const color = projectColor(project.key)
-      const epics = projectTasks.filter(t => t.task_type?.key === 'epic')
-      const topLevel = projectTasks.filter(t => t.task_type?.key !== 'epic')
+    function addTask(task: Task, parentGanttId?: string) {
+      const start = resolveStart(task)
+      const end = resolveEnd(task, tasks)
+      const color = TYPE_COLORS[task.task_type?.key ?? 'task'] ?? '#6366f1'
+      const children = tasks.filter(t => t.parent_task_id === task.id)
+      const hasChildren = children.length > 0
+      const ganttId = task.id
 
-      // Compute project date range from all scheduled tasks
-      const scheduled = projectTasks.filter(t => t.start_date)
-      const projStart = scheduled.length
-        ? new Date(Math.min(...scheduled.map(t => toDate(t.start_date!).getTime())))
-        : new Date()
-      const projEnd = scheduled.length
-        ? new Date(Math.max(...scheduled.map(t =>
-            toDate(t.due_date ?? t.start_date!).getTime()
-          )))
-        : addDay(new Date())
-
-      const projId = `proj-${project.id}`
       rows.push({
-        id: projId,
-        name: `${project.key}  ${project.name}`,
-        type: 'project',
-        start: projStart,
-        end: projEnd < projStart ? addDay(projStart) : projEnd,
+        id: ganttId,
+        name: task.title,
+        type: hasChildren ? 'project' : 'task',
+        project: parentGanttId,
+        start,
+        end: end <= start ? addDays(start, 1) : end,
         progress: 0,
-        hideChildren: collapsed.has(projId),
-        styles: {
-          backgroundColor: color + '33',
-          progressColor: color,
-          backgroundSelectedColor: color + '55',
-        },
+        hideChildren: collapsed.has(ganttId),
+        styles: hasChildren
+          ? {
+              backgroundColor: color + '22',
+              progressColor: color,
+              backgroundSelectedColor: color + '44',
+            }
+          : {
+              backgroundColor: color + 'bb',
+              progressColor: color,
+              backgroundSelectedColor: color,
+            },
       })
 
-      if (collapsed.has(projId)) continue
-
-      // Tasks under epics
-      for (const epic of epics) {
-        const children = projectTasks.filter(t => t.parent_task_id === epic.id)
-        const epicScheduled = [epic, ...children].filter(t => t.start_date)
-        const epicStart = epicScheduled.length
-          ? new Date(Math.min(...epicScheduled.map(t => toDate(t.start_date!).getTime())))
-          : projStart
-        const epicEnd = epicScheduled.length
-          ? new Date(Math.max(...epicScheduled.map(t =>
-              toDate(t.due_date ?? t.start_date!).getTime()
-            )))
-          : addDay(epicStart)
-
-        const epicId = `epic-${epic.id}`
-        rows.push({
-          id: epicId,
-          name: epic.title,
-          type: 'project',
-          project: projId,
-          start: epicStart,
-          end: epicEnd <= epicStart ? addDay(epicStart) : epicEnd,
-          progress: 0,
-          hideChildren: collapsed.has(epicId),
-          styles: {
-            backgroundColor: '#f59e0b33',
-            progressColor: '#f59e0b',
-            backgroundSelectedColor: '#f59e0b55',
-          },
-        })
-
-        if (collapsed.has(epicId)) continue
-
+      if (!collapsed.has(ganttId)) {
         for (const child of children) {
-          if (!child.start_date) continue
-          const barColor = TYPE_COLORS[child.task_type?.key ?? 'task'] ?? '#6366f1'
-          const start = toDate(child.start_date)
-          const end = child.due_date ? toDate(child.due_date) : addDay(start)
-          rows.push({
-            id: child.id,
-            name: child.title,
-            type: 'task',
-            project: epicId,
-            start,
-            end: end <= start ? addDay(start) : end,
-            progress: 0,
-            styles: {
-              backgroundColor: barColor + 'aa',
-              progressColor: barColor,
-              backgroundSelectedColor: barColor,
-            },
-          })
+          addTask(child, ganttId)
         }
-      }
-
-      // Top-level tasks (not epics, not children of epics)
-      const epicChildIds = new Set(epics.flatMap(e =>
-        projectTasks.filter(t => t.parent_task_id === e.id).map(t => t.id)
-      ))
-      for (const t of topLevel) {
-        if (epicChildIds.has(t.id) || !t.start_date) continue
-        const barColor = TYPE_COLORS[t.task_type?.key ?? 'task'] ?? '#6366f1'
-        const start = toDate(t.start_date)
-        const end = t.due_date ? toDate(t.due_date) : addDay(start)
-        rows.push({
-          id: t.id,
-          name: t.title,
-          type: 'task',
-          project: projId,
-          start,
-          end: end <= start ? addDay(start) : end,
-          progress: 0,
-          styles: {
-            backgroundColor: barColor + 'aa',
-            progressColor: barColor,
-            backgroundSelectedColor: barColor,
-          },
-        })
       }
     }
 
-    return rows
-  }, [tasks, projects, collapsed])
+    for (const root of roots) {
+      // Only add if root is actually in the fetched list (it should always be)
+      if (taskMap.has(root.id)) addTask(root)
+    }
 
-  if (!ganttTasks.length) {
+    return rows
+  }, [tasks, collapsed])
+
+  if (!tasks.length) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-        No tasks with scheduled dates found.
+      <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+        No tasks yet. Add tasks using the button above.
       </div>
     )
   }
 
-  const unscheduled = tasks.filter(t => !t.start_date).length
-
   return (
-    <div className="flex flex-col gap-2">
-      {unscheduled > 0 && (
-        <p className="text-xs text-muted-foreground px-1">
-          {unscheduled} task{unscheduled !== 1 ? 's' : ''} without a start date are not shown.
-        </p>
-      )}
-      <div className="rounded-lg border" style={{ overflowX: 'auto' }}>
-        <Gantt
-          tasks={ganttTasks}
-          viewMode={viewMode}
-          viewDate={viewDate}
-          locale="en-GB"
-          listCellWidth="200px"
-          columnWidth={viewMode === ViewMode.Week ? 120 : 65}
-          rowHeight={36}
-          headerHeight={48}
-          barFill={65}
-          barCornerRadius={4}
-          todayColor="rgba(99,102,241,0.15)"
-          fontFamily="inherit"
-          fontSize="12px"
-          onClick={task => {
-            // Navigate only for leaf tasks (type='task'), not project/epic groups
-            if (task.type === 'task') {
-              const found = tasks.find(t => t.id === task.id)
-              if (found) navigate(`/tasks/${found.key}`)
-            }
-          }}
-          onExpanderClick={task => {
-            setCollapsed(prev => {
-              const next = new Set(prev)
-              if (next.has(task.id)) next.delete(task.id)
-              else next.add(task.id)
-              return next
-            })
-          }}
-        />
-      </div>
+    <div className="rounded-lg border" style={{ overflowX: 'auto' }}>
+      <Gantt
+        tasks={ganttTasks}
+        viewMode={viewMode}
+        viewDate={viewDate}
+        locale="en-GB"
+        listCellWidth="220px"
+        columnWidth={viewMode === ViewMode.Week ? 120 : 65}
+        rowHeight={36}
+        headerHeight={48}
+        barFill={65}
+        barCornerRadius={4}
+        todayColor="rgba(99,102,241,0.15)"
+        fontFamily="inherit"
+        fontSize="12px"
+        onClick={task => {
+          if (task.type === 'task') {
+            const found = tasks.find(t => t.id === task.id)
+            if (found) navigate(`/tasks/${found.key}`)
+          }
+        }}
+        onExpanderClick={task => {
+          setCollapsed(prev => {
+            const next = new Set(prev)
+            if (next.has(task.id)) next.delete(task.id)
+            else next.add(task.id)
+            return next
+          })
+        }}
+      />
     </div>
   )
 }

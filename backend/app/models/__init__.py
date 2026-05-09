@@ -10,6 +10,7 @@ from app.models.link_type import LinkType
 from app.models.task import Task, TaskLink, TaskPriority
 from app.models.comment import Comment
 from app.models.notification import Notification, NotificationEntityType, NotificationEventType
+from app.models.gantt import GanttChart, GanttChartTask
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -23,4 +24,5 @@ __all__ = [
     "Task", "TaskLink", "TaskPriority",
     "Comment",
     "Notification", "NotificationEntityType", "NotificationEventType",
+    "GanttChart", "GanttChartTask",
 ]

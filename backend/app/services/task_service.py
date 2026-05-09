@@ -213,6 +213,8 @@ async def update_task(
         task.start_date = data.start_date
     if data.due_date is not None:
         task.due_date = data.due_date
+    if data.duration_days is not None:
+        task.duration_days = data.duration_days
     if data.meta is not None:
         task.meta = {**task.meta, **data.meta}
     task.version += 1

@@ -46,6 +46,7 @@ class Task(Base, UUIDMixin, TimestampMixin):
     meta: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     start_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)
+    duration_days: Mapped[int | None] = mapped_column(Integer)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # Updated by a Postgres trigger; see app.core.db.create_tables.
