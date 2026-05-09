@@ -2,8 +2,10 @@ import asyncio
 import json
 import uuid
 
+import json as _json
+
 from fastapi import APIRouter, Depends, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -183,8 +185,9 @@ async def export_project(
 ):
     """Export a project with all its workflows, tasks, links and comments to JSON."""
     data = await project_export_service.export_project(session, project_id, user)
-    return JSONResponse(
-        content=data,
+    return Response(
+        content=_json.dumps(data, indent=2, ensure_ascii=False),
+        media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="project-{project_id}.json"'},
     )
 

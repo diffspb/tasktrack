@@ -150,6 +150,7 @@ async def export_project(
 
     # --- comments (top-level + replies, non-deleted) ---
     comments_by_task: dict[uuid.UUID, list[Comment]] = defaultdict(list)
+    comments_all: list[Comment] = []
     if task_ids:
         comments_raw = list((await session.scalars(
             select(Comment)
@@ -163,6 +164,25 @@ async def export_project(
         )).all())
         for c in comments_raw:
             comments_by_task[c.task_id].append(c)
+            comments_all.append(c)
+            comments_all.extend(r for r in c.replies if r.deleted_at is None)
+
+    # --- batch-load users (assignees + comment authors) for email lookup ---
+    user_ids: set[uuid.UUID] = set()
+    for t in tasks_raw:
+        if t.assignee_id:
+            user_ids.add(t.assignee_id)
+    for c in comments_all:
+        user_ids.add(c.author_id)
+
+    user_email_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        user_email_map = {
+            u.id: u.email
+            for u in (await session.scalars(
+                select(User).where(User.id.in_(user_ids))
+            )).all()
+        }
 
     # --- serialize tasks ---
     tasks_out = []
@@ -170,11 +190,13 @@ async def export_project(
         s = all_statuses.get(t.current_status_id)
         comments = [
             {
+                "author_email": user_email_map.get(c.author_id),
                 "content": c.content,
                 "labels": c.labels or [],
                 "created_at": c.created_at.isoformat(),
                 "replies": [
                     {
+                        "author_email": user_email_map.get(r.author_id),
                         "content": r.content,
                         "labels": r.labels or [],
                         "created_at": r.created_at.isoformat(),
@@ -194,6 +216,7 @@ async def export_project(
             "workflow_name": workflow_name_map.get(t.workflow_id, ""),
             "status_name": s.name if s else "",
             "status_category": s.category.value if s else "initial",
+            "assignee_email": user_email_map.get(t.assignee_id) if t.assignee_id else None,
             "parent_task_key": task_key_map.get(t.parent_task_id) if t.parent_task_id else None,
             "start_date": t.start_date.isoformat() if t.start_date else None,
             "due_date": t.due_date.isoformat() if t.due_date else None,
@@ -327,6 +350,17 @@ async def import_project(
     old_key_to_task: dict[str, Task] = {}
     task_counter = 0
 
+    # Build email → user_id cache for resolving assignees and comment authors
+    _email_to_uid: dict[str, uuid.UUID] = {}
+
+    async def _resolve_user_email(email: str | None) -> uuid.UUID | None:
+        if not email:
+            return None
+        if email not in _email_to_uid:
+            u = await session.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
+            _email_to_uid[email] = u.id if u else None  # type: ignore[assignment]
+        return _email_to_uid.get(email)
+
     for t_data in _topo_sort(tasks_data):
         wf_name = t_data.get("workflow_name", "")
         wf_entry = workflow_map.get(wf_name) or _default_workflow_entry(workflow_map)
@@ -371,12 +405,14 @@ async def import_project(
             parent_id = old_key_to_task[parent_key].id
 
         task_counter += 1
+        assignee_id = await _resolve_user_email(t_data.get("assignee_email"))
+
         task = Task(
             project_id=project.id,
             workflow_id=wf_obj.id,
             task_type_id=task_type.id if task_type else None,
             reporter_id=user.id,
-            assignee_id=None,
+            assignee_id=assignee_id,
             parent_task_id=parent_id,
             current_status_id=current_status.id,
             key=f"{new_key}-{task_counter}",
@@ -422,18 +458,20 @@ async def import_project(
             if not task:
                 continue
             for c_data in t_data.get("comments", []):
+                author_id = await _resolve_user_email(c_data.get("author_email")) or user.id
                 parent_comment = Comment(
                     task_id=task.id,
-                    author_id=user.id,
+                    author_id=author_id,
                     content=c_data["content"],
                     labels=c_data.get("labels") or [],
                 )
                 session.add(parent_comment)
                 await session.flush()
                 for r_data in c_data.get("replies", []):
+                    reply_author_id = await _resolve_user_email(r_data.get("author_email")) or user.id
                     session.add(Comment(
                         task_id=task.id,
-                        author_id=user.id,
+                        author_id=reply_author_id,
                         parent_comment_id=parent_comment.id,
                         content=r_data["content"],
                         labels=r_data.get("labels") or [],
