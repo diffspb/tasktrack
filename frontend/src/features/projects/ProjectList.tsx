@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProjects, type Project } from './api'
 import { CreateProjectModal } from './CreateProjectModal'
-import { Plus, Users, Lock, Globe, Settings } from 'lucide-react'
+import { ImportProjectDialog } from './ImportProjectDialog'
+import { Plus, Upload, Users, Lock, Globe, Settings } from 'lucide-react'
 
 const COLORS = [
   'oklch(0.52 0.16 252)', 'oklch(0.55 0.18 150)', 'oklch(0.58 0.18 30)',
@@ -101,6 +102,7 @@ function LoadingSkeleton() {
 export function ProjectList() {
   const { data: projects, isLoading, isError } = useProjects()
   const [createOpen, setCreateOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -109,10 +111,16 @@ export function ProjectList() {
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">All projects you have access to</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Import
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New project
+          </Button>
+        </div>
       </div>
 
       {isLoading && <LoadingSkeleton />}
@@ -140,6 +148,7 @@ export function ProjectList() {
       )}
 
       <CreateProjectModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <ImportProjectDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   )
 }

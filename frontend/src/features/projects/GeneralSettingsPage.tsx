@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Globe, Users, Lock } from 'lucide-react'
+import { Download, Globe, Users, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { useProjectByKey, useUpdateProject, useArchiveProject } from './api'
+import { useProjectByKey, useUpdateProject, useArchiveProject, downloadProjectExport } from './api'
 import type { Project } from './api'
 
 type Visibility = Project['visibility']
@@ -71,6 +71,7 @@ export function GeneralSettingsPage() {
   const [visibility, setVisibility] = useState<Visibility>('restricted')
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (!project) return
@@ -96,6 +97,16 @@ export function GeneralSettingsPage() {
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleExport() {
+    if (!project) return
+    setExporting(true)
+    try {
+      await downloadProjectExport(project.id, project.key)
+    } finally {
+      setExporting(false)
+    }
   }
 
   async function handleArchive() {
@@ -197,6 +208,18 @@ export function GeneralSettingsPage() {
           <span className="text-xs text-muted-foreground">No unsaved changes</span>
         )}
       </div>
+
+      <SettingSection
+        title="Export"
+        desc="Download all workflows, tasks, links and comments as a JSON file. Use for backups or to import into another environment via Projects → Import."
+      >
+        <div>
+          <Button variant="outline" onClick={handleExport} disabled={exporting} className="gap-2">
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting…' : 'Download JSON'}
+          </Button>
+        </div>
+      </SettingSection>
 
       <div className="border-t pt-7 space-y-3">
         <p className="text-sm font-semibold text-destructive">Danger zone</p>

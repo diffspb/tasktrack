@@ -86,3 +86,29 @@ export function useArchiveProject(projectId: string | undefined) {
     },
   })
 }
+
+export async function downloadProjectExport(projectId: string, projectKey: string): Promise<void> {
+  const response = await api.get(`/projects/${projectId}/export`, { responseType: 'blob' })
+  const blob = new Blob([response.data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${projectKey}-export.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export interface ProjectImportPayload {
+  data: Record<string, unknown>
+  new_key: string
+  include_comments: boolean
+  reset_statuses: boolean
+}
+
+export function useImportProject() {
+  const qc = useQueryClient()
+  return useMutation<Project, unknown, ProjectImportPayload>({
+    mutationFn: payload => api.post('/projects/import', payload).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  })
+}
