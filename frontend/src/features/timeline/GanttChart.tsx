@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { Gantt, ViewMode } from 'gantt-task-react'
@@ -16,20 +16,21 @@ const TYPE_COLORS: Record<string, string> = {
   task:     '#6366f1',
 }
 
+const LIST_MIN = 180
+const LIST_MAX = 600
+const LIST_DEFAULT = 320
+
 function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 86_400_000)
 }
-
 function toDate(s: string): Date {
   const d = new Date(s)
   d.setHours(0, 0, 0, 0)
   return d
 }
-
 function resolveStart(task: Task): Date {
   return toDate(task.start_date ?? task.created_at)
 }
-
 function resolveEnd(task: Task, allTasks: Task[]): Date {
   const start = resolveStart(task)
   if (task.duration_days) return addDays(start, task.duration_days)
@@ -45,37 +46,49 @@ function resolveEnd(task: Task, allTasks: Task[]): Date {
   return addDays(start, 1)
 }
 
-// ── Task metadata (depth + real task) ────────────────────────────────────────
+/** Estimate number of time periods (months or weeks) in the task date range. */
+function countPeriods(tasks: GanttTask[], mode: ViewMode): number {
+  if (!tasks.length) return 6
+  const minMs = Math.min(...tasks.map(t => t.start.getTime()))
+  const maxMs = Math.max(...tasks.map(t => t.end.getTime()))
+  const min = new Date(minMs)
+  const max = new Date(maxMs)
+  if (mode === ViewMode.Month) {
+    return Math.max(1, (max.getFullYear() - min.getFullYear()) * 12 + max.getMonth() - min.getMonth() + 1)
+  }
+  return Math.max(1, Math.ceil((maxMs - minMs) / (7 * 86_400_000)) + 1)
+}
+
+// ── Task metadata ─────────────────────────────────────────────────────────────
 
 type TaskMeta = Map<string, { depth: number; realTask: Task }>
 
-// ── Custom list components (stable refs, data via useRef) ─────────────────────
+// ── Custom list components (stable refs, fresh data via useRef) ───────────────
 
 type ListHeaderProps = { headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string }
-type ListTableProps  = {
+type ListTableProps = {
   rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string
   tasks: GanttTask[]; selectedTaskId: string
   setSelectedTask: (id: string) => void
   onExpanderClick: (t: GanttTask) => void
 }
 
-function makeListComponents(dataRef: React.RefObject<{ taskMeta: TaskMeta; selectedTaskId: string | null; onTaskSelect?: (t: Task) => void }>) {
+function makeListComponents(
+  dataRef: React.RefObject<{ taskMeta: TaskMeta; selectedTaskId: string | null; onTaskSelect?: (t: Task) => void }>,
+) {
   const Header = function GanttListHeader({ headerHeight, rowWidth }: ListHeaderProps) {
     return (
       <div
         style={{ height: headerHeight, width: rowWidth, minWidth: rowWidth }}
         className="flex items-end px-3 pb-2 bg-muted/30 border-b shrink-0"
       >
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Task
-        </span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Task</span>
       </div>
     )
   }
 
   const Table = function GanttListTable({ rowHeight, rowWidth, tasks: visible, onExpanderClick }: ListTableProps) {
     const { taskMeta, selectedTaskId, onTaskSelect } = dataRef.current!
-
     return (
       <div style={{ width: rowWidth, minWidth: rowWidth }}>
         {visible.map(gt => {
@@ -95,10 +108,8 @@ function makeListComponents(dataRef: React.RefObject<{ taskMeta: TaskMeta; selec
               )}
               onClick={() => realTask && onTaskSelect?.(realTask)}
             >
-              {/* indent */}
               <div style={{ width: depth * 14, flexShrink: 0 }} />
 
-              {/* expander */}
               <div className="w-5 h-full shrink-0 flex items-center justify-center">
                 {isGroup ? (
                   <button
@@ -112,7 +123,6 @@ function makeListComponents(dataRef: React.RefObject<{ taskMeta: TaskMeta; selec
                 ) : null}
               </div>
 
-              {/* type icon */}
               <div className="w-4 shrink-0 flex items-center justify-center">
                 {realTask && (
                   <TaskTypeIcon
@@ -123,7 +133,6 @@ function makeListComponents(dataRef: React.RefObject<{ taskMeta: TaskMeta; selec
                 )}
               </div>
 
-              {/* key → full page */}
               {realTask && (
                 <Link
                   to={`/tasks/${realTask.key}`}
@@ -134,7 +143,6 @@ function makeListComponents(dataRef: React.RefObject<{ taskMeta: TaskMeta; selec
                 </Link>
               )}
 
-              {/* title */}
               <span className="text-xs truncate ml-0.5 text-foreground/90">{gt.name}</span>
             </div>
           )
@@ -158,12 +166,48 @@ interface Props {
 
 export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTaskId }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [listWidth, setListWidth] = useState(LIST_DEFAULT)
+  const [wrapperWidth, setWrapperWidth] = useState(0)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
 
-  // Build ganttTasks + taskMeta in one pass
+  // Measure wrapper width to compute dynamic column width
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setWrapperWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Drag-to-resize list panel
+  function startDrag(e: React.MouseEvent) {
+    e.preventDefault()
+    isDragging.current = true
+    const startX = e.clientX
+    const startW = listWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    function onMove(ev: MouseEvent) {
+      if (!isDragging.current) return
+      setListWidth(Math.max(LIST_MIN, Math.min(LIST_MAX, startW + ev.clientX - startX)))
+    }
+    function onUp() {
+      isDragging.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  // Build ganttTasks + taskMeta
   const { ganttTasks, taskMeta } = useMemo<{ ganttTasks: GanttTask[]; taskMeta: TaskMeta }>(() => {
     const ganttTasks: GanttTask[] = []
     const taskMeta: TaskMeta = new Map()
-
     const roots   = tasks.filter(t => !tasks.some(p => p.id === t.parent_task_id))
     const taskMap = new Map(tasks.map(t => [t.id, t]))
 
@@ -173,15 +217,11 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
       const color    = TYPE_COLORS[task.task_type?.key ?? 'task'] ?? '#6366f1'
       const children = tasks.filter(t => t.parent_task_id === task.id)
       const isGroup  = children.length > 0
-
       taskMeta.set(task.id, { depth, realTask: task })
-
       ganttTasks.push({
-        id: task.id,
-        name: task.title,
+        id: task.id, name: task.title,
         type: isGroup ? 'project' : 'task',
-        project: parentId,
-        start,
+        project: parentId, start,
         end: end <= start ? addDays(start, 1) : end,
         progress: 0,
         hideChildren: collapsed.has(task.id),
@@ -189,29 +229,30 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
           ? { backgroundColor: color + '22', progressColor: color, backgroundSelectedColor: color + '44' }
           : { backgroundColor: color + 'bb', progressColor: color, backgroundSelectedColor: color },
       })
-
       if (!collapsed.has(task.id)) {
         for (const child of children) addTask(child, task.id, depth + 1)
       }
     }
-
     for (const root of roots) {
       if (taskMap.has(root.id)) addTask(root, undefined, 0)
     }
-
     return { ganttTasks, taskMeta }
   }, [tasks, collapsed])
 
-  // Ref keeps latest data for custom list without recreating the component
+  // Dynamic column width: fill the available chart area
+  const columnWidth = useMemo(() => {
+    const chartArea = wrapperWidth - listWidth
+    if (chartArea <= 0) return viewMode === ViewMode.Week ? 120 : 65
+    const periods = countPeriods(ganttTasks, viewMode) + 4 // +4 padding columns
+    const minCol  = viewMode === ViewMode.Week ? 60 : 45
+    return Math.max(minCol, Math.floor(chartArea / periods))
+  }, [wrapperWidth, listWidth, ganttTasks, viewMode])
+
+  // Stable list components (data via ref)
   const dataRef = useRef({ taskMeta, selectedTaskId: selectedTaskId ?? null, onTaskSelect })
   dataRef.current = { taskMeta, selectedTaskId: selectedTaskId ?? null, onTaskSelect }
-
-  // Stable list components (created once)
-  const { Header: CustomListHeader, Table: CustomListTable } = useMemo(
-    () => makeListComponents(dataRef),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { Header: CustomListHeader, Table: CustomListTable } = useMemo(() => makeListComponents(dataRef), [])
 
   if (!tasks.length) {
     return (
@@ -222,14 +263,14 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
   }
 
   return (
-    <div className="rounded-lg border" style={{ overflowX: 'auto' }}>
+    <div ref={wrapperRef} className="rounded-lg border overflow-hidden relative">
       <Gantt
         tasks={ganttTasks}
         viewMode={viewMode}
         viewDate={viewDate}
         locale="en-GB"
-        listCellWidth="260px"
-        columnWidth={viewMode === ViewMode.Week ? 120 : 65}
+        listCellWidth={`${listWidth}px`}
+        columnWidth={columnWidth}
         rowHeight={36}
         headerHeight={48}
         barFill={65}
@@ -248,6 +289,15 @@ export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTa
           })
         }}
       />
+
+      {/* Drag handle — sits at the list/chart boundary */}
+      <div
+        style={{ position: 'absolute', left: listWidth - 3, top: 0, bottom: 0, width: 6, zIndex: 20 }}
+        className="cursor-col-resize group flex items-stretch"
+        onMouseDown={startDrag}
+      >
+        <div className="w-0.5 mx-auto bg-border group-hover:bg-primary/50 transition-colors" />
+      </div>
     </div>
   )
 }
