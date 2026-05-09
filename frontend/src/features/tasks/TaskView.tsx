@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AxiosError } from 'axios'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, Link2, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   useTask, useChildTasks, useProjectWorkflows, useProjectMembers,
-  useTransitionStatus, useUpdateTask, useTaskComments,
+  useTransitionStatus, useUpdateTask, useTaskComments, useTaskLinks, useLinkTypes, useDeleteTaskLink,
   type Task, type Status,
 } from './api'
 import { CommentSection } from './CommentSection'
 import { CreateTaskModal } from './CreateTaskModal'
+import { LinkTaskDialog } from './LinkTaskDialog'
 import { TaskTypeIcon, TYPE_COLORS } from './TaskTypeIcon'
 
 const PRIORITY_CONFIG: Record<string, {
@@ -58,6 +59,9 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const { data: parentTask }          = useTask(task.parent_task_id)
   const { data: childTasks = [] }     = useChildTasks(task.project_id, task.id)
   const { data: comments = [] }       = useTaskComments(task.id)
+  const { data: taskLinks = [] }      = useTaskLinks(task.id)
+  const { data: linkTypes = [] }      = useLinkTypes()
+  const deleteLink                    = useDeleteTaskLink(task.id)
   const transition                    = useTransitionStatus(task.project_id)
   const updateTask                    = useUpdateTask(task.id, task.project_id)
 
@@ -81,6 +85,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const [descDraft,    setDescDraft]    = useState('')
   const [editingStartDate, setEditingStartDate] = useState(false)
   const [editingDueDate,   setEditingDueDate]   = useState(false)
+  const [linkDialogOpen,   setLinkDialogOpen]   = useState(false)
 
   async function saveTitle() {
     const trimmed = titleDraft.trim()
@@ -348,10 +353,77 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     </div>
   )
 
+  const linkTypeMap = new Map(linkTypes.map(lt => [lt.id, lt]))
+
+  // All task IDs already linked (to exclude from search)
+  const linkedTaskIds = new Set([
+    task.id,
+    ...taskLinks.map(l => l.source_task.id),
+    ...taskLinks.map(l => l.target_task.id),
+  ])
+
   const relationsBlock = (
     <div className="space-y-2">
-      <SectionLabel>Relations</SectionLabel>
-      <p className="text-sm text-muted-foreground italic">No relations.</p>
+      <div className="flex items-center justify-between">
+        <SectionLabel>Relations</SectionLabel>
+        <button
+          onClick={() => setLinkDialogOpen(true)}
+          className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Add link"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {taskLinks.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">No relations.</p>
+      ) : (
+        <div className="space-y-1">
+          {taskLinks.map(link => {
+            const lt = linkTypeMap.get(link.link_type_id)
+            const isSource = link.source_task.id === task.id
+            const other    = isSource ? link.target_task : link.source_task
+            const label    = lt ? (isSource ? lt.outward_name : lt.inward_name) : '→'
+            const color    = lt?.color ?? '#6366f1'
+
+            return (
+              <div key={link.id} className="flex items-center gap-1.5 group">
+                <span
+                  className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded"
+                  style={{ background: color + '22', color }}
+                >
+                  {label}
+                </span>
+                <TaskTypeIcon
+                  typeKey={other.task_type?.key ?? 'task'}
+                  color={other.task_type?.color ?? TYPE_COLORS[other.task_type?.key ?? 'task'] ?? '#6366f1'}
+                  size={12}
+                />
+                <Link
+                  to={`/tasks/${other.key}`}
+                  className="font-mono text-[10px] text-muted-foreground hover:text-primary shrink-0"
+                >
+                  {other.key}
+                </Link>
+                <span className="text-xs text-foreground/80 truncate flex-1">{other.title}</span>
+                <button
+                  onClick={() => deleteLink.mutate(link.id)}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <LinkTaskDialog
+        open={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        taskId={task.id}
+        excludeIds={linkedTaskIds}
+      />
     </div>
   )
 

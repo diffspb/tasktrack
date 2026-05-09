@@ -281,3 +281,73 @@ export function useDeleteComment(taskId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['comments', taskId] }),
   })
 }
+
+// --- Link Types ---
+
+export interface LinkType {
+  id: string
+  name: string
+  outward_name: string
+  inward_name: string
+  is_directed: boolean
+  color: string | null
+  constraint: Record<string, unknown> | null
+  position: number
+  is_active: boolean
+}
+
+export function useLinkTypes() {
+  return useQuery<LinkType[]>({
+    queryKey: ['link-types'],
+    queryFn: () => api.get('/link-types').then(r => r.data),
+    staleTime: 5 * 60_000,
+  })
+}
+
+// --- Task Links ---
+
+export interface TaskLinkTask {
+  id: string
+  key: string
+  title: string
+  task_type: TaskType | null
+}
+
+export interface TaskLink {
+  id: string
+  source_task: TaskLinkTask
+  target_task: TaskLinkTask
+  link_type_id: string
+  created_at: string
+}
+
+export function useTaskLinks(taskId: string | null | undefined) {
+  return useQuery<TaskLink[]>({
+    queryKey: ['task-links', taskId],
+    queryFn: () => api.get(`/tasks/${taskId}/links`).then(r => r.data),
+    enabled: !!taskId,
+  })
+}
+
+export function useCreateTaskLink(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { target_task_id: string; link_type_id: string }) =>
+      api.post(`/tasks/${taskId}/links`, data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-links', taskId] })
+      qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
+    },
+  })
+}
+
+export function useDeleteTaskLink(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (linkId: string) => api.delete(`/tasks/${taskId}/links/${linkId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-links', taskId] })
+      qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
+    },
+  })
+}

@@ -47,6 +47,30 @@ class TaskStatusTransition(BaseModel):
     status_id: uuid.UUID
 
 
+class TaskMinimal(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    key: str
+    title: str
+    task_type: TaskTypeResponse | None = None
+
+
+class TaskLinkCreate(BaseModel):
+    target_task_id: uuid.UUID
+    link_type_id: uuid.UUID
+
+
+class TaskLinkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    source_task: TaskMinimal
+    target_task: TaskMinimal
+    link_type_id: uuid.UUID
+    created_at: datetime
+
+
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

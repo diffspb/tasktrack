@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
 from app.models.user import User
-from app.schemas.task import TaskCreate, TaskResponse, TaskStatusTransition, TaskUpdate
-from app.services import task_service
+from app.schemas.task import TaskCreate, TaskLinkCreate, TaskLinkResponse, TaskResponse, TaskStatusTransition, TaskUpdate
+from app.services import task_link_service, task_service
 
 router = APIRouter()
 
@@ -97,6 +97,35 @@ async def delete_task(
     user: User = Depends(get_current_user),
 ):
     await task_service.delete_task(session, task_id, user)
+
+
+@router.get("/tasks/{task_id}/links", response_model=list[TaskLinkResponse], tags=["tasks"])
+async def get_task_links(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await task_link_service.get_task_links(session, task_id, user)
+
+
+@router.post("/tasks/{task_id}/links", response_model=TaskLinkResponse, status_code=status.HTTP_201_CREATED, tags=["tasks"])
+async def create_task_link(
+    task_id: uuid.UUID,
+    data: TaskLinkCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await task_link_service.create_task_link(session, task_id, data, user)
+
+
+@router.delete("/tasks/{task_id}/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tasks"])
+async def delete_task_link(
+    task_id: uuid.UUID,
+    link_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    await task_link_service.delete_task_link(session, task_id, link_id, user)
 
 
 @router.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])

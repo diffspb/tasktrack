@@ -76,3 +76,5 @@ class TaskLink(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     link_type: Mapped["LinkType"] = relationship("LinkType")  # noqa: F821
+    source_task: Mapped["Task"] = relationship("Task", foreign_keys=[source_task_id])
+    target_task: Mapped["Task"] = relationship("Task", foreign_keys=[target_task_id])
