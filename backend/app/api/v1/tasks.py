@@ -102,8 +102,17 @@ async def delete_task(
 @router.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])
 async def list_tasks_global(
     project_ids: Annotated[list[uuid.UUID] | None, Query()] = None,
+    q: str | None = None,
+    task_type_keys: Annotated[list[str] | None, Query()] = None,
+    limit: int = 50,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    """Return tasks from all accessible projects (cross-project timeline view)."""
-    return await task_service.list_tasks_global(session, user, project_ids=project_ids)
+    """Return tasks from all accessible projects. When q is provided, searches by key or title."""
+    return await task_service.list_tasks_global(
+        session, user,
+        project_ids=project_ids,
+        q=q,
+        task_type_keys=task_type_keys,
+        limit=limit,
+    )

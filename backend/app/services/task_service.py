@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -160,8 +160,16 @@ async def list_tasks_global(
     user: User,
     *,
     project_ids: list[uuid.UUID] | None = None,
+    q: str | None = None,
+    task_type_keys: list[str] | None = None,
+    limit: int = 50,
 ) -> list[Task]:
-    """Return tasks from all projects accessible to the user (for cross-project timeline)."""
+    """Return tasks from all projects accessible to the user.
+
+    When q is provided: full-text search by key prefix or title substring,
+    no parent_task_id restriction (any task can be found).
+    Without q: returns root tasks only (for timeline view).
+    """
     accessible_ids_stmt = select(ProjectMember.project_id).where(
         ProjectMember.user_id == user.id
     )
@@ -181,13 +189,23 @@ async def list_tasks_global(
     stmt = (
         select(Task)
         .options(selectinload(Task.task_type))
-        .where(
-            Task.project_id.in_(ids),
-            Task.deleted_at.is_(None),
-            Task.parent_task_id.is_(None),
-        )
-        .order_by(Task.project_id, Task.start_date.nulls_last(), Task.created_at)
+        .where(Task.project_id.in_(ids), Task.deleted_at.is_(None))
     )
+
+    if q:
+        stmt = stmt.where(
+            or_(
+                Task.key.ilike(f"{q.upper()}%"),
+                Task.title.ilike(f"%{q}%"),
+            )
+        ).limit(limit)
+    else:
+        stmt = stmt.where(Task.parent_task_id.is_(None))
+
+    if task_type_keys:
+        stmt = stmt.join(Task.task_type).where(TaskType.key.in_(task_type_keys))
+
+    stmt = stmt.order_by(Task.project_id, Task.start_date.nulls_last(), Task.created_at)
     return list((await session.scalars(stmt)).all())
 
 

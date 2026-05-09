@@ -83,6 +83,21 @@ export function useTask(taskId: string | null | undefined) {
   })
 }
 
+export function useSearchTasks(q: string, typeKeys: string[] = []) {
+  return useQuery<Task[]>({
+    queryKey: ['tasks-search', q, typeKeys],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      params.set('q', q)
+      typeKeys.forEach(k => params.append('task_type_keys', k))
+      return api.get(`/tasks?${params}`).then(r => r.data)
+    },
+    enabled: q.length >= 1,
+    staleTime: 30_000,
+    placeholderData: prev => prev,
+  })
+}
+
 export function useTaskByKey(key: string | null | undefined) {
   return useQuery<Task>({
     queryKey: ['task-by-key', key],

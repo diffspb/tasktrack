@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ViewMode } from 'gantt-task-react'
-import { ChevronLeft, ChevronRight, Plus, Settings, X, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Settings, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { useTaskByKey, type Task } from '@/features/tasks/api'
+import { type Task } from '@/features/tasks/api'
 import { TaskDetail } from '@/features/tasks/TaskDetail'
+import { TaskSearchPopover } from '@/shared/ui/TaskSearchPopover'
 import { useGanttChart, useGanttTasks, useAddTaskToGantt, useRemoveTaskFromGantt } from './ganttApi'
 import { GanttChart } from './GanttChart'
 
@@ -18,66 +18,6 @@ function addMonths(d: Date, n: number): Date {
 
 function addWeeks(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 7 * 86_400_000)
-}
-
-function AddTaskWidget({ ganttId }: { ganttId: string }) {
-  const [open, setOpen]   = useState(false)
-  const [key, setKey]     = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const lookupKey = key.trim().toUpperCase()
-  const { data: found, isFetching } = useTaskByKey(lookupKey || null)
-  const addMutation = useAddTaskToGantt(ganttId)
-
-  async function handleAdd() {
-    if (!found) return
-    setError(null)
-    try {
-      await addMutation.mutateAsync(found.id)
-      setKey('')
-      setOpen(false)
-    } catch {
-      setError('Failed to add task')
-    }
-  }
-
-  if (!open) {
-    return (
-      <Button
-        variant="outline" size="sm" className="gap-1.5"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }}
-      >
-        <Plus className="h-3.5 w-3.5" /> Add task
-      </Button>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
-          ref={inputRef}
-          value={key}
-          onChange={e => { setKey(e.target.value); setError(null) }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleAdd()
-            if (e.key === 'Escape') setOpen(false)
-          }}
-          placeholder="Task key (e.g. DEMO-4)"
-          className="h-8 pl-7 w-44 text-sm font-mono"
-        />
-      </div>
-      {found && <span className="text-xs text-muted-foreground truncate max-w-40">{found.title}</span>}
-      {isFetching && <span className="text-xs text-muted-foreground">…</span>}
-      <Button size="sm" className="h-8 px-3" disabled={!found || addMutation.isPending} onClick={handleAdd}>
-        Add
-      </Button>
-      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setOpen(false)}>
-        <X className="h-3.5 w-3.5" />
-      </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   )
 }
@@ -106,6 +46,9 @@ export function GanttPage() {
   const { data: gantt, isLoading: ganttLoading } = useGanttChart(ganttId)
   const { data: tasks = [], isLoading: tasksLoading } = useGanttTasks(ganttId)
   const removeTask = useRemoveTaskFromGantt(ganttId!)
+  const addTask    = useAddTaskToGantt(ganttId!)
+
+  const addedTaskIds = new Set(tasks.map(t => t.id))
 
   function stepBack() {
     setViewDate(prev => viewMode === ViewMode.Week ? addWeeks(prev, -4) : addMonths(prev, -3))
@@ -159,7 +102,15 @@ export function GanttPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          <AddTaskWidget ganttId={ganttId!} />
+          <TaskSearchPopover
+            excludeIds={addedTaskIds}
+            onSelect={task => addTask.mutate(task.id)}
+            trigger={
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Add task
+              </Button>
+            }
+          />
           <Button
             variant="ghost" size="sm" className="h-8 w-8 p-0"
             onClick={() => navigate(`/timeline/${ganttId}/settings`)}
