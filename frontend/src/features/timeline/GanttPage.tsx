@@ -157,56 +157,56 @@ export function GanttPage() {
         </div>
       </div>
 
-      {/* Body: chart fills all space, TaskDetail overlays from the right */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
-        <div className="h-full overflow-y-auto overflow-x-hidden p-4 space-y-6">
-          {tasksLoading ? (
-            <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">Loading…</div>
-          ) : (
-            <GanttChart
-              tasks={tasks}
-              viewMode={viewMode}
-              viewDate={viewDate}
-              selectedTaskId={selectedTask?.id ?? null}
-              onTaskSelect={t => setSelectedTask(prev => prev?.id === t.id ? null : t)}
-            />
-          )}
+      {/* Body: chart + side panel — mirrors TaskBacklog layout */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left: chart area (flex-col wrapper prevents scrollbar from affecting flex-row layout) */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-6">
+            {tasksLoading ? (
+              <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">Loading…</div>
+            ) : (
+              <GanttChart
+                tasks={tasks}
+                viewMode={viewMode}
+                viewDate={viewDate}
+                selectedTaskId={selectedTask?.id ?? null}
+                onTaskSelect={t => setSelectedTask(prev => prev?.id === t.id ? null : t)}
+              />
+            )}
 
-          {tasks.length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                Added tasks ({rootTaskIds.size})
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {tasks.filter(t => rootTaskIds.has(t.id)).map(t => (
-                  <div key={t.id} className="flex items-center gap-1 rounded border px-2 py-1 text-xs bg-muted/30">
-                    <span className="font-mono text-muted-foreground">{t.key}</span>
-                    <span className="truncate max-w-32">{t.title}</span>
-                    <button
-                      className="ml-1 text-muted-foreground/50 hover:text-destructive"
-                      onClick={() => removeTask.mutate(t.id)}
-                      title="Remove from gantt"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+            {/* Added root tasks — remove chips */}
+            {tasks.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Added tasks ({rootTaskIds.size})
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tasks.filter(t => rootTaskIds.has(t.id)).map(t => (
+                    <div key={t.id} className="flex items-center gap-1 rounded border px-2 py-1 text-xs bg-muted/30">
+                      <span className="font-mono text-muted-foreground">{t.key}</span>
+                      <span className="truncate max-w-32">{t.title}</span>
+                      <button
+                        className="ml-1 text-muted-foreground/50 hover:text-destructive"
+                        onClick={() => removeTask.mutate(t.id)}
+                        title="Remove from gantt"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Task detail — absolute overlay on the right, full height, guaranteed width */}
-        {selectedTask && (
-          <div className="absolute inset-y-0 right-0 w-[460px] z-10 flex shadow-xl">
-            <TaskDetail
-              task={selectedTask}
-              projectId={selectedTask.project_id}
-              currentUserId={user?.id ?? ''}
-              onClose={() => setSelectedTask(null)}
-            />
-          </div>
-        )}
+        {/* Right: task detail panel */}
+        <TaskDetail
+          task={selectedTask}
+          projectId={selectedTask?.project_id ?? ''}
+          currentUserId={user?.id ?? ''}
+          onClose={() => setSelectedTask(null)}
+        />
       </div>
     </div>
   )
