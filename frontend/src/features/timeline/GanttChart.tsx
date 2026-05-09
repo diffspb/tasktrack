@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { Gantt, ViewMode } from 'gantt-task-react'
@@ -162,23 +162,19 @@ interface Props {
   viewDate?: Date
   onTaskSelect?: (task: Task) => void
   selectedTaskId?: string | null
+  /** Width of the chart area measured by the parent (avoids ResizeObserver measuring inside overflow:hidden) */
+  containerWidth?: number
 }
 
-export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTaskId }: Props) {
+export function GanttChart({ tasks, viewMode, viewDate, onTaskSelect, selectedTaskId, containerWidth }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [listWidth, setListWidth] = useState(LIST_DEFAULT)
-  const [wrapperWidth, setWrapperWidth] = useState(0)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
 
-  // Measure wrapper width to compute dynamic column width
-  useEffect(() => {
-    const el = wrapperRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => setWrapperWidth(entry.contentRect.width))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+  // containerWidth is measured by the parent on the flex row that contains this chart.
+  // Subtract p-4 padding (32px) that wraps the GanttChart inside GanttPage.
+  const wrapperWidth = containerWidth ? containerWidth - 32 : 0
 
   // Drag-to-resize list panel
   function startDrag(e: React.MouseEvent) {

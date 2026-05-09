@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ViewMode } from 'gantt-task-react'
 import { ChevronLeft, ChevronRight, Plus, Settings, X, Search } from 'lucide-react'
@@ -87,9 +87,21 @@ export function GanttPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [viewMode, setViewMode]       = useState<ViewMode>(ViewMode.Month)
-  const [viewDate, setViewDate]       = useState<Date>(new Date())
+  const [viewMode, setViewMode]         = useState<ViewMode>(ViewMode.Month)
+  const [viewDate, setViewDate]         = useState<Date>(new Date())
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [chartAreaWidth, setChartAreaWidth] = useState(0)
+  const chartAreaRef = useRef<HTMLDivElement>(null)
+
+  // Measure the chart area (the direct flex sibling of TaskDetail) to get the
+  // correct available width — this element is properly constrained by the sidebar.
+  useEffect(() => {
+    const el = chartAreaRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setChartAreaWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const { data: gantt, isLoading: ganttLoading } = useGanttChart(ganttId)
   const { data: tasks = [], isLoading: tasksLoading } = useGanttTasks(ganttId)
@@ -158,7 +170,7 @@ export function GanttPage() {
       </div>
 
       {/* Body: chart + side panel — mirrors TaskBacklog layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div ref={chartAreaRef} className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: chart area (flex-col wrapper prevents scrollbar from affecting flex-row layout) */}
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-6">
@@ -171,6 +183,7 @@ export function GanttPage() {
                 viewDate={viewDate}
                 selectedTaskId={selectedTask?.id ?? null}
                 onTaskSelect={t => setSelectedTask(prev => prev?.id === t.id ? null : t)}
+                containerWidth={chartAreaWidth}
               />
             )}
 
