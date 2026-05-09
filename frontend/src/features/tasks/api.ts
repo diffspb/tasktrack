@@ -177,6 +177,7 @@ export function useUpdateTask(taskId: string, projectId: string) {
       qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.setQueryData(['task', taskId], updated)
       qc.invalidateQueries({ queryKey: ['task-by-key', updated.key] })
+      qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
     },
   })
 }
