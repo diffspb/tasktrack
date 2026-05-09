@@ -15,6 +15,7 @@ from app.models import (
     Transition, User, View, ViewType, Workflow,
 )
 from app.models.comment import Comment
+from app.models.gantt import GanttChart, GanttChartTask
 
 
 async def reset() -> None:
@@ -194,7 +195,8 @@ async def seed(session: AsyncSession) -> None:
     ])
 
 
-    def task(n, title, type_=None, assignee=None, status=None, priority=TaskPriority.medium, description=None, parent=None, meta=None):
+    def task(n, title, type_=None, assignee=None, status=None, priority=TaskPriority.medium,
+             description=None, parent=None, meta=None, start=None, due=None):
         return Task(
             project_id=demo.id, workflow_id=wf.id, reporter_id=admin_id,
             task_type_id=(type_ or tt_task).id,
@@ -203,29 +205,48 @@ async def seed(session: AsyncSession) -> None:
             current_status_id=(status or todo).id,
             key=f"DEMO-{n}", title=title, priority=priority,
             description=description,
+            start_date=start, due_date=due,
             meta=meta or {},
         )
 
+    # Solution comments on each subtask
+    from datetime import UTC, date, datetime
+    now = datetime.now(UTC)
+    today = date.today()
+
+    def d(offset): return date(today.year, today.month, 1) if offset == 0 else \
+        date.fromordinal(date(today.year, today.month, 1).toordinal() + offset)
+
     # Regular tasks assigned to admin
     t1  = task(1,  "Настроить CI/CD pipeline",            assignee=admin_id,   priority=TaskPriority.high,
-               description="Настроить GitHub Actions: lint → test → build → deploy on merge to main")
+               description="Настроить GitHub Actions: lint → test → build → deploy on merge to main",
+               start=d(-14), due=d(0))
     t2  = task(2,  "Написать документацию API",           assignee=admin_id,
-               description="Покрыть все публичные эндпоинты, добавить примеры запросов/ответов")
+               description="Покрыть все публичные эндпоинты, добавить примеры запросов/ответов",
+               start=d(-7), due=d(7))
     t3  = task(3,  "Исправить баг с авторизацией",        type_=tt_bug, assignee=admin_id, priority=TaskPriority.critical,
-               description="При истечении токена редиректит на 404 вместо /login")
+               description="При истечении токена редиректит на 404 вместо /login",
+               start=d(-3), due=d(2))
     t4  = task(4,  "Реализовать поиск по задачам",        assignee=admin_id, status=inprog,
-               description="FTS через PostgreSQL tsvector, поиск по заголовку и описанию")
+               description="FTS через PostgreSQL tsvector, поиск по заголовку и описанию",
+               start=d(0), due=d(14))
     t5  = task(5,  "Ревью дизайна онбординга",            assignee=admin_id, status=inprog, priority=TaskPriority.low,
-               description="Пройти прототип, оставить комментарии в Figma")
-    t6  = task(6,  "Обновить зависимости",                assignee=admin_id, status=review, priority=TaskPriority.low)
-    t7  = task(7,  "Code review: модуль уведомлений",     assignee=admin_id, status=review, priority=TaskPriority.high)
-    t8  = task(8,  "Деплой на стейджинг",                 assignee=admin_id, status=done,  priority=TaskPriority.high)
-    t9  = task(9,  "Добавить тесты для task_service",     assignee=admin_id, status=done)
+               description="Пройти прототип, оставить комментарии в Figma",
+               start=d(3), due=d(10))
+    t6  = task(6,  "Обновить зависимости",                assignee=admin_id, status=review, priority=TaskPriority.low,
+               start=d(-5), due=d(-1))
+    t7  = task(7,  "Code review: модуль уведомлений",     assignee=admin_id, status=review, priority=TaskPriority.high,
+               start=d(5), due=d(12))
+    t8  = task(8,  "Деплой на стейджинг",                 assignee=admin_id, status=done,  priority=TaskPriority.high,
+               start=d(-20), due=d(-10))
+    t9  = task(9,  "Добавить тесты для task_service",     assignee=admin_id, status=done,
+               start=d(-10), due=d(-5))
 
     # Decision task — manager is the DM (assignee), blocked until subtasks are ready
     t10 = task(10, "Выбрать подход к авторизации",
                type_=tt_decision, assignee=manager_id, status=todo, priority=TaskPriority.high,
                description="Два варианта: Keycloak или собственный OAuth. Каждый исполнитель исследует и подаёт Solution.",
+               start=d(-7), due=d(21),
                meta={"criteria": [
                    {"description": "Простота интеграции с существующим стеком", "position": 0},
                    {"description": "Минимальный объём поддержки на стороне приложения",  "position": 1},
@@ -233,8 +254,10 @@ async def seed(session: AsyncSession) -> None:
                ]})
 
     # dev1 tasks
-    t11 = task(11, "Оптимизировать запросы к БД",         assignee=dev1_id, status=inprog)
-    t12 = task(12, "Добавить индексы на tasks.project_id", assignee=dev1_id, status=done, priority=TaskPriority.low)
+    t11 = task(11, "Оптимизировать запросы к БД",         assignee=dev1_id, status=inprog,
+               start=d(0), due=d(10))
+    t12 = task(12, "Добавить индексы на tasks.project_id", assignee=dev1_id, status=done, priority=TaskPriority.low,
+               start=d(-15), due=d(-8))
 
     session.add_all([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12])
     await session.flush()
@@ -249,10 +272,9 @@ async def seed(session: AsyncSession) -> None:
     session.add_all([t10_admin, t10_dev1])
     await session.flush()
 
-    # Solution comments on each subtask
-    from datetime import UTC, datetime
     now = datetime.now(UTC)
 
+    # Solution comments on each subtask
     sol_admin = Comment(
         task_id=t10_admin.id, author_id=admin_id,
         content="Предлагаю Keycloak: realm для приложения, JWKS-валидация на бэке, "
@@ -299,12 +321,29 @@ async def seed(session: AsyncSession) -> None:
         ),
     ])
 
+    # Sample Gantt charts with some tasks
+    gantt1 = GanttChart(owner_id=admin_id, name="Q2 Roadmap", description="Основные задачи второго квартала", position=0)
+    gantt2 = GanttChart(owner_id=manager_id, name="DevOps Sprint", description="Инфраструктурные задачи", position=1)
+    session.add_all([gantt1, gantt2])
+    await session.flush()
+
+    # Add root tasks to gantts (children will be pulled recursively via CTE)
+    session.add_all([
+        GanttChartTask(gantt_id=gantt1.id, task_id=t1.id,  position=0),
+        GanttChartTask(gantt_id=gantt1.id, task_id=t4.id,  position=1),
+        GanttChartTask(gantt_id=gantt1.id, task_id=t10.id, position=2),  # includes subtasks t13, t14
+        GanttChartTask(gantt_id=gantt2.id, task_id=t8.id,  position=0),
+        GanttChartTask(gantt_id=gantt2.id, task_id=t11.id, position=1),
+        GanttChartTask(gantt_id=gantt2.id, task_id=t12.id, position=2),
+    ])
+
     await session.commit()
     print("  → 3 пользователя, 4 системных воркфлоу (Task/Story, Bug, Epic, Decision Process)")
     print("  → 5 системных типов задач, привязанных к системным воркфлоу")
     print("  → проект DEMO, воркфлоу «Базовый», 4 BoardColumn")
     print("  → 12 обычных задач + 2 подзадачи DEMO-13/14 для Decision-задачи DEMO-10")
     print("  → Solution-комментарии на подзадачах, уведомления для демонстрации колокольчика")
+    print("  → 2 Gantt chart: Q2 Roadmap, DevOps Sprint")
 
 
 if __name__ == "__main__":

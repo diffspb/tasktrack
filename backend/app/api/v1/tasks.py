@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
@@ -96,3 +97,13 @@ async def delete_task(
     user: User = Depends(get_current_user),
 ):
     await task_service.delete_task(session, task_id, user)
+
+
+@router.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])
+async def list_tasks_global(
+    project_ids: Annotated[list[uuid.UUID] | None, Query()] = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Return tasks from all accessible projects (cross-project timeline view)."""
+    return await task_service.list_tasks_global(session, user, project_ids=project_ids)

@@ -51,7 +51,9 @@ export interface Task {
   description: string | null
   priority: Priority
   meta: Record<string, unknown>
+  start_date: string | null
   due_date: string | null
+  duration_days: number | null
   version: number
   deleted_at: string | null
   created_at: string
@@ -160,6 +162,7 @@ export interface UpdateTaskInput {
   description?: string
   priority?: Priority
   assignee_id?: string | null
+  start_date?: string | null
   due_date?: string | null
   meta?: Record<string, unknown>
   version: number

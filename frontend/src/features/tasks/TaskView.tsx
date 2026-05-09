@@ -79,6 +79,8 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const [titleDraft,   setTitleDraft]   = useState('')
   const [editingDesc,  setEditingDesc]  = useState(false)
   const [descDraft,    setDescDraft]    = useState('')
+  const [editingStartDate, setEditingStartDate] = useState(false)
+  const [editingDueDate,   setEditingDueDate]   = useState(false)
 
   async function saveTitle() {
     const trimmed = titleDraft.trim()
@@ -441,30 +443,71 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     </div>
   )
 
+  const fmtDate = (s: string) =>
+    new Date(s).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
+
   const datesBlock = (
     <div className="space-y-2">
       <SectionLabel>Dates</SectionLabel>
       <div className="space-y-0.5 text-sm">
         <div className="flex items-center gap-2 py-1.5">
           <span className="text-[11px] text-muted-foreground w-20 shrink-0">Created</span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(task.created_at).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </span>
+          <span className="text-xs text-muted-foreground">{fmtDate(task.created_at)}</span>
         </div>
         <div className="flex items-center gap-2 py-1.5">
           <span className="text-[11px] text-muted-foreground w-20 shrink-0">Updated</span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(task.updated_at).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </span>
+          <span className="text-xs text-muted-foreground">{fmtDate(task.updated_at)}</span>
         </div>
-        {task.due_date && (
-          <div className="flex items-center gap-2 py-1.5">
-            <span className="text-[11px] text-muted-foreground w-20 shrink-0">Due date</span>
-            <span className="text-xs font-medium">
-              {new Date(task.due_date).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </span>
-          </div>
-        )}
+
+        {/* Start date */}
+        <div className="flex items-center gap-2 py-1.5">
+          <span className="text-[11px] text-muted-foreground w-20 shrink-0">Start date</span>
+          {editingStartDate ? (
+            <input
+              type="date"
+              autoFocus
+              defaultValue={task.start_date ?? ''}
+              className="text-xs border rounded px-1.5 py-0.5 bg-background"
+              onChange={async e => {
+                setEditingStartDate(false)
+                await update.mutateAsync({ start_date: e.target.value || null, version: task.version })
+              }}
+              onBlur={() => setEditingStartDate(false)}
+            />
+          ) : (
+            <button
+              className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
+              onClick={() => setEditingStartDate(true)}
+            >
+              {task.start_date ? fmtDate(task.start_date) : <span className="italic">Not set</span>}
+            </button>
+          )}
+        </div>
+
+        {/* Due date */}
+        <div className="flex items-center gap-2 py-1.5">
+          <span className="text-[11px] text-muted-foreground w-20 shrink-0">Due date</span>
+          {editingDueDate ? (
+            <input
+              type="date"
+              autoFocus
+              defaultValue={task.due_date ?? ''}
+              className="text-xs border rounded px-1.5 py-0.5 bg-background"
+              onChange={async e => {
+                setEditingDueDate(false)
+                await update.mutateAsync({ due_date: e.target.value || null, version: task.version })
+              }}
+              onBlur={() => setEditingDueDate(false)}
+            />
+          ) : (
+            <button
+              className="text-xs text-left hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
+              onClick={() => setEditingDueDate(true)}
+            >
+              {task.due_date ? fmtDate(task.due_date) : <span className="italic">Not set</span>}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
