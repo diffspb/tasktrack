@@ -220,6 +220,7 @@ async def update_task(
     description: str | None = None,
     priority: str | None = None,
     assignee_id: str | None = None,
+    start_date: str | None = None,
     due_date: str | None = None,
 ) -> str:
     """
@@ -231,12 +232,14 @@ async def update_task(
     — re-read and retry.
 
     Only provide fields you want to change; omit others (pass null).
+    start_date / due_date: ISO date string, e.g. "2026-06-01". Pass null to clear.
     Returns the updated task with the incremented version.
     """
     from datetime import date
     async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
         aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
+        sd = date.fromisoformat(start_date) if start_date else None
         dd = date.fromisoformat(due_date) if due_date else None
 
         data = TaskUpdate(
@@ -245,6 +248,7 @@ async def update_task(
             description=description,
             priority=priority,
             assignee_id=aid,
+            start_date=sd,
             due_date=dd,
         )
         task = await task_service.update_task(session, tid, data, user)

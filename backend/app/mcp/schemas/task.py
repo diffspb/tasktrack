@@ -75,6 +75,7 @@ def task_detail(
         "description": task.description,
         "priority": task.priority.value if task.priority else None,
         "meta": task.meta,
+        "start_date": task.start_date.isoformat() if task.start_date else None,
         "due_date": task.due_date.isoformat() if task.due_date else None,
         "version": task.version,
         "created_at": task.created_at.isoformat(),
