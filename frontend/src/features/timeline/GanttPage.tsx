@@ -18,8 +18,6 @@ function addMonths(d: Date, n: number): Date {
 
 function addWeeks(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 7 * 86_400_000)
-    </div>
-  )
 }
 
 export function GanttPage() {
