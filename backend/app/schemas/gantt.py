@@ -31,3 +31,7 @@ class GanttChartResponse(BaseModel):
 
 class GanttChartAddTask(BaseModel):
     task_id: uuid.UUID
+
+
+class GanttTaskReorder(BaseModel):
+    task_ids: list[uuid.UUID]

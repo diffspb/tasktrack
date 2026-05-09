@@ -82,6 +82,15 @@ export function useRemoveTaskFromGantt(ganttId: string) {
   })
 }
 
+export function useReorderGanttTasks(ganttId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taskIds: string[]) =>
+      api.patch(`/gantt/${ganttId}/tasks/reorder`, { task_ids: taskIds }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['gantt-tasks', ganttId] }),
+  })
+}
+
 export function useGanttLinks(ganttId: string | null | undefined) {
   return useQuery<TaskLink[]>({
     queryKey: ['gantt-links', ganttId],

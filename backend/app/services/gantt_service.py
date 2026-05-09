@@ -146,13 +146,36 @@ async def get_gantt_tasks(
     if not task_ids:
         return []
 
-    tasks = await session.scalars(
+    pos_rows = await session.execute(
+        select(GanttChartTask.task_id, GanttChartTask.position)
+        .where(GanttChartTask.gantt_id == gantt_id)
+    )
+    pos_map = {row[0]: row[1] for row in pos_rows}
+
+    task_list = list((await session.scalars(
         select(Task)
         .options(selectinload(Task.task_type))
         .where(Task.id.in_(task_ids))
-        .order_by(Task.parent_task_id.nulls_first(), Task.created_at)
-    )
-    return list(tasks.all())
+    )).all())
+    # Root tasks sorted by their position in gantt_chart_tasks; subtasks by created_at
+    task_list.sort(key=lambda t: (pos_map.get(t.id, 999_999), t.created_at))
+    return task_list
+
+
+async def reorder_gantt_tasks(
+    session: AsyncSession, gantt_id: uuid.UUID, task_ids: list[uuid.UUID]
+) -> None:
+    await get_gantt_chart(session, gantt_id)
+    for idx, task_id in enumerate(task_ids):
+        entry = await session.scalar(
+            select(GanttChartTask).where(
+                GanttChartTask.gantt_id == gantt_id,
+                GanttChartTask.task_id == task_id,
+            )
+        )
+        if entry:
+            entry.position = idx + 1
+    await session.commit()
 
 
 async def get_gantt_links(
