@@ -44,6 +44,7 @@ class Task(Base, UUIDMixin, TimestampMixin):
         default=TaskPriority.medium, nullable=False,
     )
     meta: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    start_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

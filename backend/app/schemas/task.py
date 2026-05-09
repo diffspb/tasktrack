@@ -25,6 +25,7 @@ class TaskCreate(BaseModel):
     workflow_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
     parent_task_id: uuid.UUID | None = None
+    start_date: date | None = None
     due_date: date | None = None
     meta: dict = Field(default_factory=dict)
 
@@ -34,6 +35,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     priority: TaskPriority | None = None
     assignee_id: uuid.UUID | None = None
+    start_date: date | None = None
     due_date: date | None = None
     meta: dict | None = None
     version: int
@@ -60,6 +62,7 @@ class TaskResponse(BaseModel):
     description: str | None
     priority: TaskPriority
     meta: dict
+    start_date: date | None
     due_date: date | None
     version: int
     deleted_at: datetime | None

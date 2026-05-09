@@ -11,6 +11,7 @@ import { ViewsSettingsPage } from '@/features/projects/ViewsSettingsPage'
 import { ViewPage, ViewRedirect } from '@/features/projects/ViewPage'
 import { TaskPage } from '@/features/tasks/TaskPage'
 import { Dashboard } from '@/features/dashboard/Dashboard'
+import { TimelinePage } from '@/features/timeline/TimelinePage'
 import { GlobalSettingsLayout } from '@/features/admin/GlobalSettingsLayout'
 import { LinkTypesSettingsPage } from '@/features/admin/LinkTypesSettingsPage'
 
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: 'projects/:projectKey/members', element: <Navigate to="../settings/team" replace /> },
       { path: 'tasks/:key',  element: <TaskPage /> },
       { path: 'dashboard',   element: <Dashboard /> },
+      { path: 'timeline',    element: <TimelinePage /> },
       {
         path: 'admin/settings',
         element: <GlobalSettingsLayout />,

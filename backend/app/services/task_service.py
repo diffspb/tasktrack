@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.project import Project, ProjectMember
 from app.models.task import Task, TaskPriority
 from app.models.task_type import TaskType
 from app.models.user import User
@@ -21,7 +22,6 @@ async def create_task(
 ) -> Task:
     await require_project_access(session, project_id, user)
 
-    from app.models.project import Project
     project = await session.get(Project, project_id)
 
     task_type = await _resolve_task_type(session, data.task_type_key, project_id)
@@ -56,6 +56,7 @@ async def create_task(
         title=data.title,
         description=data.description,
         priority=data.priority,
+        start_date=data.start_date,
         due_date=data.due_date,
         meta=data.meta,
     )
@@ -154,6 +155,42 @@ async def list_my_tasks(
     return list((await session.scalars(stmt)).all())
 
 
+async def list_tasks_global(
+    session: AsyncSession,
+    user: User,
+    *,
+    project_ids: list[uuid.UUID] | None = None,
+) -> list[Task]:
+    """Return tasks from all projects accessible to the user (for cross-project timeline)."""
+    accessible_ids_stmt = select(ProjectMember.project_id).where(
+        ProjectMember.user_id == user.id
+    )
+    accessible_ids = list((await session.scalars(accessible_ids_stmt)).all())
+
+    if not accessible_ids:
+        return []
+
+    if project_ids:
+        ids = [pid for pid in project_ids if pid in accessible_ids]
+    else:
+        ids = accessible_ids
+
+    if not ids:
+        return []
+
+    stmt = (
+        select(Task)
+        .options(selectinload(Task.task_type))
+        .where(
+            Task.project_id.in_(ids),
+            Task.deleted_at.is_(None),
+            Task.parent_task_id.is_(None),
+        )
+        .order_by(Task.project_id, Task.start_date.nulls_last(), Task.created_at)
+    )
+    return list((await session.scalars(stmt)).all())
+
+
 async def update_task(
     session: AsyncSession, task_id: uuid.UUID, data: TaskUpdate, user: User
 ) -> Task:
@@ -172,6 +209,8 @@ async def update_task(
         task.priority = data.priority
     if data.assignee_id is not None:
         task.assignee_id = data.assignee_id
+    if data.start_date is not None:
+        task.start_date = data.start_date
     if data.due_date is not None:
         task.due_date = data.due_date
     if data.meta is not None:

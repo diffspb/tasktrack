@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight } from 'lucide-react'
+import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight, GanttChartSquare } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -128,6 +128,16 @@ export function AppSidebar() {
                   <SidebarMenuButton isActive={isActive}>
                     <LayoutDashboard />
                     <span>My Dashboard</span>
+                  </SidebarMenuButton>
+                )}
+              </NavLink>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <NavLink to="/timeline">
+                {({ isActive }) => (
+                  <SidebarMenuButton isActive={isActive}>
+                    <GanttChartSquare />
+                    <span>Timeline</span>
                   </SidebarMenuButton>
                 )}
               </NavLink>
