@@ -159,7 +159,7 @@ export function GanttPage() {
 
       {/* Body: chart + side panel */}
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 space-y-6">
           {tasksLoading ? (
             <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">Loading…</div>
           ) : (
