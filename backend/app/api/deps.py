@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -34,7 +34,12 @@ async def get_current_user(
 
     user = await session.scalar(select(User).where(User.keycloak_id == keycloak_id))
     if user is None:
-        user = User(keycloak_id=keycloak_id, email=email, display_name=display_name, is_active=True)
+        existing_count = await session.scalar(select(func.count()).select_from(User))
+        is_first = existing_count == 0
+        user = User(
+            keycloak_id=keycloak_id, email=email, display_name=display_name,
+            is_active=True, is_superuser=is_first,
+        )
         session.add(user)
         await session.commit()
         await session.refresh(user)
