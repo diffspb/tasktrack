@@ -80,10 +80,24 @@ api.interceptors.response.use(
     }
     if (err.response?.status === 401) {
       if (!IS_STUB) {
-        // Redirect to Keycloak login on expired session
         const { userManager } = await import('@/features/auth/oidc')
-        await userManager.signinRedirect()
-        return new Promise(() => {}) // pending — redirect happening
+        // Try silent token refresh before doing a full redirect.
+        // A full redirect on every 401 creates an infinite loop when Keycloak
+        // immediately issues a new token via SSO (user appears logged in but 401 repeats).
+        try {
+          await userManager.signinSilent()
+          // Retry the original request with the new token
+          const user = await userManager.getUser()
+          if (user?.access_token && err.config) {
+            err.config.headers = err.config.headers ?? {}
+            err.config.headers['Authorization'] = `Bearer ${user.access_token}`
+            return api(err.config)
+          }
+        } catch {
+          // Silent refresh failed — the session is truly gone
+          await userManager.signinRedirect()
+          return new Promise(() => {})
+        }
       }
       return Promise.reject(err)
     }

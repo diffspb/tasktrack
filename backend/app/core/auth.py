@@ -26,12 +26,26 @@ def validate_token(token: str) -> dict:
     try:
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
-        payload: dict = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            audience=settings.keycloak_client_id,
-        )
+        try:
+            payload: dict = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=settings.keycloak_client_id,
+            )
+        except jwt.InvalidAudienceError:
+            # Keycloak doesn't add client_id to aud by default — check azp instead.
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                options={"verify_aud": False},
+            )
+            azp = payload.get("azp")
+            if azp != settings.keycloak_client_id:
+                raise jwt.InvalidAudienceError(
+                    f"Token azp '{azp}' != client '{settings.keycloak_client_id}'"
+                )
         return payload
     except jwt.InvalidTokenError as exc:
         raise HTTPException(
