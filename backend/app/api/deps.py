@@ -36,11 +36,12 @@ async def get_current_user(
     if user is None:
         user = User(keycloak_id=keycloak_id, email=email, display_name=display_name, is_active=True)
         session.add(user)
-        await session.flush()
-    else:
-        if user.email != email or user.display_name != display_name:
-            user.email = email
-            user.display_name = display_name
+        await session.commit()
+        await session.refresh(user)
+    elif user.email != email or user.display_name != display_name:
+        user.email = email
+        user.display_name = display_name
+        await session.commit()
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
