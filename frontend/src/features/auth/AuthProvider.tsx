@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false
 
     async function ensureAuth() {
+      if (window.location.pathname === '/auth/callback') return
       const { userManager } = await import('./oidc')
       const user = await userManager.getUser()
       if (cancelled) return
@@ -48,7 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    ensureAuth().catch(console.error)
+    async function setup() {
+      const { userManager } = await import('./oidc')
+      userManager.events.addUserLoaded(() => { if (!cancelled) setOidcReady(true) })
+      await ensureAuth()
+    }
+
+    setup().catch(console.error)
     return () => { cancelled = true }
   }, [])
 
