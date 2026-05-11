@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight, GanttChartSquare } from 'lucide-react'
+import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight, GanttChartSquare, LogOut } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -7,6 +7,9 @@ import {
   SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjects, useProjectByKey } from '@/features/projects/api'
 import { useProjectViews } from '@/features/projects/viewsApi'
@@ -44,7 +47,7 @@ function projectColor(key: string) {
 }
 
 export function AppSidebar() {
-  const { user, stubUsers, switchStubUser } = useAuth()
+  const { user, stubUsers, switchStubUser, logout } = useAuth()
   const { data: projects } = useProjects()
 
   const projectMatch = useMatch('/projects/:projectKey/*')
@@ -250,17 +253,30 @@ export function AppSidebar() {
             </NavLink>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="text-xs">
-                  {user?.display_name?.slice(0, 2).toUpperCase() ?? 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col text-left text-sm leading-tight">
-                <span className="font-medium">{user?.display_name}</span>
-                <span className="text-xs text-muted-foreground">{user?.email}</span>
-              </div>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="w-full">
+                <SidebarMenuButton size="lg">
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="text-xs">
+                      {user?.display_name?.slice(0, 2).toUpperCase() ?? 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col text-left text-sm leading-tight">
+                    <span className="font-medium">{user?.display_name}</span>
+                    <span className="text-xs text-muted-foreground">{user?.email}</span>
+                  </div>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-52">
+                <DropdownMenuItem
+                  className="gap-2 text-destructive focus:text-destructive cursor-pointer"
+                  onClick={logout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
           {import.meta.env.DEV && stubUsers.length > 1 && (
             <SidebarMenuItem>
