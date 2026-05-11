@@ -239,18 +239,16 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
-          {user?.is_superuser && (
-            <SidebarMenuItem>
-              <NavLink to="/admin/settings">
-                {({ isActive }) => (
-                  <SidebarMenuButton isActive={isActive}>
-                    <Settings />
-                    <span>Global settings</span>
-                  </SidebarMenuButton>
-                )}
-              </NavLink>
-            </SidebarMenuItem>
-          )}
+          <SidebarMenuItem>
+            <NavLink to="/admin/settings">
+              {({ isActive }) => (
+                <SidebarMenuButton isActive={isActive}>
+                  <Settings />
+                  <span>Global settings</span>
+                </SidebarMenuButton>
+              )}
+            </NavLink>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg">
               <Avatar className="h-7 w-7">

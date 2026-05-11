@@ -30,25 +30,21 @@ async def me(user: User = Depends(get_current_user)):
 
 @router.get("/users/search", response_model=list[UserMeResponse])
 async def search_users(
-    q: str = Query(min_length=1, max_length=100),
-    limit: int = Query(default=20, le=50),
+    q: str = Query(default="", max_length=100),
+    limit: int = Query(default=50, le=200),
     session: AsyncSession = Depends(get_session),
     _user: User = Depends(get_current_user),
 ):
-    """Search users by display_name or email (case-insensitive, partial match)."""
-    pattern = f"%{q.lower()}%"
-    stmt = (
-        select(User)
-        .where(
-            User.is_active.is_(True),
+    """Search users by display_name or email. Empty q returns all active users."""
+    stmt = select(User).where(User.is_active.is_(True)).order_by(User.display_name).limit(limit)
+    if q.strip():
+        pattern = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
             or_(
                 func.lower(User.display_name).like(pattern),
                 func.lower(User.email).like(pattern),
-            ),
+            )
         )
-        .order_by(User.display_name)
-        .limit(limit)
-    )
     return list((await session.scalars(stmt)).all())
 
 

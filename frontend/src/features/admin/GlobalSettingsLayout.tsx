@@ -1,19 +1,13 @@
-import { NavLink, Outlet, Navigate } from 'react-router-dom'
-import { Link2 } from 'lucide-react'
+import { NavLink, Outlet } from 'react-router-dom'
+import { Link2, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/features/auth/AuthProvider'
 
 const NAV = [
+  { label: 'Users',      path: 'users',      icon: Users },
   { label: 'Link types', path: 'link-types', icon: Link2 },
 ]
 
 export function GlobalSettingsLayout() {
-  const { user } = useAuth()
-
-  if (!user?.is_superuser) {
-    return <Navigate to="/dashboard" replace />
-  }
-
   return (
     <div className="flex h-full">
       {/* Sidebar nav */}

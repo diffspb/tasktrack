@@ -16,6 +16,7 @@ import { GanttPage } from '@/features/timeline/GanttPage'
 import { GanttSettingsPage } from '@/features/timeline/GanttSettingsPage'
 import { GlobalSettingsLayout } from '@/features/admin/GlobalSettingsLayout'
 import { LinkTypesSettingsPage } from '@/features/admin/LinkTypesSettingsPage'
+import { UsersSettingsPage } from '@/features/admin/UsersSettingsPage'
 
 export const router = createBrowserRouter([
   { path: '/auth/callback', element: <AuthCallback /> },
@@ -50,7 +51,8 @@ export const router = createBrowserRouter([
         path: 'admin/settings',
         element: <GlobalSettingsLayout />,
         children: [
-          { index: true, element: <Navigate to="link-types" replace /> },
+          { index: true, element: <Navigate to="users" replace /> },
+          { path: 'users',      element: <UsersSettingsPage /> },
           { path: 'link-types', element: <LinkTypesSettingsPage /> },
         ],
       },

@@ -31,7 +31,7 @@ export function UserSearchCombobox({ value, onChange, placeholder = 'Search by n
   const { data: results = [], isFetching } = useQuery<User[]>({
     queryKey: ['user-search', debouncedQ],
     queryFn: () => api.get('/users/search', { params: { q: debouncedQ } }).then(r => r.data),
-    enabled: debouncedQ.length >= 1,
+    enabled: open,
     staleTime: 30_000,
   })
 
@@ -95,10 +95,8 @@ export function UserSearchCombobox({ value, onChange, placeholder = 'Search by n
                 ))}
               </CommandGroup>
             )}
-            {!debouncedQ && (
-              <div className="py-3 text-center text-xs text-muted-foreground">
-                Start typing to search
-              </div>
+            {!isFetching && !debouncedQ && results.length === 0 && (
+              <CommandEmpty className="text-xs py-4">No users found.</CommandEmpty>
             )}
           </CommandList>
         </Command>
