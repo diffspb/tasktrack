@@ -103,7 +103,7 @@ export function useProjectEvents(
     async function run() {
       while (!disposed) {
         try {
-          await connectSse(projectId, (evt) => onEventRef.current(evt), controller.signal)
+          await connectSse(projectId!, (evt) => onEventRef.current(evt), controller.signal)
           retryDelay = 1000 // clean close — reset backoff
         } catch (err) {
           if (controller.signal.aborted) break

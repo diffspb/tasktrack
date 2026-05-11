@@ -2,7 +2,6 @@ import { useState, useCallback, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSearchTasks, type Task } from '@/features/tasks/api'
 import { TaskTypeIcon, TYPE_COLORS } from '@/features/tasks/TaskTypeIcon'
@@ -31,7 +30,7 @@ function useDebounced<T>(value: T, delay: number): T {
 interface Props {
   onSelect: (task: Task) => void
   excludeIds?: Set<string>
-  trigger: React.ReactNode
+  trigger: React.ReactElement
 }
 
 export function TaskSearchPopover({ onSelect, excludeIds, trigger }: Props) {
@@ -67,7 +66,7 @@ export function TaskSearchPopover({ onSelect, excludeIds, trigger }: Props) {
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverTrigger render={trigger} />
       <PopoverContent
         className="w-[420px] p-0"
         align="start"

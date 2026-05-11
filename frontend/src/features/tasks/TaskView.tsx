@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AxiosError } from 'axios'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, Link2, Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {

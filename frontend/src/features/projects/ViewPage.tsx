@@ -1,5 +1,4 @@
 import { useParams, Navigate } from 'react-router-dom'
-import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjectByKey } from './api'
 import { useView, useProjectViews } from './viewsApi'
 import { TaskBoard } from '@/features/tasks/TaskBoard'

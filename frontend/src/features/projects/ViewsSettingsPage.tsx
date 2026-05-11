@@ -50,7 +50,7 @@ export function ViewsSettingsPage() {
     setName('')
   }
 
-  async function handleRename(viewId: string) {
+  async function handleRename(_viewId: string) {
     if (!editingName.trim()) { setEditingId(null); return }
     await updateView.mutateAsync({ name: editingName.trim() })
     setEditingId(null)
