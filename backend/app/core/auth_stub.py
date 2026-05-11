@@ -19,12 +19,11 @@ async def get_or_create_stub_user(
 ):
     """Resolve the stub user.
 
-    - email=None  → DEFAULT_STUB_EMAIL (or create a placeholder if DB is empty).
-    - email set   → look up by email; 401 if not found, so a typo in the
-                    dev switcher fails loud rather than silently.
+    - email=None  → DEFAULT_STUB_EMAIL (or bootstrap if DB is empty).
+    - email set   → look up by email; fall back to default if not found
+                    (happens after DB reset when localStorage still has a
+                    stale email).
     """
-    from fastapi import HTTPException, status
-
     from app.models.user import User
 
     target_email = email or DEFAULT_STUB_EMAIL
@@ -33,13 +32,7 @@ async def get_or_create_stub_user(
     if user:
         return user
 
-    if email is not None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Stub user with email '{email}' not found",
-        )
-
-    # Pre-seed bootstrap: keep legacy behavior so /health works on a fresh DB.
+    # Email not found — fall back to the default bootstrap user.
     user = await session.get(User, STUB_USER_ID)
     if not user:
         user = User(

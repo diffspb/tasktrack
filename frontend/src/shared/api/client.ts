@@ -79,6 +79,12 @@ api.interceptors.response.use(
       return Promise.reject(err)
     }
     if (err.response?.status === 401) {
+      if (IS_STUB) {
+        // Stale email in localStorage — clear it and reload so AuthProvider picks the default user
+        window.localStorage.removeItem(STUB_USER_KEY)
+        window.location.reload()
+        return new Promise(() => {})
+      }
       if (!IS_STUB) {
         const { userManager } = await import('@/features/auth/oidc')
         // Try silent token refresh before doing a full redirect.
