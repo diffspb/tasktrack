@@ -1,7 +1,7 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /frontend
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json frontend/.npmrc ./
 RUN npm ci
 
 # Keycloak settings are baked into the JS bundle at build time
