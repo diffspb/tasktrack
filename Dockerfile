@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1
+
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json frontend/.npmrc ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --cache /root/.npm --prefer-offline
 
 # Keycloak settings are baked into the JS bundle at build time
 ARG VITE_KEYCLOAK_URL=https://auth.busypage.ru
@@ -22,7 +25,8 @@ WORKDIR /app
 RUN python -m venv /venv
 COPY backend/pyproject.toml .
 COPY backend/app/ ./app/
-RUN /venv/bin/pip install --no-cache-dir .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /venv/bin/pip install .
 
 # Stage 3: Final image
 FROM python:3.12-slim
