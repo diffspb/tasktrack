@@ -1,0 +1,16 @@
+name: tasktrack
+service: app
+port: 8000
+compose:
+  files:
+    - docker-compose.yml
+    - docker-compose.prod.yml
+routes:
+  - subdomain: tasktrack
+    auth: none
+    middlewares:
+      - secure-headers@file
+healthcheck:
+  path: /api/v1/health
+  retries: 12
+  interval_seconds: 2
