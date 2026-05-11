@@ -30,7 +30,7 @@ async def create_link_type(session: AsyncSession, data: LinkTypeCreate, user: Us
         raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "DUPLICATE_LINK_TYPE_NAME"})
     lt = LinkType(**data.model_dump())
     session.add(lt)
-    await session.flush()
+    await session.commit()
     await session.refresh(lt)
     return lt
 
@@ -39,7 +39,7 @@ async def update_link_type(session: AsyncSession, link_type_id: UUID, data: Link
     lt = await get_link_type(session, link_type_id)
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(lt, field, value)
-    await session.flush()
+    await session.commit()
     await session.refresh(lt)
     return lt
 
@@ -55,4 +55,4 @@ async def delete_link_type(session: AsyncSession, link_type_id: UUID, user: User
             detail={"code": "LINK_TYPE_IN_USE", "count": count},
         )
     await session.delete(lt)
-    await session.flush()
+    await session.commit()
