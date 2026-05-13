@@ -1,4 +1,4 @@
-.PHONY: install db-start db-create reset dev test test-cov mcp-bootstrap
+.PHONY: install db-start db-stop db-create reset full-reset dev test test-cov mcp-bootstrap
 
 install:
 	pip install -e ".[dev]"
@@ -16,6 +16,19 @@ db-stop:
 	docker stop tasktrack-dev && docker rm tasktrack-dev
 
 reset:
+	python scripts/reset_db.py
+
+# Снести контейнер целиком, поднять заново и засеять
+full-reset:
+	-docker stop tasktrack-dev && docker rm tasktrack-dev
+	docker run -d --name tasktrack-dev \
+	  -e POSTGRES_DB=tasktrack \
+	  -e POSTGRES_USER=tasktrack \
+	  -e POSTGRES_PASSWORD=tasktrack \
+	  -p 5432:5432 \
+	  postgres:16-alpine
+	@echo "Waiting for PostgreSQL to be ready..."
+	@until docker exec tasktrack-dev pg_isready -U tasktrack -q; do sleep 1; done
 	python scripts/reset_db.py
 
 dev:
