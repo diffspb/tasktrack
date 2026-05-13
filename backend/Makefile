@@ -18,7 +18,7 @@ db-stop:
 reset:
 	python scripts/reset_db.py
 
-# Снести контейнер целиком, поднять заново и засеять
+# Снести контейнер целиком, поднять заново — схема без данных (имитация первого деплоя)
 full-reset:
 	-docker stop tasktrack-dev && docker rm tasktrack-dev
 	docker run -d --name tasktrack-dev \
@@ -29,7 +29,7 @@ full-reset:
 	  postgres:16-alpine
 	@echo "Waiting for PostgreSQL to be ready..."
 	@until docker exec tasktrack-dev pg_isready -U tasktrack -q; do sleep 1; done
-	python scripts/reset_db.py
+	python scripts/reset_db.py --schema-only
 
 dev:
 	uvicorn app.main:app --reload --port 8000

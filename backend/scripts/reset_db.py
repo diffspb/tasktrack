@@ -346,5 +346,29 @@ async def seed(session: AsyncSession) -> None:
     print("  → 2 Gantt chart: Q2 Roadmap, DevOps Sprint")
 
 
+async def schema_only() -> None:
+    """Drop and recreate schema without seeding — simulates a fresh deployment."""
+    from sqlalchemy import text
+    from app.core.db import _FTS_DDL
+
+    engine = create_async_engine(settings.database_url)
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+        ))
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+        await conn.run_sync(Base.metadata.create_all)
+        for stmt in _FTS_DDL:
+            await conn.execute(text(stmt))
+    await engine.dispose()
+    print("✓ Schema recreated (no data)")
+
+
 if __name__ == "__main__":
-    asyncio.run(reset())
+    import sys
+    if "--schema-only" in sys.argv:
+        asyncio.run(schema_only())
+    else:
+        asyncio.run(reset())
