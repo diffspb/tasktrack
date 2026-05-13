@@ -1,4 +1,5 @@
 import type { Task, Priority } from './api'
+import { useProjectTaskTypes } from './api'
 
 export interface FilterState {
   assignee: 'all' | 'mine' | 'unassigned'
@@ -36,15 +37,16 @@ const ASSIGNEE_OPTS = [
   { value: 'unassigned' as const, label: 'Unassigned' },
 ]
 
-const TYPES = ['all', 'task', 'bug', 'story', 'epic', 'decision']
-
 interface Props {
   filter: FilterState
   onChange: (f: FilterState) => void
   taskCount: number
+  projectId: string
 }
 
-export function TaskFilterBar({ filter, onChange, taskCount }: Props) {
+export function TaskFilterBar({ filter, onChange, taskCount, projectId }: Props) {
+  const { data: taskTypesData } = useProjectTaskTypes(projectId)
+  const taskTypes = taskTypesData?.items ?? []
   const active =
     filter.assignee !== 'all' || filter.priority !== 'all' || filter.type !== 'all'
 
@@ -82,10 +84,11 @@ export function TaskFilterBar({ filter, onChange, taskCount }: Props) {
       <select
         value={filter.type}
         onChange={e => onChange({ ...filter, type: e.target.value })}
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground capitalize"
+        className="h-7 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground"
       >
-        {TYPES.map(t => (
-          <option key={t} value={t} className="capitalize">{t === 'all' ? 'All types' : t}</option>
+        <option value="all">All types</option>
+        {taskTypes.map(t => (
+          <option key={t.key} value={t.key}>{t.name}</option>
         ))}
       </select>
 

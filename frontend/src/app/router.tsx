@@ -16,6 +16,7 @@ import { GanttPage } from '@/features/timeline/GanttPage'
 import { GanttSettingsPage } from '@/features/timeline/GanttSettingsPage'
 import { GlobalSettingsLayout } from '@/features/admin/GlobalSettingsLayout'
 import { LinkTypesSettingsPage } from '@/features/admin/LinkTypesSettingsPage'
+import { SystemSettingsPage } from '@/features/admin/SystemSettingsPage'
 import { UsersSettingsPage } from '@/features/admin/UsersSettingsPage'
 
 export const router = createBrowserRouter([
@@ -51,7 +52,8 @@ export const router = createBrowserRouter([
         path: 'admin/settings',
         element: <GlobalSettingsLayout />,
         children: [
-          { index: true, element: <Navigate to="users" replace /> },
+          { index: true, element: <Navigate to="system" replace /> },
+          { path: 'system',     element: <SystemSettingsPage /> },
           { path: 'users',      element: <UsersSettingsPage /> },
           { path: 'link-types', element: <LinkTypesSettingsPage /> },
         ],

@@ -1,6 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/shared/api/client'
 
+export function useSystemStatus() {
+  return useQuery<{ initialized: boolean }>({
+    queryKey: ['system-status'],
+    queryFn: () => api.get('/admin/system-status').then(r => r.data),
+    staleTime: 30_000,
+  })
+}
+
+export function useInitializeSystem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post('/admin/initialize').then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['system-status'] }),
+  })
+}
+
 export interface LinkType {
   id: string
   name: string

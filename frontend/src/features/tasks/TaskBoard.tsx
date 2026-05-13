@@ -181,7 +181,7 @@ export function TaskBoard({ viewId, projectId }: TaskBoardProps) {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center gap-3 border-b px-5 py-3 shrink-0">
-          <TaskFilterBar filter={filter} onChange={setFilter} taskCount={activeTasks.length} />
+          <TaskFilterBar filter={filter} onChange={setFilter} taskCount={activeTasks.length} projectId={projectId ?? ''} />
           <div className="flex-1" />
           {boardError && <span className="text-sm text-destructive">{boardError}</span>}
           <button

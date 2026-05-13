@@ -80,7 +80,7 @@ export function TaskBacklog({ viewId: _viewId, projectId }: TaskBacklogProps) {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center gap-2 border-b px-5 py-3 shrink-0 flex-wrap">
-          <TaskFilterBar filter={filter} onChange={setFilter} taskCount={filtered.length} />
+          <TaskFilterBar filter={filter} onChange={setFilter} taskCount={filtered.length} projectId={projectId ?? ''} />
           <div className="flex-1" />
           <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Create task

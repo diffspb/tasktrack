@@ -86,14 +86,9 @@ export function CreateTaskModal({ open, projectId, parentTaskId, onClose }: Prop
                 onChange={e => setTypeKey(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                {taskTypes.length > 0
-                  ? taskTypes.map(t => (
-                    <option key={t.key} value={t.key}>{t.name}</option>
-                  ))
-                  : ['task', 'bug', 'story', 'epic', 'decision'].map(t => (
-                    <option key={t} value={t} className="capitalize">{t}</option>
-                  ))
-                }
+                {taskTypes.map(t => (
+                  <option key={t.key} value={t.key}>{t.name}</option>
+                ))}
               </select>
             </div>
 
