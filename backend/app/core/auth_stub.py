@@ -41,6 +41,7 @@ async def get_or_create_stub_user(
             display_name="Admin",
             keycloak_id=str(STUB_USER_ID),
             is_active=True,
+            is_superuser=True,
         )
         session.add(user)
         await session.commit()
