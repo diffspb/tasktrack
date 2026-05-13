@@ -40,22 +40,28 @@ async def resolve_all_agents() -> None:
     if settings.mcp_agents:
         mapping = _parse_agents_env(settings.mcp_agents)
         if not mapping:
-            raise RuntimeError("MCP_AGENTS is set but could not be parsed. Expected format: key1:uuid1,key2:uuid2")
+            print("[MCP] Warning: MCP_AGENTS is set but could not be parsed. Expected format: key1:uuid1,key2:uuid2")
+            return
         async with SessionLocal() as session:
             for key, uid in mapping.items():
                 user = await session.get(User, uid)
                 if user is None or not user.is_active:
-                    raise RuntimeError(f"Agent user {uid} (key={key!r}) not found or inactive.")
+                    print(f"[MCP] Warning: agent user {uid} (key={key!r}) not found or inactive — skipped.")
+                    continue
                 _agents[key] = user
-        print(f"[MCP] Loaded {len(_agents)} agent(s): {', '.join(_agents)}")
+        if _agents:
+            print(f"[MCP] Loaded {len(_agents)} agent(s): {', '.join(_agents)}")
+        else:
+            print("[MCP] Warning: no agent users could be loaded. MCP tools will fail until DB is populated.")
     elif settings.mcp_agent_user_id is not None:
         async with SessionLocal() as session:
             user = await session.get(User, settings.mcp_agent_user_id)
             if user is None or not user.is_active:
-                raise RuntimeError(
-                    f"Agent user {settings.mcp_agent_user_id} not found or inactive. "
+                print(
+                    f"[MCP] Warning: agent user {settings.mcp_agent_user_id} not found or inactive. "
                     "Run 'make mcp-bootstrap' to create it."
                 )
+                return
             _dev_user = user
         print(f"[MCP] Dev mode: single agent user '{_dev_user.email}'")
     else:
