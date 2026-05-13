@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateTask, useProjectMembers, useProjectEpics, useProjectTaskTypes, type Priority } from './api'
+import { useCreateTask, useProjectMembers, useProjectEpics, useTaskTypes, type Priority } from './api'
 
 interface Props {
   open: boolean
@@ -30,7 +30,7 @@ export function CreateTaskModal({ open, projectId, parentTaskId, onClose }: Prop
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
   const { data: epics = [] } = useProjectEpics(projectId)
-  const { data: taskTypesData } = useProjectTaskTypes(projectId)
+  const { data: taskTypesData } = useTaskTypes()
   const taskTypes = taskTypesData?.items ?? []
 
   async function handleSubmit(e: React.FormEvent) {

@@ -122,12 +122,17 @@ export function useProjectMembers(projectId: string | null | undefined) {
   })
 }
 
-export function useProjectTaskTypes(projectId: string | null | undefined) {
+export function useTaskTypes() {
   return useQuery<{ items: TaskType[] }>({
-    queryKey: ['task-types', projectId],
-    queryFn: () => api.get(`/projects/${projectId}/task-types`).then(r => r.data),
-    enabled: !!projectId,
+    queryKey: ['task-types'],
+    queryFn: () => api.get('/task-types').then(r => r.data),
+    staleTime: 60_000,
   })
+}
+
+/** @deprecated use useTaskTypes() */
+export function useProjectTaskTypes(_projectId?: string | null) {
+  return useTaskTypes()
 }
 
 export function useChildTasks(projectId: string | null | undefined, parentTaskId: string | null | undefined) {

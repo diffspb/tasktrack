@@ -1,5 +1,5 @@
 import type { Task, Priority } from './api'
-import { useProjectTaskTypes } from './api'
+import { useTaskTypes } from './api'
 
 export interface FilterState {
   assignee: 'all' | 'mine' | 'unassigned'
@@ -41,11 +41,10 @@ interface Props {
   filter: FilterState
   onChange: (f: FilterState) => void
   taskCount: number
-  projectId: string
 }
 
-export function TaskFilterBar({ filter, onChange, taskCount, projectId }: Props) {
-  const { data: taskTypesData } = useProjectTaskTypes(projectId)
+export function TaskFilterBar({ filter, onChange, taskCount }: Props) {
+  const { data: taskTypesData } = useTaskTypes()
   const taskTypes = taskTypesData?.items ?? []
   const active =
     filter.assignee !== 'all' || filter.priority !== 'all' || filter.type !== 'all'

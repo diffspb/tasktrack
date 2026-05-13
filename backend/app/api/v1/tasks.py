@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
@@ -10,6 +11,22 @@ from app.schemas.task import TaskCreate, TaskLinkCreate, TaskLinkResponse, TaskR
 from app.services import task_link_service, task_service
 
 router = APIRouter()
+
+
+@router.get("/task-types", tags=["tasks"])
+async def list_task_types(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    from app.models.task_type import TaskType
+    from app.schemas.task_type import TaskTypeResponse
+
+    types = await session.scalars(
+        select(TaskType)
+        .where(TaskType.is_system.is_(True))
+        .order_by(TaskType.name)
+    )
+    return {"items": [TaskTypeResponse.model_validate(t) for t in types]}
 
 
 @router.post(
