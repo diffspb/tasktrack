@@ -1,4 +1,4 @@
-.PHONY: install db-start db-stop db-create reset full-reset dev test test-cov mcp-bootstrap
+.PHONY: install db-start db-stop db-create reset full-reset dev test test-cov mcp-bootstrap migrate makemigration
 
 install:
 	pip install -e ".[dev]"
@@ -43,3 +43,10 @@ test-cov:
 
 mcp-bootstrap:
 	python scripts/bootstrap_agent_user.py
+
+# Alembic
+migrate:
+	alembic upgrade head
+
+makemigration:
+	alembic revision --autogenerate -m "$(msg)"

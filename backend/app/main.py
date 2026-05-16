@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import router
 from app.core.config import settings
-from app.core.db import create_tables
+from app.core.db import run_migrations
 from app.core.scheduler import scheduler
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -17,7 +17,7 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    await create_tables()
+    await run_migrations()
     scheduler.start()
     from app.mcp.auth import resolve_all_agents
     await resolve_all_agents()

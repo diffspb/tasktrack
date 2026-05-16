@@ -1,4 +1,6 @@
+import asyncio
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -44,9 +46,20 @@ _FTS_DDL = [
 
 
 async def create_tables() -> None:
+    """Used by tests only. Production startup uses run_migrations()."""
     from app.models import Base  # noqa: F401 — side-effect import registers all models
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         for stmt in _FTS_DDL:
             await conn.execute(text(stmt))
+
+
+async def run_migrations() -> None:
+    """Apply pending Alembic migrations. Called from app lifespan on startup."""
+    from alembic import command
+    from alembic.config import Config
+
+    ini_path = Path(__file__).parent.parent.parent / "alembic.ini"
+    alembic_cfg = Config(str(ini_path))
+    await asyncio.to_thread(command.upgrade, alembic_cfg, "head")

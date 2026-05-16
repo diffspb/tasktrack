@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.models import (
-    Base, BoardColumn, BoardColumnStatus, LinkType, Notification, NotificationEntityType, NotificationEventType,
+    BoardColumn, BoardColumnStatus, LinkType, Notification, NotificationEntityType, NotificationEventType,
     Project, ProjectMember, ProjectMemberRole, ProjectVisibility, ProjectTaskTypeConfig,
     Status, StatusCategory, Task, TaskPriority, TaskType,
     Transition, User, View, ViewType, Workflow,
@@ -18,27 +18,37 @@ from app.models.comment import Comment
 from app.models.gantt import GanttChart, GanttChartTask
 
 
-async def reset() -> None:
+async def _drop_and_recreate_schema() -> None:
     from sqlalchemy import text
-    from app.core.db import _FTS_DDL
-
     engine = create_async_engine(settings.database_url)
     async with engine.begin() as conn:
-        # Terminate other connections so DROP SCHEMA doesn't deadlock
         await conn.execute(text(
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
             "WHERE datname = current_database() AND pid <> pg_backend_pid()"
         ))
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
-        await conn.run_sync(Base.metadata.create_all)
-        for stmt in _FTS_DDL:
-            await conn.execute(text(stmt))
+    await engine.dispose()
 
+
+def _run_alembic_upgrade() -> None:
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    ini_path = Path(__file__).parent.parent / "alembic.ini"
+    command.upgrade(Config(str(ini_path)), "head")
+
+
+async def reset() -> None:
+    await _drop_and_recreate_schema()
+    _run_alembic_upgrade()
+
+    engine = create_async_engine(settings.database_url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
     async with Session() as session:
         await seed(session)
 
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.execute(text("UPDATE tasks SET title = title"))
 
@@ -348,22 +358,9 @@ async def seed(session: AsyncSession) -> None:
 
 async def schema_only() -> None:
     """Drop and recreate schema without seeding — simulates a fresh deployment."""
-    from sqlalchemy import text
-    from app.core.db import _FTS_DDL
-
-    engine = create_async_engine(settings.database_url)
-    async with engine.begin() as conn:
-        await conn.execute(text(
-            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-            "WHERE datname = current_database() AND pid <> pg_backend_pid()"
-        ))
-        await conn.execute(text("DROP SCHEMA public CASCADE"))
-        await conn.execute(text("CREATE SCHEMA public"))
-        await conn.run_sync(Base.metadata.create_all)
-        for stmt in _FTS_DDL:
-            await conn.execute(text(stmt))
-    await engine.dispose()
-    print("✓ Schema recreated (no data)")
+    await _drop_and_recreate_schema()
+    _run_alembic_upgrade()
+    print("✓ Schema recreated via Alembic (no data)")
 
 
 if __name__ == "__main__":
