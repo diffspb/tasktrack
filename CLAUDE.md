@@ -87,7 +87,7 @@ docs/
 
 Реализация идёт поэтапно. Подробный план — `docs/18-implementation-plan.md`.
 
-**Текущий этап:** Alembic + Keycloak (блокеры перед `mvp-research-launch`)
+**Текущий этап:** Этап 8 завершён (Alembic + Keycloak). Следующий приоритет: закрытие непокрытых тестов и UX-долг.
 
 | Этап | Тег | Статус |
 |------|-----|--------|
@@ -99,7 +99,7 @@ docs/
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
 | 6. Decision Process backend | `impl-phase-6` | ✅ |
 | 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | 🔲 |
+| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
 ### Правила разработки
