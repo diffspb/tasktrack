@@ -25,6 +25,7 @@ async def list_comments(
         .where(
             Comment.task_id == task_id,
             Comment.parent_comment_id.is_(None),
+            Comment.deleted_at.is_(None),
         )
         .order_by(Comment.created_at)
     )

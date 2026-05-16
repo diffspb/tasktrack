@@ -61,16 +61,6 @@
 
 ---
 
-## 5. Неполная инвалидация кэша при операциях с task links
-
-`useDeleteTaskLink` в `frontend/src/features/tasks/api.ts` инвалидирует `['task-links', taskId]` и gantt-ключи, но не `['tasks', projectId]`. После удаления связи Kanban-доска может показывать устаревшие данные.
-
-**Решение:** добавить `qc.invalidateQueries({ queryKey: ['tasks', projectId] })` в `onSuccess` хука `useDeleteTaskLink`. Аналогично проверить `useCreateTaskLink`.
-
-**Когда делать:** быстрый однострочный фикс, можно сразу.
-
----
-
 ## 8. Нет error boundaries на уровне Layout
 
 Если `AppSidebar`, `Breadcrumbs` или `SearchBar` падают с исключением, весь навигационный слой ломается — пользователь видит белый экран без возможности восстановиться.

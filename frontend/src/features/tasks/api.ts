@@ -335,7 +335,7 @@ export function useTaskLinks(taskId: string | null | undefined) {
   })
 }
 
-export function useCreateTaskLink(viewTaskId: string) {
+export function useCreateTaskLink(viewTaskId: string, projectId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { source_task_id: string; target_task_id: string; link_type_id: string }) =>
@@ -345,18 +345,20 @@ export function useCreateTaskLink(viewTaskId: string) {
       }).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task-links', viewTaskId] })
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
       qc.invalidateQueries({ queryKey: ['gantt-links'] })
     },
   })
 }
 
-export function useDeleteTaskLink(taskId: string) {
+export function useDeleteTaskLink(taskId: string, projectId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (linkId: string) => api.delete(`/tasks/${taskId}/links/${linkId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task-links', taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['gantt-tasks'] })
       qc.invalidateQueries({ queryKey: ['gantt-links'] })
     },

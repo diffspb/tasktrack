@@ -61,7 +61,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const { data: comments = [] }       = useTaskComments(task.id)
   const { data: taskLinks = [] }      = useTaskLinks(task.id)
   const { data: linkTypes = [] }      = useLinkTypes()
-  const deleteLink                    = useDeleteTaskLink(task.id)
+  const deleteLink                    = useDeleteTaskLink(task.id, task.project_id)
   const transition                    = useTransitionStatus(task.project_id)
   const updateTask                    = useUpdateTask(task.id, task.project_id)
 
@@ -422,6 +422,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
         open={linkDialogOpen}
         onClose={() => setLinkDialogOpen(false)}
         taskId={task.id}
+        projectId={task.project_id}
         excludeIds={linkedTaskIds}
       />
     </div>

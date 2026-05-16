@@ -13,12 +13,13 @@ interface Props {
   open: boolean
   onClose: () => void
   taskId: string
+  projectId: string
   excludeIds?: Set<string>
 }
 
-export function LinkTaskDialog({ open, onClose, taskId, excludeIds }: Props) {
+export function LinkTaskDialog({ open, onClose, taskId, projectId, excludeIds }: Props) {
   const { data: linkTypes = [] } = useLinkTypes()
-  const createLink = useCreateTaskLink(taskId)
+  const createLink = useCreateTaskLink(taskId, projectId)
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [choiceKey, setChoiceKey]       = useState<ChoiceKey | ''>('')
