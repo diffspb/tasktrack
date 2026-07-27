@@ -502,16 +502,21 @@ async def submit_solution(session: AsyncSession, solution_id: uuid.UUID) -> Solu
     return solution
 ```
 
-### Миграции Alembic: первая
+### Миграции Alembic
+
+Подключены в этапе 8 (`1bb2489`). Фактическое состояние:
+
+- `backend/alembic/` + `alembic.ini`, ревизии в `alembic/versions/`.
+- Приложение применяет миграции само: `run_migrations()` в lifespan (`app/main.py`) вызывает `command.upgrade(cfg, "head")` в отдельном потоке.
+- **Первая ревизия — не autogenerate.** `993840ac9a18_initial_schema` вызывает `Base.metadata.create_all(bind=conn)` (идемпотентно, `checkfirst=True`) плюс сырой DDL для FTS: функция `tasks_search_vector_update`, триггер и GIN-индекс. Так снимался снимок уже существующей схемы без ручного переписывания DDL.
+- Последующие ревизии — обычный `alembic revision --autogenerate`; работает потому, что `env.py` импортирует `app.models` целиком.
+- `Base.metadata.create_all` остался только в `core/db.py:create_tables()` — его использует тестовый conftest.
 
 ```bash
 cd backend
-alembic init alembic          # создаёт alembic/env.py
-alembic revision --autogenerate -m "initial: users, projects, workflows, tasks"
-alembic upgrade head
+alembic revision --autogenerate -m "описание"
+alembic upgrade head          # или просто перезапустить приложение
 ```
-
-`autogenerate` работает только если все модели импортированы в `env.py` (добавить `from app.models import *`).
 
 ### Типизация: openapi-typescript workflow
 
@@ -621,7 +626,9 @@ python scripts/bootstrap_agent_user.py --email exec-agent@tasktrack
 
 ## 8. Первые шаги до рабочего сценария S1
 
-S1: создать проект → создать задачу → назначить исполнителя → провести по воркфлоу → закрыть с резолюцией.
+> 📌 **Исторический раздел.** Все шаги выполнены (этапы 0–5, тег `s1-complete`). Часть пунктов описывает состав, от которого потом отказались: таблицы `groups`, `assignments`, `resolutions` и поле `global_status` в коде отсутствуют — см. `12-data-model.md`. Оставлено как запись исходного плана.
+
+S1: создать проект → создать задачу → назначить исполнителя → провести по воркфлоу → закрыть.
 
 1. **Scaffold backend**: скопировать паттерн из `new-app.sh` в `backend/`, расширить `pyproject.toml` (добавить `sqlalchemy[asyncio]`, `asyncpg`, `alembic`, `apscheduler`).
 
