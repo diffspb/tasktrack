@@ -5,7 +5,7 @@
 Внутренний таск-трекер с ключевой фичей — несколько исполнителей на одну задачу, каждый с независимым воркфлоу. При завершении всех частей запускается **Decision Process**: каждый исполнитель подаёт Solution, decision-maker выносит Decision.
 
 Стек: Python / FastAPI / PostgreSQL / Keycloak / Traefik / Docker Compose + React 19 / Vite / shadcn/ui.  
-Текущий этап: **Этап 9 завершён (FR-001)**. Следующий приоритет: Alembic + Keycloak (этап 8) перед `mvp-research-launch`. Отложенные работы — см. `docs/tech-debt.md`.
+Текущий этап: **этапы 8 и 9 завершены** (Alembic + Keycloak, FR-001). Следующий приоритет: закрытие непокрытых тестов и UX-долг. Decision Process в текущем коде работает на MVP-суррогате — см. таблицу этапов ниже. Отложенные работы — `docs/tech-debt.md`.
 
 Актуальное состояние → `docs/README.md`. Архитектура → `docs/17-architecture.md`. План реализации → `docs/18-implementation-plan.md`.
 
@@ -97,17 +97,19 @@ docs/
 | 3. Задачи и назначения | `impl-phase-3` | ✅ |
 | 4. Frontend scaffold | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
-| 6. Decision Process backend | `impl-phase-6` | ✅ |
-| 7. Decision Process UI | `s23-complete` | ✅ |
+| 6. Decision Process backend | `impl-phase-6` | ⚠️ откатан |
+| 7. Decision Process UI | `s23-complete` | ⚠️ откатан |
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
+
+> ⚠️ Этапы 6–7 были сданы под своими тегами, но откатаны MVP-упрощением (`40caac4`, 2026-05-02): таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision` удалены, у задачи один `assignee_id`, Solution живёт суррогатом в `Comment.labels=["solution"]`, `frontend/src/features/decision-process/` пуст. Восстановление ключевой фичи — см. `docs/tech-debt.md`.
 
 ### Правила разработки
 
 - Тест пишется **до или вместе** с кодом сервиса, никогда после
 - `make test` обязателен перед каждым коммитом
 - Каждый этап — один коммит + тег `impl-phase-N`
-- **Миграции:** `metadata.create_all` в lifespan; Alembic отложен на post-MVP (см. `docs/tech-debt.md`)
+- **Миграции:** Alembic — `run_migrations()` в lifespan применяет `upgrade head` при старте, ревизии в `backend/alembic/versions/`. `metadata.create_all` остался только для тестов (`core/db.py:create_tables`). Изменил модель → сгенерируй ревизию, не полагайся на `create_all`
 
 ### Тесты
 
