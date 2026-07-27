@@ -7,25 +7,16 @@
 
 ---
 
----
-
 ## Отложено на post-MVP (после исследовательского запуска)
 
 **APScheduler стартует без задач.**
 `scheduler.start()` в lifespan — мёртвый код. Структуру не убираем; задачи (напоминания decision-maker'у через 3 дня в `awaiting_decision`) — после реализации полноценного Decision Process (зависит от восстановления Assignment+Solution).
-
----
-
-## Отложено на post-MVP (после исследовательского запуска)
 
 **Мульти-исполнители и Assignment.** MVP-упрощение (коммит `40caac4`): таблица `Assignment` удалена, задача имеет один `assignee_id`. Восстановить: таблицу `Assignment (task_id, user_id, role, current_status_id, workflow_id, resolution_id)`, поле `Task.global_status`, логику пересчёта `global_status` при изменении Assignment'ов. Это основная дифференцирующая фича продукта; откладывается до стабилизации базового флоу.
 
 **Decision Process (Solution / TaskDecision).** Таблицы `Solution` и `TaskDecision` не реализованы. В MVP: суррогат через `Comment` с `labels=["solution"]` и `meta.solution_comment_id`. Восстановить: полноценные таблицы, API `submit_solution / make_decision / request_revision`, state machine `draft → submitted → accepted / revision_requested`. Зависит от восстановления Assignment.
 
 **Transition: несколько ролей.** Сейчас `Transition.required_role` — одиночная строка (один required_role или NULL). Документация описывала `allowed_roles[]` (массив). Изменить на массив, когда понадобится разрешать переход нескольким разным ролям одновременно.
-
-**`resolution_id` хранится в `Task.meta` как строка, не как FK.**
-При переходе в финальный статус воркфлоу `resolution_id` сохраняется в `Task.meta["resolution_id"]` (строка UUID). Последствия: нет FK-ограничения (можно указать несуществующую резолюцию), нет индекса для фильтрации задач по резолюции, `TaskResponse` не возвращает `resolution_id` — фронтенд не может показать выбранную резолюцию на карточке задачи. Правильное решение: добавить `Task.resolution_id FK → resolutions.id` как отдельную колонку.
 
 **`Comment.search_vector` не реализован.**
 Поиск по тексту комментариев (`09-mvp.md`: 🟢) не работает — `Comment` не имеет поля `search_vector`, `search_service.py` ищет только по `Task.search_vector`. Добавить: поле `search_vector tsvector` в `Comment`, триггер обновления, `GIN`-индекс, расширить запрос в `search_service.py`.
