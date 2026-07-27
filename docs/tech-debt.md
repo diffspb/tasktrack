@@ -21,9 +21,6 @@
 **`Comment.search_vector` не реализован.**
 Поиск по тексту комментариев (`09-mvp.md`: 🟢) не работает — `Comment` не имеет поля `search_vector`, `search_service.py` ищет только по `Task.search_vector`. Добавить: поле `search_vector tsvector` в `Comment`, триггер обновления, `GIN`-индекс, расширить запрос в `search_service.py`.
 
-**`_count_active_assignments()` — вводящее в заблуждение имя.**
-Функция в `workflow_service.py` считает `Task.current_status_id`, а не Assignment-записи (которых нет). Переименовать в `_count_tasks_in_status()`.
-
 **MCP-сервер: неполное покрытие операций.**
 Текущий набор инструментов закрывает основной сценарий «AI-агент = исполнитель» (CRUD задач, комментарии, переходы, связи, поиск задач/пользователей, edit комментария — добавлено 2026-05-09). Не реализовано через MCP, хотя есть в REST:
 - `delete_task` (soft-delete) — `DELETE /tasks/{id}`
@@ -47,17 +44,10 @@
 
 ## Непокрытые тесты
 
-Закрыты P0/P1 перед Этапом 4 (2026-04-29). Оставшиеся кейсы:
+Список закрыт (сверено 2026-07-27): кейсы `TASK_NOT_FOUND`, `NO_DEFAULT_WORKFLOW`, `STATUS_WORKFLOW_MISMATCH`, `TRANSITION_NOT_FOUND`, `STATUS_DEFAULT_MUST_BE_INITIAL` и happy path `PATCH /workflows/{id}` / `PATCH /statuses/{id}` покрыты в `test_tasks.py`, `test_workflows.py`, `test_task_type_workflow.py`.
 
-**Error cases:**
+Что остаётся непокрытым:
 
-- `TASK_NOT_FOUND` при GET/PATCH/DELETE с несуществующим UUID задачи
-- `NO_DEFAULT_WORKFLOW` при создании задачи в проекте без дефолтного воркфлоу
-- `STATUS_WORKFLOW_MISMATCH` в `migrate_status` (target из другого воркфлоу)
-- `TRANSITION_NOT_FOUND` при `DELETE /transitions/{id}` с несуществующим ID
-- `STATUS_DEFAULT_MUST_BE_INITIAL` через `PATCH /statuses/{id}`
-
-**Happy path:**
-
-- `PATCH /workflows/{id}` — `update_workflow` happy path
-- `update_status` happy path через `PATCH`
+- Блокировка перехода decision-задачи (`task_service._check_decision_task_unblocked`) — тестов нет.
+- Конкурентное обновление задачи: `VERSION_CONFLICT` под параллельной нагрузкой.
+- Фронтенд: тесты есть только у `TaskBoard` и `ProjectList`; `TaskView.tsx` (687 строк) без тестов — см. `ux-debt.md`.
