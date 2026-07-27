@@ -20,10 +20,12 @@
 | 3. Задачи и назначения (S1 через API) | `impl-phase-3` | ✅ |
 | 4. Frontend scaffold + Projects UI | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
-| 6. Decision Process backend | `impl-phase-6` | ✅ |
-| 7. Decision Process UI | `s23-complete` | ✅ |
-| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | 🔲 |
+| 6. Decision Process backend | `impl-phase-6` | ⚠️ откатан |
+| 7. Decision Process UI | `s23-complete` | ⚠️ откатан |
+| 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
+
+> ⚠️ **Этапы 6–7 сданы под своими тегами, но откатаны** MVP-упрощением (`40caac4`, 2026-05-02). Удалены таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision`; у задачи один `assignee_id`; Solution хранится суррогатом в `Comment.labels=["solution"]` + `Task.meta.solution_comment_id`; каталог `frontend/src/features/decision-process/` пуст. Ключевая фича продукта в текущем коде **не реализована** — план восстановления в [tech-debt.md](./tech-debt.md).
 
 **Внеочередные фичи (post-phase-9):**
 - ✅ MCP-сервер для агентов (`GET /mcp/sse`, multi-agent auth через `MCP_AGENTS`)
@@ -31,7 +33,7 @@
 - ✅ SSE онлайн-обновления задач (борд + бэклог, переключатель Live/Paused)
 - ✅ Ключ проекта в URL вместо UUID (`/projects/DEMO/board`)
 
-Инфра: Docker обязателен. Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
+Инфра: Docker обязателен. Схема БД — Alembic (`upgrade head` в lifespan). Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
 Архитектурные решения → **[decisions/](./decisions/)**.
 
 ---
@@ -79,6 +81,9 @@
 | [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment |
 | [decisions/ADR-009](./decisions/ADR-009-board-columns-fr001.md) | BoardColumn — независимый слой между воркфлоу и Kanban-бордой (FR-001) |
 | [decisions/ADR-010](./decisions/ADR-010-mcp-server.md) | MCP-сервер для агентов — встроенный SSE-транспорт, multi-agent auth |
+| [decisions/ADR-011](./decisions/ADR-011-epic-tree-view.md) | Epic Tree View — древовидный список задач по эпикам |
+| [decisions/ADR-012](./decisions/ADR-012-gantt-charts.md) | Диаграммы Ганта — именованные кросс-проектные таймлайны |
+| [decisions/ADR-013](./decisions/ADR-013-gantt-dependency-arrows.md) | Стрелки зависимостей на диаграмме Ганта |
 
 ### Открытые хвосты
 
@@ -87,6 +92,8 @@
 | [tech-debt.md](./tech-debt.md) | Бэкенд-долг: что отложено и до какого этапа |
 | [ux-debt.md](./ux-debt.md) | UX-долг фронтенда: открытые проблемы интерфейса |
 | [phase-9-fr001-multi-workflow.md](./phase-9-fr001-multi-workflow.md) | **Этап 9 (post-MVP): FR-001 мульти-воркфлоу** — полный трекинговый документ: стадии, чеклист, открытые вопросы |
+| [feature-requests/](./feature-requests/) | Запросы на фичи: [FR-001](./feature-requests/FR-001-multi-workflow-per-type.md) (реализован, этап 9), [FR-002](./feature-requests/FR-002-mcp-action-api.md) (на рассмотрении) |
+| [project-review-2026-05.md](./project-review-2026-05.md) | Ревью проекта от 2026-05-14: документация, архитектура, качество кода, полнота реализации |
 
 ### Исторические файлы (не актуальны как планы)
 
@@ -104,7 +111,7 @@
 
 1. **[00-context.md](./00-context.md)** — что строим, для кого, что точно не делаем.
 2. **[glossary.md](./glossary.md)** — прочитать один раз, держать открытым.
-3. **[decisions/](./decisions/)** — пройти по ADR-001…007: ключевые архитектурные и продуктовые решения.
+3. **[decisions/](./decisions/)** — пройти по ADR-001…013: ключевые архитектурные и продуктовые решения.
 4. **[09-mvp.md](./09-mvp.md)** — scope и приоритизация до погружения в детали.
 5. **[07-decision-process.md](./07-decision-process.md)** — ключевой механизм продукта.
 6. **[03-user-stories.md](./03-user-stories.md)** → **[stories/decision-process.md](./stories/decision-process.md)** — истории с AC.
