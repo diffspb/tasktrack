@@ -1,6 +1,6 @@
 # 12. Модель данных
 
-> **Актуальность:** отражает текущее состояние кода (ветка `main`, 2026-05-02).  
+> **Актуальность:** отражает текущее состояние кода (ветка `main`, сверено с `backend/app/models/` 2026-07-27).  
 > MVP-упрощения по сравнению с целевой архитектурой зафиксированы в `docs/tech-debt.md`.
 
 ---
@@ -15,6 +15,7 @@ erDiagram
         string display_name
         string keycloak_id UK
         boolean is_active
+        boolean is_superuser
         string timezone
         timestamp created_at
         timestamp updated_at
@@ -50,6 +51,7 @@ erDiagram
         string color
         string icon
         jsonb meta_schema
+        uuid default_workflow_id FK
         timestamp created_at
         timestamp updated_at
     }
@@ -85,12 +87,38 @@ erDiagram
         timestamp updated_at
     }
 
-    Resolution {
+    ProjectTaskTypeConfig {
+        uuid id PK
+        uuid project_id FK
+        uuid task_type_id FK
+        uuid workflow_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    View {
         uuid id PK
         uuid project_id FK
         string name
-        boolean is_default
+        string type
         integer position
+        boolean is_default
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    BoardColumn {
+        uuid id PK
+        uuid view_id FK
+        string name
+        integer position
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    BoardColumnStatus {
+        uuid board_column_id PK
+        uuid status_id PK
     }
 
     Task {
@@ -107,7 +135,9 @@ erDiagram
         text description
         string priority
         jsonb meta
+        date start_date
         date due_date
+        integer duration_days
         tsvector search_vector
         timestamp deleted_at
         integer version
@@ -119,8 +149,22 @@ erDiagram
         uuid id PK
         uuid source_task_id FK
         uuid target_task_id FK
-        string link_type
+        uuid link_type_id FK
         uuid created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    LinkType {
+        uuid id PK
+        string name UK
+        string outward_name
+        string inward_name
+        boolean is_directed
+        string color
+        jsonb constraint
+        integer position
+        boolean is_active
         timestamp created_at
         timestamp updated_at
     }
@@ -151,20 +195,44 @@ erDiagram
         timestamp updated_at
     }
 
+    GanttChart {
+        uuid id PK
+        uuid owner_id FK
+        string name
+        text description
+        jsonb settings
+        integer position
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    GanttChartTask {
+        uuid id PK
+        uuid gantt_id FK
+        uuid task_id FK
+        integer position
+        timestamp created_at
+        timestamp updated_at
+    }
+
     User ||--o{ ProjectMember : "состоит в"
     User ||--o{ Task : "создаёт (reporter)"
     User ||--o{ Task : "исполнитель (assignee)"
     User ||--o{ Comment : "пишет"
     User ||--o{ Notification : "получает"
     User ||--o{ TaskLink : "создаёт"
+    User ||--o{ GanttChart : "владеет"
 
     Project ||--o{ ProjectMember : "имеет участников"
     Project ||--o{ Task : "содержит задачи"
     Project ||--o{ Workflow : "использует"
-    Project ||--o{ Resolution : "имеет"
     Project ||--o{ TaskType : "кастомные типы"
+    Project ||--o{ View : "имеет представления"
+    Project ||--o{ ProjectTaskTypeConfig : "настраивает тип→воркфлоу"
 
     TaskType ||--o{ Task : "определяет тип"
+    TaskType ||--o{ ProjectTaskTypeConfig : "настраивается в проекте"
+    Workflow ||--o{ ProjectTaskTypeConfig : "назначен типу"
 
     Workflow ||--o{ Status : "содержит статусы"
     Workflow ||--o{ Transition : "содержит переходы"
@@ -172,10 +240,18 @@ erDiagram
     Status ||--o{ Transition : "to"
     Status ||--o{ Task : "current_status"
 
+    View ||--o{ BoardColumn : "содержит колонки"
+    BoardColumn ||--o{ BoardColumnStatus : "объединяет статусы"
+    Status ||--o{ BoardColumnStatus : "попадает в колонку"
+
     Task ||--o{ Task : "подзадачи (parent_task_id)"
     Task ||--o{ Comment : "имеет комментарии"
     Task ||--o{ Notification : "порождает"
     Task }o--o{ TaskLink : "связана с"
+    LinkType ||--o{ TaskLink : "типизирует связь"
+
+    GanttChart ||--o{ GanttChartTask : "включает задачи"
+    Task ||--o{ GanttChartTask : "входит в диаграмму"
 ```
 
 ---
@@ -192,7 +268,9 @@ erDiagram
 
 `Task.workflow_id` — FK → `workflows.id`, NOT NULL. Фиксируется при создании задачи и не меняется. Даже если менеджер изменит конфигурацию воркфлоу для типа задачи — уже созданные задачи движутся по своему воркфлоу.
 
-Текущая логика выбора при создании: берётся воркфлоу с `is_default = true` для проекта. После реализации FR-001: `ProjectTaskTypeConfig → TaskType.default_workflow_id`.
+Логика выбора при создании (FR-001 реализован, `workflow_service.get_workflow_for_task_type`): если клиент передал `workflow_id` — берётся он; иначе `ProjectTaskTypeConfig(project_id, task_type_id)` → если конфига нет, fallback на воркфлоу проекта с `is_default = true`; если и его нет — `400 NO_DEFAULT_WORKFLOW`. Системные воркфлоу (`project_id = NULL`) подхватываются только через явный `ProjectTaskTypeConfig`.
+
+Валидации «выбранный `workflow_id` совместим с `task_type`» нет — см. `docs/tech-debt.md`.
 
 ### Один исполнитель (MVP-упрощение)
 
@@ -202,12 +280,20 @@ erDiagram
 
 `Task.parent_task_id` — FK → `tasks.id`, nullable (self-reference). Используется для связи подзадач с родительской задачей и для связи задач с эпиком (`task_type_key = 'epic'`). ORM-relationship: `Task.subtasks`.
 
+### Resolution удалён из модели
+
+Таблицы `resolutions` в коде нет. Модель, схемы, сервис и 4 CRUD-эндпоинта удалены в `8b7f59f` (2026-05-06) как преждевременная мера; переход в финальный статус больше не требует `resolution_id`, ошибки `RESOLUTION_REQUIRED` не существует. Исторические упоминания резолюций в `09-mvp.md`, `stories/core.md`, ADR-006 и архитектурных ревью относятся к состоянию до этого коммита.
+
+### View и BoardColumn: слой отображения (FR-001)
+
+`View` — именованное представление проекта (`kanban` / `backlog` / `epic_tree`). Kanban-представление содержит `BoardColumn`, каждая колонка через таблицу связи `BoardColumnStatus` объединяет один или несколько статусов. Колонки живут независимо от воркфлоу: один статус может попадать в колонки разных представлений (уникальность `status_id` намеренно снята), а задачи разных воркфлоу — сходиться в одну колонку. Обоснование — [ADR-009](./decisions/ADR-009-board-columns-fr001.md).
+
 ### StatusCategory enum
 
 `Status.category` — enum: `initial | intermediate | final`. Семантика:
 - `initial` — начальный статус; задача создаётся с `is_default = true` среди initial-статусов.
 - `intermediate` — в работе.
-- `final` — финальный; переход в него = завершение работы исполнителя.
+- `final` — финальный; переход в него = завершение работы исполнителя. Резолюция при этом не запрашивается.
 
 Ровно один статус воркфлоу должен иметь `is_default = true` — это начальный статус для новых задач.
 
@@ -258,9 +344,9 @@ erDiagram
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid | PK |
-| project_id | uuid FK | Проект (NOT NULL в текущей реализации; nullable после FR-001 — для системных воркфлоу) |
+| project_id | uuid FK nullable | Проект. `NULL` — системный воркфлоу, доступный всем проектам через `ProjectTaskTypeConfig` (FR-001) |
 | name | string | Название («Разработка», «Баг-трекинг») |
-| is_default | boolean | Используется по умолчанию для новых задач (до FR-001) |
+| is_default | boolean | Fallback-воркфлоу проекта, когда для типа задачи нет `ProjectTaskTypeConfig` |
 | created_at / updated_at | timestamp | |
 
 **Status** — статус в рамках конкретного воркфлоу.
@@ -302,12 +388,18 @@ erDiagram
 
 ## Индексы
 
-| Таблица | Индекс | Зачем |
-|---------|--------|-------|
-| `tasks` | `(project_id, deleted_at)` | Список задач проекта |
-| `tasks` | `GIN(search_vector)` | Полнотекстовый поиск |
-| `task_types` | `(is_system, key)` | Поиск системных типов по ключу |
-| `notifications` | `(recipient_id, is_read, created_at)` | Счётчик непрочитанных |
+Фактически объявленные в моделях и миграции:
+
+| Таблица | Индекс / ограничение | Зачем |
+|---------|----------------------|-------|
+| `tasks` | `GIN(search_vector)` — `ix_tasks_search_vector` | Полнотекстовый поиск (создаётся сырым DDL вместе с триггером) |
+| `notifications` | `(recipient_id, is_read, created_at)` — `ix_notifications_recipient_unread` | Счётчик непрочитанных |
+| `views` | `(project_id, position)` — `ix_views_project_position` | Список представлений проекта по порядку |
+| `board_columns` | `(view_id, position)` — `ix_board_columns_view_position` | Колонки борды по порядку |
+| `project_task_type_configs` | `UNIQUE (project_id, task_type_id)` | Один воркфлоу на тип задачи в проекте |
+| `users` / `projects` / `tasks` / `link_types` | `UNIQUE` на `email`, `keycloak_id`, `key`, `name` | Естественные ключи |
+
+Индексов на `tasks(project_id, deleted_at)` и `task_types(is_system, key)` нет — PostgreSQL не создаёт индексы под FK автоматически. Добавить при появлении заметных объёмов.
 
 ---
 
@@ -321,8 +413,6 @@ erDiagram
 | `Solution` | Поданное решение исполнителя (Decision Process) |
 | `TaskDecision` | Итоговое решение decision-maker'а |
 | `DecisionCriteria` | Критерии оценки Solution'ов |
-| `ProjectTaskTypeConfig` | Воркфлоу по типу задачи (FR-001) |
-| `BoardColumn` / `BoardColumnStatus` | Независимые колонки Kanban-борды (FR-001) |
 | `Label` / `TaskLabel` | Метки задач |
 | `Attachment` | Вложения файлов |
 | `Watcher` | Подписчики задачи |
