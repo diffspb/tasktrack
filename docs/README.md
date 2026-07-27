@@ -25,7 +25,7 @@
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
-> ⚠️ **Этапы 6–7 сданы под своими тегами, но откатаны** MVP-упрощением (`40caac4`, 2026-05-02). Удалены таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision`; у задачи один `assignee_id`; Solution хранится суррогатом в `Comment.labels=["solution"]` + `Task.meta.solution_comment_id`; каталог `frontend/src/features/decision-process/` пуст. Ключевая фича продукта в текущем коде **не реализована** — план восстановления в [tech-debt.md](./tech-debt.md).
+> ⚠️ **Этапы 6–7 сданы под своими тегами, но откатаны** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)). Удалены таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision`; у задачи один `assignee_id`; Solution хранится суррогатом в `Comment.labels=["solution"]` + `Task.meta.solution_comment_id`; каталог `frontend/src/features/decision-process/` пуст. Ключевая фича продукта в текущем коде **не реализована** — план восстановления в [tech-debt.md](./tech-debt.md).
 
 **Внеочередные фичи (post-phase-9):**
 - ✅ MCP-сервер для агентов (`GET /mcp/sse`, multi-agent auth через `MCP_AGENTS`)
@@ -84,6 +84,8 @@
 | [decisions/ADR-011](./decisions/ADR-011-epic-tree-view.md) | Epic Tree View — древовидный список задач по эпикам |
 | [decisions/ADR-012](./decisions/ADR-012-gantt-charts.md) | Диаграммы Ганта — именованные кросс-проектные таймлайны |
 | [decisions/ADR-013](./decisions/ADR-013-gantt-dependency-arrows.md) | Стрелки зависимостей на диаграмме Ганта |
+| [decisions/ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md) | MVP-упрощение: отказ от Assignment и Decision Process |
+| [decisions/ADR-015](./decisions/ADR-015-resolution-removal.md) | Удаление Resolution из модели |
 
 ### Открытые хвосты
 

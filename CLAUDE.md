@@ -102,7 +102,7 @@ docs/
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
-> ⚠️ Этапы 6–7 были сданы под своими тегами, но откатаны MVP-упрощением (`40caac4`, 2026-05-02): таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision` удалены, у задачи один `assignee_id`, Solution живёт суррогатом в `Comment.labels=["solution"]`, `frontend/src/features/decision-process/` пуст. Восстановление ключевой фичи — см. `docs/tech-debt.md`.
+> ⚠️ Этапы 6–7 были сданы под своими тегами, но откатаны MVP-упрощением (`40caac4`, 2026-05-02, `docs/decisions/ADR-014`): таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision` удалены, у задачи один `assignee_id`, Solution живёт суррогатом в `Comment.labels=["solution"]`, `frontend/src/features/decision-process/` пуст. Восстановление ключевой фичи — см. `docs/tech-debt.md`.
 
 ### Правила разработки
 

@@ -2,7 +2,7 @@
 
 Описание механики и продуктовых решений. User stories по данной теме вынесены в [`docs/stories/decision-process.md`](./stories/decision-process.md) — это канонический источник.
 
-> ⚠️ **Целевое состояние, в коде не реализовано.** Мульти-исполнители (`Assignment`) и Decision Process были сданы в этапах 6–7 и откатаны MVP-упрощением (`40caac4`, 2026-05-02). Сейчас у задачи один `Task.assignee_id`, суррогат Solution — комментарий с `labels=["solution"]`. Документ описывает, что должно получиться при восстановлении (`tech-debt.md`).
+> ⚠️ **Целевое состояние, в коде не реализовано.** Мульти-исполнители (`Assignment`) и Decision Process были сданы в этапах 6–7 и откатаны MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)). Сейчас у задачи один `Task.assignee_id`, суррогат Solution — комментарий с `labels=["solution"]`. Документ описывает, что должно получиться при восстановлении (`tech-debt.md`).
 
 > 📖 Терминология: ниже строго разводятся **Solution** (поданное решение исполнителя) и **Decision** (итоговое решение, выносится decision-maker'ом). См. [glossary.md](./glossary.md).
 
