@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjects, type Project } from './api'
 import { CreateProjectModal } from './CreateProjectModal'
 import { ImportProjectDialog } from './ImportProjectDialog'
@@ -101,6 +102,8 @@ function LoadingSkeleton() {
 
 export function ProjectList() {
   const { data: projects, isLoading, isError } = useProjects()
+  // Creating and importing projects: instance administrator only (13-permissions.md).
+  const canCreate = useAuth().user?.is_superuser ?? false
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
@@ -111,16 +114,18 @@ export function ProjectList() {
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">All projects you have access to</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New project
-          </Button>
-        </div>
+        {canCreate && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New project
+            </Button>
+          </div>
+        )}
       </div>
 
       {isLoading && <LoadingSkeleton />}
@@ -134,10 +139,14 @@ export function ProjectList() {
       {projects && projects.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <p className="text-muted-foreground">No projects yet.</p>
-          <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create your first project
-          </Button>
+          {canCreate ? (
+            <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create your first project
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground">Ask an administrator to create a project or add you to one.</p>
+          )}
         </div>
       )}
 

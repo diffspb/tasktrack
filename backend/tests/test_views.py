@@ -1,6 +1,7 @@
 """Tests for Views CRUD API."""
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,13 @@ from app.models.user import User
 from app.models.workflow import View, ViewType
 from app.schemas.project import ProjectCreate
 from app.services import project_service
+
+
+
+@pytest.fixture(autouse=True)
+def _stub_user_is_instance_admin(stub_user):
+    """Creating projects over HTTP requires a superuser (13-permissions.md)."""
+    stub_user.is_superuser = True
 
 
 async def _setup(session: AsyncSession, user: User) -> dict:

@@ -1,10 +1,18 @@
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.project import Project, ProjectMember, ProjectMemberRole, ProjectVisibility
 from app.models.user import User
+
+
+
+@pytest.fixture(autouse=True)
+def _stub_user_is_instance_admin(stub_user):
+    """Creating projects over HTTP requires a superuser (13-permissions.md)."""
+    stub_user.is_superuser = True
 
 
 async def _make_project_with_member_stub(db_session: AsyncSession, stub_user: User) -> str:
@@ -401,3 +409,18 @@ async def test_get_project_by_key_case_insensitive(client: AsyncClient):
 async def test_get_project_by_key_not_found(client: AsyncClient):
     r = await client.get("/api/v1/projects/by-key/DOESNOTEXIST")
     assert r.status_code == 404
+
+
+# ── Создание проекта — только администратор инстанса (13-permissions.md) ─────
+
+async def test_create_and_import_project_require_superuser(client: AsyncClient, stub_user: User):
+    stub_user.is_superuser = False
+    r = await client.post("/api/v1/projects", json={"name": "No", "key": "NOPE"})
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "PERMISSION_DENIED"
+    r = await client.post("/api/v1/projects/import", json={"data": {}, "new_key": "NOPE2"})
+    assert r.status_code == 403
+
+    stub_user.is_superuser = True
+    r = await client.post("/api/v1/projects", json={"name": "Yes", "key": "YESS"})
+    assert r.status_code == 201
