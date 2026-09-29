@@ -26,6 +26,7 @@ from app.models.workflow import (
     ViewType,
     Workflow,
 )
+from app.services import audit_service
 from app.services.permissions import require_project_access
 
 EXPORT_VERSION = 1
@@ -428,8 +429,19 @@ async def import_project(
         session.add(task)
         await session.flush()
         old_key_to_task[t_data["key"]] = task
+        await audit_service.record(
+            session, actor_id=user.id, project_id=project.id, task_id=task.id,
+            entity_type="task", entity_id=task.id, action="created",
+            after={**audit_service.snapshot(task, audit_service.TASK_FIELDS),
+                   "imported_from": t_data["key"]},
+        )
 
     project.task_seq = task_counter
+    await audit_service.record(
+        session, actor_id=user.id, project_id=project.id, entity_type="project",
+        entity_id=project.id, action="imported",
+        after={"key": project.key, "tasks": task_counter, "source_key": proj_data.get("key")},
+    )
 
     # 6. Task links
     lt_cache: dict[str, LinkType | None] = {}

@@ -9,7 +9,19 @@ from app.models.gantt import GanttChart, GanttChartTask
 from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.schemas.gantt import GanttChartCreate, GanttChartUpdate
+from app.services import audit_service
 from app.services.permissions import require_project_access, visible_project_ids
+
+_GANTT = ("name", "description", "position")
+
+
+async def _audit(session: AsyncSession, user: User, gantt_id: uuid.UUID, action: str,
+                 before: dict | None = None, after: dict | None = None) -> None:
+    """Gantt charts belong to no project: their events are system-level (ADR-018)."""
+    await audit_service.record(
+        session, actor_id=user.id, project_id=None, entity_type="gantt_chart",
+        entity_id=gantt_id, action=action, before=before, after=after,
+    )
 
 
 async def list_gantt_charts(session: AsyncSession) -> list[GanttChart]:
@@ -50,6 +62,8 @@ async def create_gantt_chart(
         position=(max_pos or 0) + 1,
     )
     session.add(gantt)
+    await session.flush()
+    await _audit(session, user, gantt.id, "created", after=audit_service.snapshot(gantt, _GANTT))
     await session.commit()
     await session.refresh(gantt)
     return gantt
@@ -59,6 +73,7 @@ async def update_gantt_chart(
     session: AsyncSession, gantt_id: uuid.UUID, data: GanttChartUpdate, user: User
 ) -> GanttChart:
     gantt = await _get_own_gantt_chart(session, gantt_id, user)
+    before = audit_service.snapshot(gantt, _GANTT)
     if data.name is not None:
         gantt.name = data.name
     if data.description is not None:
@@ -67,6 +82,8 @@ async def update_gantt_chart(
         gantt.settings = {**gantt.settings, **data.settings}
     if data.position is not None:
         gantt.position = data.position
+    await _audit(session, user, gantt.id, "updated",
+                 *audit_service.diff(before, audit_service.snapshot(gantt, _GANTT)))
     await session.commit()
     await session.refresh(gantt)
     return gantt
@@ -74,6 +91,7 @@ async def update_gantt_chart(
 
 async def delete_gantt_chart(session: AsyncSession, gantt_id: uuid.UUID, user: User) -> None:
     gantt = await _get_own_gantt_chart(session, gantt_id, user)
+    await _audit(session, user, gantt.id, "deleted", before=audit_service.snapshot(gantt, _GANTT))
     await session.delete(gantt)
     await session.commit()
 
@@ -108,6 +126,7 @@ async def add_task_to_gantt(
         gantt_id=gantt_id, task_id=task_id, position=(max_pos or 0) + 1
     )
     session.add(entry)
+    await _audit(session, user, gantt_id, "task_added", after={"task_id": str(task_id)})
     await session.commit()
 
 
@@ -123,6 +142,7 @@ async def remove_task_from_gantt(
     )
     if not entry:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "GANTT_TASK_NOT_FOUND"})
+    await _audit(session, user, gantt_id, "task_removed", before={"task_id": str(task_id)})
     await session.delete(entry)
     await session.commit()
 
@@ -186,6 +206,7 @@ async def reorder_gantt_tasks(
         )
         if entry:
             entry.position = idx + 1
+    await _audit(session, user, gantt_id, "reordered", after={"task_ids": [str(t) for t in task_ids]})
     await session.commit()
 
 

@@ -24,7 +24,30 @@ from app.schemas.workflow import (
     WorkflowCreate,
     WorkflowUpdate,
 )
+from app.services import audit_service
 from app.services.permissions import require_manager, require_project_access
+
+_WF = ("name", "is_default")
+_STATUS = ("workflow_id", "name", "category", "is_default", "position", "color")
+_TRANSITION = ("workflow_id", "from_status_id", "to_status_id", "required_role", "required_fields")
+_VIEW = ("name", "type", "position", "is_default")
+_COLUMN = ("view_id", "name", "position")
+_TYPE_CONFIG = ("task_type_id", "workflow_id")
+
+
+async def _audit(
+    session: AsyncSession, project_id: uuid.UUID | None, user: User, entity_type: str,
+    entity_id: uuid.UUID, action: str, before: dict | None = None, after: dict | None = None,
+) -> None:
+    """Project configuration changes go to the audit log too (ADR-018)."""
+    await audit_service.record(
+        session, actor_id=user.id, project_id=project_id, entity_type=entity_type,
+        entity_id=entity_id, action=action, before=before, after=after,
+    )
+
+
+def _snap(obj, fields) -> dict:
+    return audit_service.snapshot(obj, fields)
 
 
 # --- Workflow ---
@@ -35,6 +58,8 @@ async def create_workflow(
     await require_manager(session, project_id, user)  # also validates project exists
     wf = Workflow(project_id=project_id, name=data.name, is_default=data.is_default)
     session.add(wf)
+    await session.flush()
+    await _audit(session, project_id, user, "workflow", wf.id, "created", after=_snap(wf, _WF))
     await session.commit()
     return await _load_workflow(session, wf.id)
 
@@ -68,6 +93,7 @@ async def update_workflow(
 ) -> Workflow:
     wf = await _get_workflow_or_404(session, workflow_id)
     await require_manager(session, wf.project_id, user)
+    before = _snap(wf, _WF)
     if data.name is not None:
         wf.name = data.name
     if data.is_default is not None:
@@ -79,6 +105,8 @@ async def update_workflow(
                 .values(is_default=False)
             )
         wf.is_default = data.is_default
+    await _audit(session, wf.project_id, user, "workflow", wf.id, "updated",
+                 *audit_service.diff(before, _snap(wf, _WF)))
     await session.commit()
     return await _load_workflow(session, wf.id)
 
@@ -105,6 +133,7 @@ async def delete_workflow(
             {"code": "WORKFLOW_HAS_TASKS"},
         )
 
+    await _audit(session, wf.project_id, user, "workflow", wf.id, "deleted", before=_snap(wf, _WF))
     await session.delete(wf)
     await session.commit()
 
@@ -134,6 +163,8 @@ async def create_status(
         color=data.color,
     )
     session.add(s)
+    await session.flush()
+    await _audit(session, wf.project_id, user, "status", s.id, "created", after=_snap(s, _STATUS))
     await session.commit()
     await session.refresh(s)
     return s
@@ -145,6 +176,7 @@ async def update_status(
     s = await _get_status_or_404(session, status_id)
     wf = await _get_workflow_or_404(session, s.workflow_id)
     await require_manager(session, wf.project_id, user)
+    before = _snap(s, _STATUS)
 
     if data.color is not None:
         s.color = data.color
@@ -168,6 +200,8 @@ async def update_status(
             await _unset_default_status(session, s.workflow_id)
         s.is_default = data.is_default
 
+    await _audit(session, wf.project_id, user, "status", s.id, "updated",
+                 *audit_service.diff(before, _snap(s, _STATUS)))
     await session.commit()
     await session.refresh(s)
     return s
@@ -183,6 +217,7 @@ async def delete_status(
     if await _count_tasks_in_status(session, status_id) > 0:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "STATUS_HAS_ACTIVE_TASKS"})
 
+    await _audit(session, wf.project_id, user, "status", s.id, "deleted", before=_snap(s, _STATUS))
     await _delete_status_with_transitions(session, s)
 
 
@@ -198,12 +233,14 @@ async def migrate_status(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "STATUS_WORKFLOW_MISMATCH"})
 
     from app.models.task import Task
-    await session.execute(
+    moved = await session.execute(
         update(Task)
         .where(Task.current_status_id == status_id, Task.deleted_at.is_(None))
         .values(current_status_id=data.target_status_id)
     )
 
+    await _audit(session, wf.project_id, user, "status", s.id, "deleted", before=_snap(s, _STATUS),
+                 after={"migrated_to": str(data.target_status_id), "tasks_moved": moved.rowcount})
     await _delete_status_with_transitions(session, s)
 
 
@@ -231,6 +268,8 @@ async def create_transition(
         required_fields=list(data.required_fields),
     )
     session.add(t)
+    await session.flush()
+    await _audit(session, wf.project_id, user, "transition", t.id, "created", after=_snap(t, _TRANSITION))
     await session.commit()
     await session.refresh(t)
     return t
@@ -244,11 +283,14 @@ async def update_transition(
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TRANSITION_NOT_FOUND"})
     wf = await _get_workflow_or_404(session, t.workflow_id)
     await require_manager(session, wf.project_id, user)
+    before = _snap(t, _TRANSITION)
     fs = data.model_fields_set
     if "required_role" in fs:
         t.required_role = data.required_role
     if "required_fields" in fs and data.required_fields is not None:
         t.required_fields = list(data.required_fields)
+    await _audit(session, wf.project_id, user, "transition", t.id, "updated",
+                 *audit_service.diff(before, _snap(t, _TRANSITION)))
     await session.commit()
     await session.refresh(t)
     return t
@@ -262,6 +304,7 @@ async def delete_transition(
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TRANSITION_NOT_FOUND"})
     wf = await _get_workflow_or_404(session, t.workflow_id)
     await require_manager(session, wf.project_id, user)
+    await _audit(session, wf.project_id, user, "transition", t.id, "deleted", before=_snap(t, _TRANSITION))
     await session.delete(t)
     await session.commit()
 
@@ -405,7 +448,10 @@ async def set_task_type_workflow(
         )
     )
     if existing:
+        before = _snap(existing, _TYPE_CONFIG)
         existing.workflow_id = data.workflow_id
+        await _audit(session, project_id, user, "task_type_config", existing.id, "updated",
+                     *audit_service.diff(before, _snap(existing, _TYPE_CONFIG)))
         await session.commit()
         await session.refresh(existing)
         return existing
@@ -416,6 +462,9 @@ async def set_task_type_workflow(
         workflow_id=data.workflow_id,
     )
     session.add(config)
+    await session.flush()
+    await _audit(session, project_id, user, "task_type_config", config.id, "created",
+                 after=_snap(config, _TYPE_CONFIG))
     await session.commit()
     await session.refresh(config)
     return config
@@ -432,6 +481,8 @@ async def reset_task_type_workflow(
         )
     )
     if config:
+        await _audit(session, project_id, user, "task_type_config", config.id, "deleted",
+                     before=_snap(config, _TYPE_CONFIG))
         await session.delete(config)
         await session.commit()
 
@@ -471,6 +522,8 @@ async def create_view(
         position = data.position
     v = View(project_id=project_id, name=data.name, type=data.type, position=position)
     session.add(v)
+    await session.flush()
+    await _audit(session, project_id, user, "view", v.id, "created", after=_snap(v, _VIEW))
     await session.commit()
     await session.refresh(v)
     return v
@@ -483,10 +536,12 @@ async def update_view(
     if not v:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "VIEW_NOT_FOUND"})
     await require_manager(session, v.project_id, user)
+    before = _snap(v, _VIEW)
     if data.name is not None:
         v.name = data.name
     if data.position is not None:
         v.position = data.position
+    await _audit(session, v.project_id, user, "view", v.id, "updated", *audit_service.diff(before, _snap(v, _VIEW)))
     await session.commit()
     await session.refresh(v)
     return v
@@ -501,6 +556,7 @@ async def delete_view(
     await require_manager(session, v.project_id, user)
     if v.is_default:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VIEW_IS_DEFAULT"})
+    await _audit(session, v.project_id, user, "view", v.id, "deleted", before=_snap(v, _VIEW))
     await session.delete(v)
     await session.commit()
 
@@ -528,6 +584,8 @@ async def create_board_column(
     await require_manager(session, v.project_id, user)
     col = BoardColumn(view_id=view_id, name=data.name, position=data.position)
     session.add(col)
+    await session.flush()
+    await _audit(session, v.project_id, user, "board_column", col.id, "created", after=_snap(col, _COLUMN))
     await session.commit()
     return await _load_board_column(session, col.id)
 
@@ -538,10 +596,13 @@ async def update_board_column(
     col = await _get_board_column_or_404(session, column_id)
     v = await session.get(View, col.view_id)
     await require_manager(session, v.project_id, user)
+    before = _snap(col, _COLUMN)
     if data.name is not None:
         col.name = data.name
     if data.position is not None:
         col.position = data.position
+    await _audit(session, v.project_id, user, "board_column", col.id, "updated",
+                 *audit_service.diff(before, _snap(col, _COLUMN)))
     await session.commit()
     return await _load_board_column(session, col.id)
 
@@ -552,6 +613,7 @@ async def delete_board_column(
     col = await _get_board_column_or_404(session, column_id)
     v = await session.get(View, col.view_id)
     await require_manager(session, v.project_id, user)
+    await _audit(session, v.project_id, user, "board_column", col.id, "deleted", before=_snap(col, _COLUMN))
     await session.delete(col)
     await session.commit()
 
@@ -577,6 +639,8 @@ async def add_status_to_column(
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "STATUS_ALREADY_MAPPED"})
 
     session.add(BoardColumnStatus(board_column_id=column_id, status_id=status_id))
+    await _audit(session, v.project_id, user, "board_column", column_id, "status_added",
+                 after={"status_id": str(status_id)})
     await session.commit()
     return await _load_board_column(session, column_id)
 
@@ -594,6 +658,8 @@ async def remove_status_from_column(
         )
     )
     if mapping:
+        await _audit(session, v.project_id, user, "board_column", column_id, "status_removed",
+                     before={"status_id": str(status_id)})
         await session.delete(mapping)
         await session.commit()
 

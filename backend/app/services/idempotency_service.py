@@ -133,6 +133,15 @@ async def complete(
     await session.commit()
 
 
+async def purge_expired(session: AsyncSession) -> int:
+    """Delete keys older than KEY_TTL. Returns the number removed."""
+    result = await session.execute(
+        delete(IdempotencyKey).where(IdempotencyKey.created_at < datetime.now(UTC) - KEY_TTL)
+    )
+    await session.commit()
+    return result.rowcount
+
+
 async def _check_replay_access(session: AsyncSession, record: IdempotencyKey, user: User) -> None:
     if record.system and not user.is_superuser:
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})

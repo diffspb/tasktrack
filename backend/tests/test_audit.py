@@ -260,3 +260,33 @@ async def test_no_gap_when_commits_are_out_of_order(committed_engine):
     async with Session() as s:
         stored = (await s.scalars(select(AuditEvent).where(AuditEvent.project_id == project_id))).all()
         assert len(stored) == 2
+
+
+async def test_configuration_changes_are_recorded(
+    client: AsyncClient, db_session: AsyncSession, stub_user: User
+):
+    pid = await _project(db_session, stub_user)
+    wf = (await client.post(f"/api/v1/projects/{pid}/workflows", json={"name": "Extra"})).json()
+    st = (await client.post(f"/api/v1/workflows/{wf['id']}/statuses", json={
+        "name": "Queued", "category": "initial", "is_default": True, "position": 0,
+    })).json()
+    await client.patch(f"/api/v1/statuses/{st['id']}", json={"name": "Queue"})
+    await client.delete(f"/api/v1/statuses/{st['id']}")
+
+    events = [(e["entity_type"], e["action"]) for e in (await _log(client, pid))["items"]]
+    assert ("workflow", "created") in events
+    assert ("status", "created") in events and ("status", "updated") in events
+    assert ("status", "deleted") in events
+
+
+async def test_import_is_recorded(client: AsyncClient, db_session: AsyncSession, stub_user: User):
+    from app.services import project_export_service
+
+    pid = await _project(db_session, stub_user)
+    await client.post(f"/api/v1/projects/{pid}/tasks", json={"title": "Экспортируемая"})
+    data = await project_export_service.export_project(db_session, pid, stub_user)
+    stub_user.is_superuser = True
+    r = await client.post("/api/v1/projects/import", json={"data": data, "new_key": uuid.uuid4().hex[:8].upper()})
+    assert r.status_code == 201, r.text
+    events = [(e["entity_type"], e["action"]) for e in (await _log(client, r.json()["id"]))["items"]]
+    assert ("project", "imported") in events and ("task", "created") in events

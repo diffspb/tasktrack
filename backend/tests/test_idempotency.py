@@ -204,3 +204,18 @@ async def test_concurrent_duplicates_execute_once(committed_app):
     assert len({r.json()["id"] for r in results}) == 1
     async with Session() as s:
         assert await _count_tasks(s, pid) == 1
+
+
+async def test_purge_expired_keys(db_session: AsyncSession, stub_user: User):
+    from app.services.idempotency_service import purge_expired
+
+    old = IdempotencyKey(user_id=stub_user.id, key=uuid.uuid4().hex, request_hash="x" * 64,
+                         created_at=datetime.now(UTC) - timedelta(hours=25))
+    fresh = IdempotencyKey(user_id=stub_user.id, key=uuid.uuid4().hex, request_hash="y" * 64,
+                           created_at=datetime.now(UTC) - timedelta(hours=1))
+    db_session.add_all([old, fresh])
+    await db_session.flush()
+    assert await purge_expired(db_session) >= 1
+    remaining = set((await db_session.scalars(select(IdempotencyKey.key).where(
+        IdempotencyKey.key.in_([old.key, fresh.key])))).all())
+    assert remaining == {fresh.key}
