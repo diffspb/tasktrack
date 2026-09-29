@@ -6,11 +6,17 @@
 # если копия старее кода.
 #
 # Переменные окружения:
-#   TASKTRACK_COMPOSE — команда compose (по умолчанию prod-набор файлов)
+#   TASKTRACK_PROJECT — имя compose-проекта (под PaaS-деплоером: prod-tasktrack)
+#   TASKTRACK_COMPOSE — иначе команда compose (по умолчанию prod-набор файлов)
 #   TASKTRACK_YES=1   — не спрашивать подтверждение
 set -euo pipefail
 
-COMPOSE="${TASKTRACK_COMPOSE:-docker compose -f docker-compose.yml -f docker-compose.prod.yml}"
+# Под PaaS-деплоером: TASKTRACK_PROJECT=prod-tasktrack (имя compose-проекта; файлы не нужны)
+if [ -n "${TASKTRACK_PROJECT:-}" ]; then
+    COMPOSE="docker compose -p $TASKTRACK_PROJECT"
+else
+    COMPOSE="${TASKTRACK_COMPOSE:-docker compose -f docker-compose.yml -f docker-compose.prod.yml}"
+fi
 FILE="${1:?usage: restore.sh <file.dump>}"
 [ -f "$FILE" ] || { echo "нет файла: $FILE" >&2; exit 1; }
 
