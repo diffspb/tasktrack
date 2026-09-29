@@ -1,10 +1,12 @@
-# Таск-трекер с поддержкой мульти-исполнителей — документация
+# TaskTrack — документация
 
 ## О продукте
 
-Внутренний таск-трекер с уникальной механикой: **одна задача может выполняться несколькими исполнителями параллельно**, каждый ведёт задачу через **свой персональный воркфлоу** независимо от других. При завершении всех частей вместо автоматического закрытия запускается **Decision Process**: каждый исполнитель подаёт свой Solution, decision-maker выносит Decision — выбирает один или несколько Solution как итог.
+Внутренний таск-трекер для работы людей и консольных агентов над портфелем проектов. Хранит работу и локальную проверку её результата. У задачи **один исполнитель**; ключевая механика — **независимая проверка результата**: исполнитель подаёт предложение результата, проверяющий (не автор) принимает его или возвращает на доработку, и ни редактируемый комментарий, ни формальная отметка не создают ложной готовности. Решение — [ADR-016](./decisions/ADR-016-responsible-review-model.md), план развития — [FR-003](./feature-requests/FR-003-portfolio-execution.md).
 
-**Контекст:** single-tenant, внутренний инструмент без биллинга. Много проектов в одном инстансе, видимость настраивается по группам. Цель первого запуска — исследовательская: прогнать 2–3 реальных проекта и собрать обратную связь.
+> **Смена главной фишки (2026-09-29).** Исходно продукт строился вокруг нескольких исполнителей на одну задачу с независимыми воркфлоу и Decision Process (каждый подаёт Solution, decision-maker выносит Decision). В коде эта механика была откатана ещё в мае ([ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)), а ADR-016 окончательно от неё отказался. Документы о ней перенесены в «Исторические файлы».
+
+**Контекст:** single-tenant, внутренний инструмент без биллинга. Много проектов в одном инстансе, видимость настраивается по участникам. Агенты работают через REST и MCP от служебных учётных записей.
 
 ---
 
@@ -20,12 +22,12 @@
 | 3. Задачи и назначения (S1 через API) | `impl-phase-3` | ✅ |
 | 4. Frontend scaffold + Projects UI | `impl-phase-4` | ✅ |
 | 5. Tasks UI + Kanban | `s1-complete` | ✅ |
-| 6. Decision Process backend | `impl-phase-6` | ⚠️ откатан |
-| 7. Decision Process UI | `s23-complete` | ⚠️ откатан |
+| 6. Decision Process backend | `impl-phase-6` | ⛔ откатан, отменён |
+| 7. Decision Process UI | `s23-complete` | ⛔ откатан, отменён |
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
-> ⚠️ **Этапы 6–7 сданы под своими тегами, но откатаны** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)). Удалены таблицы `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision`; у задачи один `assignee_id`; Solution хранится суррогатом в `Comment.labels=["solution"]` + `Task.meta.solution_comment_id`; каталог `frontend/src/features/decision-process/` пуст. Ключевая фича продукта в текущем коде **не реализована** — план восстановления в [tech-debt.md](./tech-debt.md).
+> ⛔ **Этапы 6–7 сданы под своими тегами, откатаны** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)) **и отменены** [ADR-016](./decisions/ADR-016-responsible-review-model.md): восстанавливать не нужно. До реализации предложений результата и проверки (FR-003, TT-14/15) в коде остаётся суррогат — задача типа `decision` и комментарий с меткой `solution`.
 
 **Внеочередные фичи (post-phase-9):**
 - ✅ MCP-сервер для агентов (`GET /mcp/sse`, multi-agent auth через `MCP_AGENTS`)
@@ -57,12 +59,11 @@
 | [stories/collaboration.md](./stories/collaboration.md) | Comments, Notifications, History, Time tracking |
 | [stories/planning.md](./stories/planning.md) | Epics, Labels, Search, Boards, Analytics, Integrations |
 | [stories/access.md](./stories/access.md) | Permissions, Groups & Visibility, Project Links |
-| [stories/decision-process.md](./stories/decision-process.md) | Decision Process + мульти-исполнители (с AC для 🟢) |
-| [07-decision-process.md](./07-decision-process.md) | Decision Process: механика, состояния, Solution, revision |
-| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: механика, роли lead/reviewer/consultant |
+| [stories/result-review.md](./stories/result-review.md) | Предложение результата и независимая проверка (ADR-016, FR-003 пакет C) |
+| [feature-requests/FR-003](./feature-requests/FR-003-portfolio-execution.md) | **План развития:** пакеты A–D, статус пунктов |
 | [12-data-model.md](./12-data-model.md) | ERD (Mermaid), схема воркфлоу, нетривиальные решения |
-| [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие, AssigneeRole × действие |
-| [14-diagrams.md](./14-diagrams.md) | State-диаграммы задачи и Solution, sequence S2, уведомления |
+| [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие |
+| [14-diagrams.md](./14-diagrams.md) | State-диаграммы задачи, уведомления (разделы о Solution и S2 — исторические) |
 | [15-api.md](./15-api.md) | REST API контракты для MVP-сценариев |
 | [10-nfr.md](./10-nfr.md) | NFR: масштаб, стек, инфра, Keycloak, деплой |
 | [05-often-missed.md](./05-often-missed.md) | Решения по часто упускаемым техническим деталям |
@@ -72,14 +73,14 @@
 | Файл | Что внутри |
 |------|------------|
 | [decisions/](./decisions/) | ADR-каталог: все ключевые архитектурные и продуктовые решения |
-| [decisions/ADR-001](./decisions/ADR-001-decision-process.md) | Decision Process как механизм закрытия |
+| [decisions/ADR-001](./decisions/ADR-001-decision-process.md) | Decision Process как механизм закрытия — _заменено ADR-016_ |
 | [decisions/ADR-002](./decisions/ADR-002-tech-stack.md) | Технологический стек и инфраструктура |
 | [decisions/ADR-003](./decisions/ADR-003-notifications.md) | Уведомления: отказ от email |
 | [decisions/ADR-004](./decisions/ADR-004-data-model.md) | Ключевые решения по модели данных |
 | [decisions/ADR-005](./decisions/ADR-005-product.md) | Сборник продуктовых решений |
 | [decisions/ADR-006](./decisions/ADR-006-phase2-model-decisions.md) | Решения по модели, принятые в Этапе 2 |
 | [decisions/ADR-007](./decisions/ADR-007-frontend-architecture.md) | Архитектура фронтенда: стек, сайдбар, токены |
-| [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment |
+| [decisions/ADR-008](./decisions/ADR-008-awaiting-decision-trigger.md) | Триггер `awaiting_decision` — Solution.submit, не финальный статус Assignment — _заменено ADR-016_ |
 | [decisions/ADR-009](./decisions/ADR-009-board-columns-fr001.md) | BoardColumn — независимый слой между воркфлоу и Kanban-бордой (FR-001) |
 | [decisions/ADR-010](./decisions/ADR-010-mcp-server.md) | MCP-сервер для агентов — встроенный SSE-транспорт, multi-agent auth |
 | [decisions/ADR-011](./decisions/ADR-011-epic-tree-view.md) | Epic Tree View — древовидный список задач по эпикам |
@@ -87,7 +88,7 @@
 | [decisions/ADR-013](./decisions/ADR-013-gantt-dependency-arrows.md) | Стрелки зависимостей на диаграмме Ганта |
 | [decisions/ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md) | MVP-упрощение: отказ от Assignment и Decision Process |
 | [decisions/ADR-015](./decisions/ADR-015-resolution-removal.md) | Удаление Resolution из модели |
-| [decisions/ADR-016](./decisions/ADR-016-responsible-review-model.md) | **На рассмотрении:** один ответственный + предложения результата + независимая проверка вместо мульти-исполнителей (FR-003) |
+| [decisions/ADR-016](./decisions/ADR-016-responsible-review-model.md) | **Главная механика:** один исполнитель + предложения результата + независимая проверка вместо мульти-исполнителей (принято 2026-09-29) |
 | [decisions/ADR-017](./decisions/ADR-017-service-accounts-api-keys.md) | Служебные учётные записи и ключи API для REST и MCP вместо `MCP_AGENTS` (FR-003, TT-05) |
 | [decisions/ADR-018](./decisions/ADR-018-audit-log-event-journal.md) | Аудит-лог и журнал событий: запись в транзакции изменения, курсор `(xid, id)` без пропусков (FR-003, TT-06) |
 | [decisions/ADR-019](./decisions/ADR-019-idempotency-keys.md) | Безопасный повтор команд по `Idempotency-Key`, резерв в транзакции команды (FR-003, TT-04) |
@@ -111,6 +112,8 @@
 | [16-arch-review.md](./16-arch-review.md) | Архитектурное ревью от 2026-04-26 — закрыто, заменено ревью № 2 |
 | [17-arch-review-2.md](./17-arch-review-2.md) | **Архитектурное ревью № 2 (2026-05-02)** — 20 delta кода vs docs, блокеры перед FR-001 |
 | [01-needs.md](./01-needs.md) | Исходные потребности («зачем») |
+| [04-multi-assignee.md](./04-multi-assignee.md) | Мульти-исполнители: механика, роли lead/reviewer/consultant — **отменено ADR-016** |
+| [07-decision-process.md](./07-decision-process.md) | Decision Process: механика, состояния, Solution, revision — **отменено ADR-016** |
 
 ---
 
@@ -118,11 +121,11 @@
 
 1. **[00-context.md](./00-context.md)** — что строим, для кого, что точно не делаем.
 2. **[glossary.md](./glossary.md)** — прочитать один раз, держать открытым.
-3. **[decisions/](./decisions/)** — пройти по ADR-001…013: ключевые архитектурные и продуктовые решения.
-4. **[09-mvp.md](./09-mvp.md)** — scope и приоритизация до погружения в детали.
-5. **[07-decision-process.md](./07-decision-process.md)** — ключевой механизм продукта.
-6. **[03-user-stories.md](./03-user-stories.md)** → **[stories/decision-process.md](./stories/decision-process.md)** — истории с AC.
+3. **[ADR-016](./decisions/ADR-016-responsible-review-model.md)** и **[FR-003](./feature-requests/FR-003-portfolio-execution.md)** — текущая главная механика и план развития.
+4. **[decisions/](./decisions/)** — остальные ADR; заменённые помечены в индексе.
+5. **[09-mvp.md](./09-mvp.md)** — scope и приоритизация.
+6. **[03-user-stories.md](./03-user-stories.md)** → **[stories/](./stories/)** — истории.
 7. **[12-data-model.md](./12-data-model.md)** — ERD и схема воркфлоу.
 8. **[13-permissions.md](./13-permissions.md)** — матрица прав.
 9. **[15-api.md](./15-api.md)** — API контракты.
-10. **[10-nfr.md](./10-nfr.md)** — инфраструктура и ограничения.
+10. **[10-nfr.md](./10-nfr.md)** и **[configuration.md](./configuration.md)** — инфраструктура, развёртывание, параметры.
