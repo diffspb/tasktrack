@@ -32,6 +32,7 @@
 - ✅ Поиск пользователей при добавлении участника проекта (autocomplete combobox)
 - ✅ SSE онлайн-обновления задач (борд + бэклог, переключатель Live/Paused)
 - ✅ Ключ проекта в URL вместо UUID (`/projects/DEMO/board`)
+- ✅ FR-003 пакет A, TT-01–03: единая проверка прав на запись, атомарные версия и нумерация задач (2026-09-29)
 
 Инфра: Docker обязателен. Схема БД — Alembic (`upgrade head` в lifespan). Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
 Архитектурные решения → **[decisions/](./decisions/)**.
