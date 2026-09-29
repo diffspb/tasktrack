@@ -1,6 +1,6 @@
 # ADR-008: Триггер перехода в `awaiting_decision` — Solution.submit, не финальный статус Assignment
 
-**Статус:** Принято
+**Статус:** Заменено [ADR-016](./ADR-016-responsible-review-model.md) (2026-09-29) — Decision Process отменён
 **Дата:** 2026-04-30
 
 ## Контекст
