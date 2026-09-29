@@ -29,6 +29,7 @@ erDiagram
         uuid actor_id
         uuid project_id
         uuid task_id
+        uuid session_id
         string entity_type
         uuid entity_id
         string action
@@ -84,6 +85,7 @@ erDiagram
         uuid project_id FK
         uuid user_id FK
         string role
+        boolean is_reviewer
         timestamp created_at
     }
 
@@ -96,6 +98,7 @@ erDiagram
         string color
         string icon
         jsonb meta_schema
+        boolean requires_review
         uuid default_workflow_id FK
         timestamp created_at
         timestamp updated_at
@@ -128,6 +131,7 @@ erDiagram
         uuid from_status_id FK
         uuid to_status_id FK
         string required_role
+        jsonb required_fields
         timestamp created_at
         timestamp updated_at
     }
@@ -183,11 +187,81 @@ erDiagram
         date start_date
         date due_date
         integer duration_days
+        jsonb work_package_draft
+        integer work_package_version
+        uuid reviewer_id FK
+        string result_state
+        jsonb delivery
+        jsonb recipient_acceptance
         tsvector search_vector
         timestamp deleted_at
         integer version
         timestamp created_at
         timestamp updated_at
+    }
+
+    WorkPackage {
+        uuid id PK
+        uuid task_id FK
+        integer version
+        jsonb content
+        string digest
+        uuid issued_by FK
+        timestamp created_at
+    }
+
+    ResultProposal {
+        uuid id PK
+        uuid task_id FK
+        integer version
+        uuid author_id FK
+        uuid work_package_id FK
+        uuid supersedes_id FK
+        uuid session_id FK
+        string status
+        text summary
+        jsonb links
+        jsonb criteria
+        jsonb checks
+        text limitations
+        jsonb provenance
+        timestamp created_at
+    }
+
+    Review {
+        uuid id PK
+        uuid proposal_id FK
+        uuid reviewer_id FK
+        string verdict
+        jsonb criteria
+        text rationale
+        timestamp created_at
+    }
+
+    TaskSession {
+        uuid id PK
+        uuid task_id FK
+        uuid user_id FK
+        uuid work_package_id FK
+        string role
+        string state
+        string machine
+        string workdir
+        string client
+        timestamp last_checkpoint_at
+        timestamp ended_at
+        uuid ended_by FK
+        text end_reason
+        text result
+        timestamp created_at
+    }
+
+    SessionCheckpoint {
+        uuid id PK
+        uuid session_id FK
+        text note
+        jsonb data
+        timestamp created_at
     }
 
     TaskLink {
@@ -267,6 +341,14 @@ erDiagram
     User ||--o{ Notification : "получает"
     User ||--o{ ApiKey : "служебная учётная запись владеет ключами"
     User ||--o{ IdempotencyKey : "повторяемые команды"
+    Task ||--o{ WorkPackage : "версии задания"
+    Task ||--o{ ResultProposal : "версии результата"
+    ResultProposal ||--o{ Review : "проверки"
+    WorkPackage ||--o{ ResultProposal : "по версии задания"
+    Task ||--o{ TaskSession : "сессии исполнения"
+    TaskSession ||--o{ SessionCheckpoint : "контрольные точки"
+    TaskSession ||--o{ ResultProposal : "подано из сессии"
+    User ||--o{ Review : "проверяет"
     User ||--o{ TaskLink : "создаёт"
     User ||--o{ GanttChart : "владеет"
 
@@ -358,7 +440,7 @@ erDiagram
 
 ### Comment.labels
 
-`Comment.labels: string[]` — PostgreSQL ARRAY(String). Используется для внутренней классификации комментариев. Текущее значение: `["solution"]` — суррогат результата подзадачи до реализации предложения результата (FR-003, TT-14); Decision Process отменён ADR-016.
+`Comment.labels: string[]` — PostgreSQL ARRAY(String). Используется для внутренней классификации комментариев. Метки — свободная классификация; метка `solution` больше ничего не значит (результат задачи — `ResultProposal`, ADR-021).
 
 ### Comment soft-delete
 
@@ -388,13 +470,22 @@ Append-only таблица значимых изменений ([ADR-018](./deci
 
 Строка на пару (пользователь, ключ) ([ADR-019](./decisions/ADR-019-idempotency-keys.md)). Вставляется в транзакции команды до её выполнения, поэтому существует только если команда зафиксирована. `completed_at`, `status_code`, `response_body` заполняются сразу после ответа. `xid` связывает ключ с событиями аудита той же транзакции; по ним заполняются `project_ids`/`system` для повторной проверки прав. Срок действия — 24 часа.
 
+### Задание, результат, проверка, сессии (FR-003)
+
+- **WorkPackage** — неизменяемая версия задания ([ADR-020](./decisions/ADR-020-work-package.md)); черновик — `Task.work_package_draft`, текущая версия — `Task.work_package_version`. `digest` — SHA-256 канонического JSON `content`; критерии имеют ключи `c1`, `c2`…
+- **ResultProposal** — результат исполнителя ([ADR-021](./decisions/ADR-021-result-proposal-review.md)), неизменяем; `(task_id, version)` уникально; статус `submitted` / `accepted` / `changes_requested` / `rejected` / `withdrawn` / `superseded` / `historical` (перенесённые `solution`-комментарии).
+- **Review** — неизменяемая проверка одной версии с обязательным `rationale`.
+- `Task.result_state` вычисляется из предложений и хранится для фильтров; `Task.reviewer_id` — назначенный проверяющий; `Task.delivery` / `Task.recipient_acceptance` — предложенная поставка и полученный факт приёмки.
+- `ProjectMember.is_reviewer` — профиль проверяющего; `TaskType.requires_review` — финальный статус только после вердикта; `Transition.required_fields` — обязательные поля `meta` ([ADR-023](./decisions/ADR-023-process-types.md)).
+- **TaskSession** ([ADR-022](./decisions/ADR-022-task-sessions.md)) — частичный уникальный индекс `uq_task_sessions_active_executor (task_id) WHERE state='active' AND role='executor'`; завершается только явно. `AuditEvent.session_id` — сессия, в которой сделано изменение.
+
 ### Нумерация задач (Project.task_seq)
 
 `Project.task_seq` — последний выданный номер задачи в проекте. `create_task` увеличивает его одним `UPDATE … RETURNING`; блокировка строки проекта сериализует параллельное создание, ключ `{project.key}-{task_seq}` не повторяется (FR-003, TT-03). Номера удалённых задач не переиспользуются. Постоянный идентификатор задачи — UUID; ключ проекта не меняется после создания.
 
 ### meta (JSONB)
 
-`Task.meta: jsonb` — произвольные метаданные задачи. В текущей реализации используется для хранения `solution_comment_id` (суррогат результата до TT-14).
+`Task.meta: jsonb` — произвольные метаданные задачи. Проверяется по `TaskType.meta_schema`, если схема задана (ADR-023); ключи `meta` могут быть обязательными для переходов (`Transition.required_fields`).
 
 ---
 
@@ -472,8 +563,6 @@ Append-only таблица значимых изменений ([ADR-018](./deci
 
 | Таблица | Зачем |
 |---------|-------|
-| `ResultProposal` | Предложение результата (FR-003, TT-14) — новая главная сущность |
-| `Review` | Проверка результата (FR-003, TT-15) |
 | `Label` / `TaskLabel` | Метки задач |
 | `Attachment` | Вложения файлов |
 | `Watcher` | Подписчики задачи |

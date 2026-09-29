@@ -14,7 +14,7 @@
 | [stories/collaboration.md](./stories/collaboration.md) | Комментарии, уведомления, история, учёт времени | I, N, M, L |
 | [stories/planning.md](./stories/planning.md) | Эпики, метки, поиск, доски, аналитика, интеграции | D, E, J, K, Q, O |
 | [stories/access.md](./stories/access.md) | Права доступа, группы пользователей, связи между проектами | P, R, S |
-| [stories/result-review.md](./stories/result-review.md) | Предложение результата и независимая проверка (ADR-016) | T |
+| [stories/result-review.md](./stories/result-review.md) | Задание, результат и проверка, сессии исполнения, контроль (ADR-016, ADR-020…023) | T, U |
 
 ---
 

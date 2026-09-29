@@ -2069,7 +2069,7 @@ Callback после авторизации через Google. Обрабатыв
 
 Для `MCP_AGENTS` и dev-режима агент-пользователи резолвятся один раз при старте (`resolve_all_agents()` в lifespan). Если пользователь не найден или деактивирован — сервер не падает, но инструменты вернут ошибку до наполнения БД (`make mcp-bootstrap`).
 
-### Инструменты (18 зарегистрированных)
+### Инструменты (28 зарегистрированных)
 
 | Группа | Инструменты |
 |--------|-------------|
@@ -2079,10 +2079,70 @@ Callback после авторизации через Google. Обрабатыв
 | Воркфлоу (read-only) | `list_workflows`, `get_workflow` |
 | Связи задач | `create_task_link`, `delete_task_link` |
 | Пользователи | `search_users` |
+| Рабочий цикл агента (FR-003, TT-18) | `get_work_package`, `claim_task`, `checkpoint`, `finish_session`, `release_session`, `submit_result`, `list_results`, `list_review_queue`, `review_result`, `get_task_history` |
 
 Соглашения: `get_task` / `get_task_by_key` возвращают связи задачи в поле `links`; перед `update_task` нужно получить актуальный `version` через `get_task` (оптимистичная блокировка та же, что в REST).
 
+Рабочий цикл: `get_work_package` → `claim_task` (сессия) → `checkpoint` … → `submit_result` → `finish_session`; проверяющий — `list_review_queue` → `review_result`. Изменяющие инструменты (`create_task`, `update_task`, `transition_task_status`, `add_comment`, `claim_task`, `submit_result`, `review_result`) принимают `idempotency_key`; часть — `session_id` (как `X-Task-Session`) и `reason` (как `X-Change-Reason`). Результат задачи — только `submit_result`; комментарий результатом не является.
+
 Не покрыто через MCP, хотя есть в REST: `delete_task`, `delete_comment`, уведомления, лента событий проекта, Гант, колонки борды — см. `tech-debt.md`. Управление проектами, участниками и CUD воркфлоу остаётся только в UI/REST по дизайну. Предложение переработать набор в action-oriented стиль — [FR-002](./feature-requests/FR-002-mcp-action-api.md).
+
+---
+
+## Задание, результат и проверка (FR-003)
+
+Главная механика продукта ([ADR-016](./decisions/ADR-016-responsible-review-model.md)). Решения — [ADR-020](./decisions/ADR-020-work-package.md) (задание), [ADR-021](./decisions/ADR-021-result-proposal-review.md) (результат и проверка), [ADR-022](./decisions/ADR-022-task-sessions.md) (сессии), [ADR-023](./decisions/ADR-023-process-types.md) (процессы).
+
+### Задание (WorkPackage)
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `GET /tasks/{id}/work-package` | Видит задачу | `{state: none\|draft\|issued\|draft_changed, draft, current}` |
+| `PUT /tasks/{id}/work-package/draft` | Автор задачи или менеджер | Сохранить черновик `{goal, expected_result, criteria[{key?, text, required}], inputs[{kind, ref, version?, note?}], constraints[], specialization}` |
+| `POST /tasks/{id}/work-package/issue` | Автор задачи или менеджер | Выпустить неизменяемую версию: `201 {id, version, content, digest, issued_by}`; `422 WORK_PACKAGE_INCOMPLETE {missing}`; `409 WORK_PACKAGE_UNCHANGED` |
+| `GET /tasks/{id}/work-packages` | Видит задачу | Все версии |
+| `GET /work-packages/{id}` | Видит задачу | Версия |
+| `GET /work-packages/{id}/export?format=json\|yaml` | Видит задачу | Закреплённая копия для консоли: id, версия, digest, проект, задача, содержимое |
+
+Критериям присваиваются ключи `c1`, `c2`… при выпуске. `TaskResponse.work_package_version` — текущая версия.
+
+### Предложение результата и проверка
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `POST /tasks/{id}/proposals` | Исполнитель задачи (роль member+) | Подать результат `{summary, links[{kind, url, ref?}], criteria[{key, status: met\|not_met\|not_applicable, evidence?}], checks[{name, result: passed\|failed\|skipped, details?}], limitations?, supersedes_id?, work_package_id?}` → `201`. `403 NOT_ASSIGNEE`, `422 UNKNOWN_CRITERION`, `409 PROPOSAL_NOT_SUPERSEDABLE` |
+| `GET /tasks/{id}/proposals` | Видит задачу | Все версии с проверками |
+| `GET /proposals/{id}` | Видит задачу | Версия |
+| `POST /proposals/{id}/withdraw` | Автор, пока не проверено | → `withdrawn`; `409 PROPOSAL_NOT_WITHDRAWABLE` |
+| `POST /proposals/{id}/reviews` | Профиль проверяющего; не автор и не исполнитель; назначенный, если задан | `{verdict: accepted\|changes_requested\|rejected, rationale, criteria[{key, verdict: met\|not_met, note?}]}` → `201`. `403 SELF_REVIEW / NOT_REVIEWER / NOT_DESIGNATED_REVIEWER`, `409 PROPOSAL_NOT_REVIEWABLE`, `422 CRITERIA_NOT_MET {criteria}` |
+| `GET /review-queue?project_id=` | Любой | Предложения, ждущие проверки текущего пользователя, с `{task: {id, key, title, project_id}}` |
+| `POST /tasks/{id}/delivery` | Исполнитель или менеджер, после принятия | `{target, ref?, note?}` → задача с `delivery`; `409 RESULT_NOT_ACCEPTED` |
+| `POST /tasks/{id}/recipient-acceptance` | Менеджер | Записать приёмку получателем как полученный факт `{accepted_by, accepted_at, source, ref?, note?}`; `409 DELIVERY_NOT_PROPOSED` |
+| `PATCH /projects/{id}/members/{user_id}` | Менеджер | `{role?, is_reviewer?}` — роль и профиль проверяющего |
+
+`PATCH /tasks/{id}` принимает `reviewer_id` (менеджер; только участник с профилем проверяющего, не исполнитель — иначе `400 NOT_REVIEWER / SELF_REVIEW`). `TaskResponse` содержит `reviewer_id`, `result_state` (`none`/`proposed`/`changes_requested`/`accepted`/`rejected`/`historical`), `delivery`, `recipient_acceptance`.
+
+### Сессии исполнения
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `POST /tasks/{id}/sessions` | Исполнитель (`role: executor`) или проверяющий (`role: reviewer`) | `{role?, machine?, workdir?, client?}` → `201`; `409 SESSION_ACTIVE {session_id, user_id, machine, started_at, last_checkpoint_at}` |
+| `GET /tasks/{id}/sessions`, `GET /sessions/{id}` | Видит задачу | Сессии с контрольными точками |
+| `POST /sessions/{id}/checkpoints` | Владелец активной сессии | `{note, data?}` → `201` |
+| `POST /sessions/{id}/complete` | Владелец | `{result?}` |
+| `POST /sessions/{id}/release` | Владелец или менеджер | `{reason}` — обязательна; истечения времени нет |
+
+Заголовок `X-Task-Session: <id>` в любом запросе относит изменения к своей активной сессии (журнал, `session_id` и провенанс предложения результата); чужая или завершённая сессия — `409 SESSION_NOT_ACTIVE`, неверный формат — `400 SESSION_HEADER_INVALID`.
+
+### Процессы и метаданные
+
+- `TaskType.meta_schema` (JSON Schema) проверяется при создании и изменении `meta`: `422 META_INVALID {errors[{path, message}]}`.
+- `PATCH /transitions/{id}` `{required_role?, required_fields?}` (менеджер). Вход в статус по переходу требует непустых полей `meta` из `required_fields`: `400 TRANSITION_FIELDS_REQUIRED {missing}`.
+- Типы с `requires_review` (`execution`, `research`, `migration`) переходят в финальный статус только при `result_state` `accepted` или `rejected`: `400 RESULT_NOT_REVIEWED`.
+
+### Представление руководителя
+
+`GET /projects/{id}/control?specialization=&reviewer_id=&reason=` (видит проект) → `{summary: {open_tasks, by_reason, by_specialization}, items[{id, key, title, task_type, status, assignee_id, reviewer_id, specialization, work_package_version, result_state, active_session, blocked_by, waiting[]}]}`. Причины ожидания: `no_work_package`, `work_package_changed`, `no_assignee`, `blocked`, `awaiting_review`, `changes_requested`, `session_stale` (> 24 ч без контрольных точек), `awaiting_recipient`, `unverified_result`.
 
 ---
 
@@ -2101,7 +2161,7 @@ Callback после авторизации через Google. Обрабатыв
 | У пользователя больше нет права записи в изменённый проект | Обычная ошибка доступа (`403`/`404`), сохранённый ответ не выдаётся |
 | Ключ длиннее 255 или с недопустимыми символами | `400 IDEMPOTENCY_KEY_INVALID` |
 
-MCP-инструменты ключ пока не принимают.
+MCP: изменяющие инструменты принимают параметр `idempotency_key` с теми же правилами.
 
 ---
 
@@ -2294,7 +2354,6 @@ Soft-deleted задачи не включаются в результаты по
 | `SOLUTION_IN_REVISION` | 400 | Попытка отозвать Solution в статусе `revision_requested` — нужно доработать и подать повторно |
 | `TASK_ALREADY_AWAITING_DECISION` | 400 | Задача уже в статусе `awaiting_decision`; Solution принят, но переход задачи не повторяется |
 | `CANNOT_MODIFY_DECIDED_TASK` | 400 | Изменение задачи после вынесения Decision недоступно |
-| `SOLUTION_NOT_ASSIGNEE` | 403 | Комментарий с меткой `solution` (суррогат Solution, ADR-014) может создать только исполнитель задачи. _Реализовано (FR-003, TT-01)._ |
 
 ### Assignment (400)
 

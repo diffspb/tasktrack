@@ -27,13 +27,14 @@
 | 8. Доводка (Alembic, Keycloak) | `mvp-research-launch` | ✅ |
 | 9. FR-001 мульти-воркфлоу | `impl-phase-9` | ✅ |
 
-> ⛔ **Этапы 6–7 сданы под своими тегами, откатаны** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)) **и отменены** [ADR-016](./decisions/ADR-016-responsible-review-model.md): восстанавливать не нужно. До реализации предложений результата и проверки (FR-003, TT-14/15) в коде остаётся суррогат — задача типа `decision` и комментарий с меткой `solution`.
+> ⛔ **Этапы 6–7 сданы под своими тегами, откатаны** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)) **и отменены** [ADR-016](./decisions/ADR-016-responsible-review-model.md): восстанавливать не нужно. Их место заняла новая главная механика — задание, предложение результата и проверка (FR-003, ADR-020…023, реализовано 2026-09-30).
 
 **Внеочередные фичи (post-phase-9):**
 - ✅ MCP-сервер для агентов (`GET /mcp/sse`, multi-agent auth через `MCP_AGENTS`)
 - ✅ Поиск пользователей при добавлении участника проекта (autocomplete combobox)
 - ✅ SSE онлайн-обновления задач (борд + бэклог, переключатель Live/Paused)
 - ✅ Ключ проекта в URL вместо UUID (`/projects/DEMO/board`)
+- ✅ FR-003 пакеты B–D без внешних систем (TT-09, 12–18, 22, 2026-09-30): задание с версиями, сессии исполнения, предложение результата и независимая проверка, типы-процессы, MCP-контракт агента, страница Control; UI для всего этого. Ждут контракта внешних систем: TT-08, 10, 11, 19–21
 - ✅ FR-003 пакет A (TT-01–07, 2026-09-29): единая проверка прав на запись, атомарные версия и нумерация задач, `Idempotency-Key`, служебные учётные записи и ключи API, журнал событий с курсором, воспроизводимый образ с резервным копированием. Остатки — в таблице статуса [FR-003](./feature-requests/FR-003-portfolio-execution.md)
 
 Инфра: Docker обязателен. Схема БД — Alembic (`upgrade head` в lifespan). Тесты — PostgreSQL через testcontainers (savepoint-изоляция). Dev-БД — `make db-start`.  
@@ -59,7 +60,7 @@
 | [stories/collaboration.md](./stories/collaboration.md) | Comments, Notifications, History, Time tracking |
 | [stories/planning.md](./stories/planning.md) | Epics, Labels, Search, Boards, Analytics, Integrations |
 | [stories/access.md](./stories/access.md) | Permissions, Groups & Visibility, Project Links |
-| [stories/result-review.md](./stories/result-review.md) | Предложение результата и независимая проверка (ADR-016, FR-003 пакет C) |
+| [stories/result-review.md](./stories/result-review.md) | Задание, результат и проверка, сессии, контроль (ADR-016, ADR-020…023) |
 | [feature-requests/FR-003](./feature-requests/FR-003-portfolio-execution.md) | **План развития:** пакеты A–D, статус пунктов |
 | [12-data-model.md](./12-data-model.md) | ERD (Mermaid), схема воркфлоу, нетривиальные решения |
 | [13-permissions.md](./13-permissions.md) | Матрица прав: ProjectRole × действие |
