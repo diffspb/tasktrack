@@ -35,6 +35,8 @@ class Project(Base, UUIDMixin, TimestampMixin):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Last issued task number; incremented atomically by task_service.create_task.
+    task_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     members: Mapped[list["ProjectMember"]] = relationship(
         "ProjectMember", back_populates="project"

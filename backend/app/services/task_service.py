@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -39,10 +39,14 @@ async def create_task(
     if not default_status:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_NO_DEFAULT_STATUS"})
 
-    count = await session.scalar(
-        select(func.count()).select_from(Task).where(Task.project_id == project_id)
-    ) or 0
-    key = f"{project.key}-{count + 1}"
+    # Row lock on the project serialises numbering; released at commit.
+    seq = await session.scalar(
+        update(Project)
+        .where(Project.id == project_id)
+        .values(task_seq=Project.task_seq + 1)
+        .returning(Project.task_seq)
+    )
+    key = f"{project.key}-{seq}"
 
     task = Task(
         project_id=project_id,
@@ -73,9 +77,9 @@ async def create_task(
 
 
 async def get_task(
-    session: AsyncSession, task_id: uuid.UUID, user: User
+    session: AsyncSession, task_id: uuid.UUID, user: User, *, for_update: bool = False
 ) -> Task:
-    task = await _load_task(session, task_id)
+    task = await _load_task(session, task_id, for_update=for_update)
     if not task or task.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TASK_NOT_FOUND"})
     await require_project_access(session, task.project_id, user)
@@ -212,11 +216,9 @@ async def list_tasks_global(
 async def update_task(
     session: AsyncSession, task_id: uuid.UUID, data: TaskUpdate, user: User
 ) -> Task:
-    task = await get_task(session, task_id, user)
+    task = await get_task(session, task_id, user, for_update=True)
     await require_writer(session, task.project_id, user)
-
-    if data.version != task.version:
-        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VERSION_CONFLICT"})
+    _check_version(task, data.version)
 
     old_assignee = task.assignee_id
 
@@ -259,8 +261,10 @@ async def transition_status(
     data: TaskStatusTransition,
     user: User,
 ) -> Task:
-    task = await get_task(session, task_id, user)
+    task = await get_task(session, task_id, user, for_update=True)
     member = await require_writer(session, task.project_id, user)
+    if data.version is not None:
+        _check_version(task, data.version)
 
     # Assignee moves their own task; manager/admin may move anyone's.
     if task.assignee_id != user.id and not has_role(member, ProjectMemberRole.manager):
@@ -280,6 +284,7 @@ async def transition_status(
         await _check_decision_task_unblocked(session, task)
 
     task.current_status_id = data.status_id
+    task.version += 1
 
     await session.commit()
     loaded = await _load_task(session, task.id)
@@ -289,12 +294,27 @@ async def transition_status(
 
 # --- Internal helpers ---
 
-async def _load_task(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
-    return await session.scalar(
+async def _load_task(
+    session: AsyncSession, task_id: uuid.UUID, *, for_update: bool = False
+) -> Task | None:
+    stmt = (
         select(Task)
         .options(selectinload(Task.task_type), selectinload(Task.subtasks))
         .where(Task.id == task_id)
     )
+    if for_update:
+        # Lock the row until commit and re-read it: a concurrent writer that
+        # committed while we waited must be visible to the version check.
+        stmt = stmt.with_for_update(of=Task).execution_options(populate_existing=True)
+    return await session.scalar(stmt)
+
+
+def _check_version(task: Task, version: int) -> None:
+    if version != task.version:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "VERSION_CONFLICT", "current_version": task.version},
+        )
 
 
 async def _resolve_task_type(

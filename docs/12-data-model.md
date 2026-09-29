@@ -31,6 +31,7 @@ erDiagram
         boolean is_archived
         timestamp deleted_at
         integer version
+        integer task_seq
         timestamp created_at
         timestamp updated_at
     }
@@ -299,7 +300,7 @@ erDiagram
 
 ### Transition.required_role
 
-`Transition.required_role` — nullable string. Если `NULL` — переход доступен всем участникам проекта. Если задано — только пользователям с соответствующей ролью в проекте (`admin`, `manager`, `member`).
+`Transition.required_role` — nullable string. Если `NULL` — переход доступен всем, кто может переводить задачу (исполнитель или `manager`/`admin`). Если задано — значение трактуется как **минимальная** роль в проекте по порядку `viewer` < `member` < `manager` < `admin`; неизвестное значение — отказ (`TRANSITION_ROLE_REQUIRED`). Проверка реализована в FR-003 (TT-01).
 
 Текущее ограничение MVP: одна роль на переход. Расширение до массива ролей — см. `docs/tech-debt.md`.
 
@@ -327,7 +328,11 @@ erDiagram
 
 ### Оптимистичные блокировки
 
-`Task.version` (integer) инкрементируется при каждом обновлении полей задачи (заголовок, описание, приоритет и т.д.). Смена `Task.current_status_id` через переход статуса — не инкрементирует `version`. При PATCH клиент передаёт текущую версию; если в БД версия выше — `409 Conflict`.
+`Task.version` (integer) инкрементируется при каждом обновлении полей задачи и при переходе статуса. PATCH и переход берут строку задачи под `SELECT … FOR UPDATE` и сравнивают версию уже под блокировкой, поэтому из двух запросов с одной исходной версией проходит ровно один, второй получает `409 VERSION_CONFLICT` с `current_version` (FR-003, TT-02). В переходе `version` необязателен: если передан — проверяется.
+
+### Нумерация задач (Project.task_seq)
+
+`Project.task_seq` — последний выданный номер задачи в проекте. `create_task` увеличивает его одним `UPDATE … RETURNING`; блокировка строки проекта сериализует параллельное создание, ключ `{project.key}-{task_seq}` не повторяется (FR-003, TT-03). Номера удалённых задач не переиспользуются. Постоянный идентификатор задачи — UUID; ключ проекта не меняется после создания.
 
 ### meta (JSONB)
 

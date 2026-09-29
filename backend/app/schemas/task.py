@@ -46,6 +46,8 @@ class TaskUpdate(BaseModel):
 
 class TaskStatusTransition(BaseModel):
     status_id: uuid.UUID
+    # Optional optimistic lock: when given, must match the task's current version.
+    version: int | None = None
 
 
 class TaskMinimal(BaseModel):

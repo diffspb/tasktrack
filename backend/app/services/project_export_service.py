@@ -427,6 +427,8 @@ async def import_project(
         await session.flush()
         old_key_to_task[t_data["key"]] = task
 
+    project.task_seq = task_counter
+
     # 6. Task links
     lt_cache: dict[str, LinkType | None] = {}
     for lnk in data.get("links", []):
