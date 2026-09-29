@@ -37,6 +37,20 @@ erDiagram
         jsonb after
     }
 
+    IdempotencyKey {
+        uuid user_id PK
+        string key PK
+        string request_hash
+        bigint xid
+        timestamp created_at
+        timestamp completed_at
+        integer status_code
+        text response_body
+        string media_type
+        jsonb project_ids
+        boolean system
+    }
+
     ApiKey {
         uuid id PK
         uuid user_id FK
@@ -252,6 +266,7 @@ erDiagram
     User ||--o{ Comment : "пишет"
     User ||--o{ Notification : "получает"
     User ||--o{ ApiKey : "служебная учётная запись владеет ключами"
+    User ||--o{ IdempotencyKey : "повторяемые команды"
     User ||--o{ TaskLink : "создаёт"
     User ||--o{ GanttChart : "владеет"
 
@@ -368,6 +383,10 @@ erDiagram
 ### AuditEvent: журнал событий
 
 Append-only таблица значимых изменений ([ADR-018](./decisions/ADR-018-audit-log-event-journal.md)), пишется в транзакции изменения. Внешних ключей нет намеренно — запись переживает строки, которые описывает (поэтому `AuditEvent` не связан с другими сущностями на диаграмме). `xid` — id транзакции-писателя (`pg_current_xact_id()`), вместе с `id` образует курсор чтения; отдаются события только завершённых транзакций (`xid < pg_snapshot_xmin`). Индексы `(project_id, xid, id)` и `(task_id, xid, id)`.
+
+### IdempotencyKey: повтор команд
+
+Строка на пару (пользователь, ключ) ([ADR-019](./decisions/ADR-019-idempotency-keys.md)). Вставляется в транзакции команды до её выполнения, поэтому существует только если команда зафиксирована. `completed_at`, `status_code`, `response_body` заполняются сразу после ответа. `xid` связывает ключ с событиями аудита той же транзакции; по ним заполняются `project_ids`/`system` для повторной проверки прав. Срок действия — 24 часа.
 
 ### Нумерация задач (Project.task_seq)
 
