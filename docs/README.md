@@ -92,6 +92,10 @@
 | [decisions/ADR-017](./decisions/ADR-017-service-accounts-api-keys.md) | Служебные учётные записи и ключи API для REST и MCP вместо `MCP_AGENTS` (FR-003, TT-05) |
 | [decisions/ADR-018](./decisions/ADR-018-audit-log-event-journal.md) | Аудит-лог и журнал событий: запись в транзакции изменения, курсор `(xid, id)` без пропусков (FR-003, TT-06) |
 | [decisions/ADR-019](./decisions/ADR-019-idempotency-keys.md) | Безопасный повтор команд по `Idempotency-Key`, резерв в транзакции команды (FR-003, TT-04) |
+| [decisions/ADR-020](./decisions/ADR-020-work-package.md) | Задание: черновик и неизменяемые версии с digest (FR-003, TT-09) |
+| [decisions/ADR-021](./decisions/ADR-021-result-proposal-review.md) | **Главная механика:** предложение результата, проверка, профиль проверяющего, поставка (FR-003, TT-14–17) |
+| [decisions/ADR-022](./decisions/ADR-022-task-sessions.md) | Сессии исполнения: одна активная, контрольные точки, завершение только явно (FR-003, TT-12) |
+| [decisions/ADR-023](./decisions/ADR-023-process-types.md) | Типы-процессы и валидация метаданных, обязательные поля переходов (FR-003, TT-13) |
 
 ### Открытые хвосты
 
