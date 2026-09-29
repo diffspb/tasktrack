@@ -16,7 +16,22 @@ erDiagram
         string keycloak_id UK
         boolean is_active
         boolean is_superuser
+        boolean is_service
         string timezone
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ApiKey {
+        uuid id PK
+        uuid user_id FK
+        string name
+        string prefix
+        string key_hash UK
+        uuid created_by FK
+        timestamp expires_at
+        timestamp revoked_at
+        timestamp last_used_at
         timestamp created_at
         timestamp updated_at
     }
@@ -221,6 +236,7 @@ erDiagram
     User ||--o{ Task : "исполнитель (assignee)"
     User ||--o{ Comment : "пишет"
     User ||--o{ Notification : "получает"
+    User ||--o{ ApiKey : "служебная учётная запись владеет ключами"
     User ||--o{ TaskLink : "создаёт"
     User ||--o{ GanttChart : "владеет"
 
@@ -329,6 +345,10 @@ erDiagram
 ### Оптимистичные блокировки
 
 `Task.version` (integer) инкрементируется при каждом обновлении полей задачи и при переходе статуса. PATCH и переход берут строку задачи под `SELECT … FOR UPDATE` и сравнивают версию уже под блокировкой, поэтому из двух запросов с одной исходной версией проходит ровно один, второй получает `409 VERSION_CONFLICT` с `current_version` (FR-003, TT-02). В переходе `version` необязателен: если передан — проверяется.
+
+### Служебные учётные записи и ApiKey
+
+`User.is_service = true` — учётная запись агента или интеграции ([ADR-017](./decisions/ADR-017-service-accounts-api-keys.md)): `keycloak_id = "service:<uuid>"`, входа через Keycloak нет. Аутентифицируется ключом `ApiKey`: хранится SHA-256 токена (`key_hash`, уникален) и первые 10 символов (`prefix`) для опознания. Ключ недействителен при `revoked_at`, истёкшем `expires_at` или неактивной учётной записи; проверка по БД на каждом запросе. `ON DELETE CASCADE` от пользователя.
 
 ### Нумерация задач (Project.task_seq)
 

@@ -88,6 +88,7 @@
 | [decisions/ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md) | MVP-упрощение: отказ от Assignment и Decision Process |
 | [decisions/ADR-015](./decisions/ADR-015-resolution-removal.md) | Удаление Resolution из модели |
 | [decisions/ADR-016](./decisions/ADR-016-responsible-review-model.md) | **На рассмотрении:** один ответственный + предложения результата + независимая проверка вместо мульти-исполнителей (FR-003) |
+| [decisions/ADR-017](./decisions/ADR-017-service-accounts-api-keys.md) | Служебные учётные записи и ключи API для REST и MCP вместо `MCP_AGENTS` (FR-003, TT-05) |
 
 ### Открытые хвосты
 

@@ -34,14 +34,37 @@
 
 ---
 
-## MCP-сервер для агентов
-
-MCP-сервер встроен в основное приложение и доступен по `GET /mcp/sse`. Все параметры опциональны — при отсутствии конфигурации MCP-инструменты вернут ошибку при вызове.
+## Режим установки
 
 | Переменная | Обязательна | По умолчанию | Описание |
 |---|---|---|---|
-| `MCP_AGENT_USER_ID` | Нет | — | UUID пользователя БД для dev-режима (один агент, без проверки ключа). Создаётся через `make mcp-bootstrap`. |
-| `MCP_AGENTS` | Нет | `""` | Маппинг ключей → UUID пользователей для prod/multi-agent режима. Формат: `key1:uuid1,key2:uuid2`. Если задано — API-ключ в `Authorization: Bearer <key>` обязателен. |
+| `APP_ENV` | Нет | `dev` | `production` задаётся в Docker-образе. При нём приложение **не стартует** с `AUTH_STUB=true` и с MCP без ключа (`MCP_AGENT_USER_ID` без `MCP_AGENTS`). Локально не задавать. |
+
+---
+
+## MCP-сервер для агентов
+
+MCP-сервер встроен в основное приложение и доступен по `GET /mcp/sse`.
+
+**Рекомендуемый способ — ключи служебных учётных записей** ([ADR-017](./decisions/ADR-017-service-accounts-api-keys.md)): переменные окружения не нужны, ключ работает и в MCP, и в REST, отзывается без перезапуска.
+
+```bash
+# на сервере, внутри контейнера приложения
+python scripts/service_account.py create --email pm-agent@agents --name "PM agent"
+python scripts/service_account.py issue  --email pm-agent@agents --key-name laptop --expires-days 90
+# → token (shown once): tt_…
+python scripts/service_account.py keys   --email pm-agent@agents
+python scripts/service_account.py rotate --key-id <id>     # или revoke
+```
+
+Затем добавить учётную запись участником нужных проектов (роль `viewer` — только чтение) и указать токен в `.mcp.json` вместо `pm-secret-abc` в примере ниже.
+
+Переменные ниже — **устаревший** способ (оставлен для существующих агентов):
+
+| Переменная | Обязательна | По умолчанию | Описание |
+|---|---|---|---|
+| `MCP_AGENT_USER_ID` | Нет | — | UUID пользователя БД для dev-режима (один агент, без проверки ключа). Создаётся через `make mcp-bootstrap`. Запрещён при `APP_ENV=production`. |
+| `MCP_AGENTS` | Нет | `""` | _Устарел._ Маппинг ключей → UUID пользователей для prod/multi-agent режима. Формат: `key1:uuid1,key2:uuid2`. Если задано — API-ключ в `Authorization: Bearer <key>` обязателен. |
 
 **Приоритет:** если `MCP_AGENTS` задан и не пустой — используется он. Иначе — `MCP_AGENT_USER_ID`. Оба могут быть заданы одновременно (например, один агент без ключа для dev, несколько с ключами для prod — в разных env-файлах).
 
@@ -144,7 +167,8 @@ POSTGRES_PASSWORD=CHANGE_ME
 # CORS
 CORS_ORIGINS=https://tasktrack.busypage.ru
 
-# MCP агенты (опционально — только если используются AI-агенты)
+# MCP агенты: выпускайте ключи служебных учётных записей
+# (scripts/service_account.py, ADR-017). MCP_AGENTS — устаревший способ:
 # MCP_AGENTS=pm-secret:uuid1,exec-secret:uuid2
 ```
 
