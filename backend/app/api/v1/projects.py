@@ -4,7 +4,7 @@ import uuid
 
 import json as _json
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,14 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
+    _require_instance_admin(user)
     return await project_service.create_project(session, data, user)
+
+
+def _require_instance_admin(user: User) -> None:
+    """Creating and importing projects: instance administrator only (13-permissions.md)."""
+    if not user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -206,6 +213,7 @@ async def import_project(
     reset_statuses: if true, all tasks are placed in the initial workflow status
                     instead of restoring the original status (default false).
     """
+    _require_instance_admin(user)
     return await project_export_service.import_project(
         session, body.data, body.new_key,
         body.include_comments, body.reset_statuses, user,

@@ -290,6 +290,7 @@ async def test_import_duplicate_key(db_session: AsyncSession, stub_user: User):
 async def test_import_http(client: AsyncClient, db_session: AsyncSession, stub_user: User):
     p, *_ = await _setup(db_session, stub_user)
     export_data = await project_export_service.export_project(db_session, p.id, stub_user)
+    stub_user.is_superuser = True  # import creates a project: instance admin only
 
     new_key = _unique_key()
     resp = await client.post("/api/v1/projects/import", json={

@@ -1,6 +1,7 @@
 """Tests for BoardColumn CRUD via View-based API."""
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +9,13 @@ from app.models.project import Project, ProjectMember, ProjectMemberRole, Projec
 from app.models.user import User
 from app.schemas.project import ProjectCreate
 from app.services import project_service
+
+
+
+@pytest.fixture(autouse=True)
+def _stub_user_is_instance_admin(stub_user):
+    """Creating projects over HTTP requires a superuser (13-permissions.md)."""
+    stub_user.is_superuser = True
 
 
 async def _setup(session: AsyncSession, user: User) -> tuple[str, str, str, str]:

@@ -73,7 +73,23 @@ json() { python3 -c "import sys, json; print(json.load(sys.stdin)$1)"; }
 step "5a. повтор команды по Idempotency-Key"
 $TASKTRACK_COMPOSE exec -T app python -c \
     "import asyncio; from app.core.bootstrap import ensure_system_data; asyncio.run(ensure_system_data())"
-PID="$(api -d '{"name":"Smoke","key":"SMOKE"}' "http://localhost:$PORT/api/v1/projects" | json '["id"]')"
+code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    -d '{"name":"No","key":"NOPE"}' "http://localhost:$PORT/api/v1/projects")"
+[ "$code" = "403" ] || fail "проект создан не администратором: $code"
+# Проект создаёт администратор; для проверки — скриптом, владелец — служебная учётная запись
+PID="$($TASKTRACK_COMPOSE exec -T app python -c '
+import asyncio
+from sqlalchemy import select
+from app.core.db import SessionLocal
+from app.models.user import User
+from app.schemas.project import ProjectCreate
+from app.services.project_service import create_project
+async def main():
+    async with SessionLocal() as s:
+        owner = await s.scalar(select(User).where(User.email == "smoke@agents"))
+        print((await create_project(s, ProjectCreate(name="Smoke", key="SMOKE"), owner)).id)
+asyncio.run(main())
+')"
 FIRST="$(api -H "Idempotency-Key: smoke-1" -d '{"title":"once"}' "http://localhost:$PORT/api/v1/projects/$PID/tasks")"
 SECOND="$(api -H "Idempotency-Key: smoke-1" -d '{"title":"once"}' "http://localhost:$PORT/api/v1/projects/$PID/tasks")"
 [ "$FIRST" = "$SECOND" ] || fail "повтор вернул другой ответ"
