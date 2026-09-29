@@ -15,6 +15,7 @@ class AuditEventResponse(BaseModel):
     actor_id: uuid.UUID | None
     project_id: uuid.UUID | None
     task_id: uuid.UUID | None
+    session_id: uuid.UUID | None = None
     entity_type: str
     entity_id: uuid.UUID
     action: str

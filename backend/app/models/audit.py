@@ -31,6 +31,8 @@ class AuditEvent(Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     # The task the change belongs to (task itself, its comment or link) — for task history.
     task_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
+    # Work session the change was made in (X-Task-Session, ADR-022), if any.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
     entity_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     action: Mapped[str] = mapped_column(String(30), nullable=False)

@@ -54,7 +54,15 @@ async def submit_proposal(
     if task.assignee_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "NOT_ASSIGNEE"})
 
-    package = await _resolve_package(session, task, data.work_package_id)
+    # A change made in a work session belongs to that session and its pinned assignment version.
+    from app.services.session_service import current_session, provenance as session_provenance
+    work_session = current_session.get()
+    if work_session is not None and work_session.task_id != task.id:
+        work_session = None
+    package_id = data.work_package_id
+    if package_id is None and work_session is not None:
+        package_id = work_session.work_package_id
+    package = await _resolve_package(session, task, package_id)
     known = _criteria_keys(package)
     unknown = [c.key for c in data.criteria if known is not None and c.key not in known]
     if unknown:
@@ -78,13 +86,14 @@ async def submit_proposal(
         task_id=task.id, version=version, author_id=user.id,
         work_package_id=package.id if package else None,
         supersedes_id=previous.id if previous else None,
+        session_id=work_session.id if work_session else None,
         status=ProposalStatus.submitted,
         summary=data.summary,
         links=[link.model_dump() for link in data.links],
         criteria=[c.model_dump() for c in data.criteria],
         checks=[c.model_dump() for c in data.checks],
         limitations=data.limitations,
-        provenance=data.provenance,
+        provenance={**data.provenance, **(session_provenance(work_session) if work_session else {})},
     )
     session.add(proposal)
     await session.flush()

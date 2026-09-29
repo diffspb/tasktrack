@@ -79,6 +79,7 @@ class ProposalResponse(BaseModel):
     author_id: uuid.UUID
     work_package_id: uuid.UUID | None
     supersedes_id: uuid.UUID | None
+    session_id: uuid.UUID | None = None
     status: ProposalStatus
     summary: str
     links: list

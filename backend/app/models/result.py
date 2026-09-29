@@ -40,6 +40,8 @@ class ResultProposal(Base, UUIDMixin, TimestampMixin):
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     work_package_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("work_packages.id"))
     supersedes_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("result_proposals.id"))
+    # Work session the proposal was submitted from (ADR-022).
+    session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("task_sessions.id"))
     status: Mapped[ProposalStatus] = mapped_column(
         SQLEnum(ProposalStatus, native_enum=False, length=30), nullable=False
     )

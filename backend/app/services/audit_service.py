@@ -32,6 +32,10 @@ MAX_LIMIT = 500
 change_reason: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "change_reason", default=None
 )
+# Set per request from a validated X-Task-Session header (task_session_guard, ADR-022).
+task_session_id: contextvars.ContextVar[uuid.UUID | None] = contextvars.ContextVar(
+    "task_session_id", default=None
+)
 
 TASK_FIELDS = (
     "key", "title", "description", "priority", "task_type_id", "workflow_id",
@@ -65,7 +69,7 @@ async def record(
     event = AuditEvent(
         actor_id=actor_id, project_id=project_id, task_id=task_id,
         entity_type=entity_type, entity_id=entity_id, action=action,
-        reason=change_reason.get(), before=before, after=after,
+        reason=change_reason.get(), session_id=task_session_id.get(), before=before, after=after,
     )
     session.add(event)
     return event
