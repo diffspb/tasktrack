@@ -51,16 +51,7 @@ Keycloak уже запущен на `auth.busypage.ru`, realm `home`. Нужно
 
 ## Деплой
 
-```bash
-# На сервере в директории проекта
-cp .env.prod.example .env.prod
-# Отредактировать .env.prod: POSTGRES_PASSWORD и DATABASE_URL
-
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-
-# После первого старта — инициализировать БД
-docker compose exec app python scripts/reset_db.py
-```
+Рабочая установка разворачивается PaaS-деплоером — см. [docs/configuration.md](docs/configuration.md), раздел «Развёртывание через PaaS-деплоер». Схема БД создаётся миграциями при старте; `scripts/reset_db.py` на рабочей установке не запускать — он удаляет данные.
 
 ## Локальная разработка
 

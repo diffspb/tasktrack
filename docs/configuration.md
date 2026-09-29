@@ -184,7 +184,7 @@ docker compose -p prod-tasktrack exec app python -c \
 
 Перед выкладкой новой версии образ можно проверить локально: `bash deploy/smoke-test.sh` (см. `10-nfr.md`).
 
-`deploy/install.sh` — **устаревший** способ (тянет образ из ghcr, который никто не публикует, и не передаёт `.env.prod` в контейнер); оставлен до удаления.
+Прежний способ установки `deploy/install.sh` (готовый образ из ghcr + `.env.prod`) удалён 2026-09-29: образ никто не публиковал, а `.env.prod` не доходил до контейнера.
 
 ---
 
@@ -204,25 +204,15 @@ CORS_ORIGINS=["http://localhost:5173"]
 # MCP_AGENT_USER_ID=<uuid из вывода bootstrap>
 ```
 
-### `.env.prod` (production)
+### Рабочая установка
+
+Файла окружения нет: переменные задаются в PaaS-деплоере (`deployer projects env-set prod tasktrack KEY=value`, см. «Развёртывание через PaaS-деплоер»). Минимальный набор:
 
 ```bash
-# Auth
-AUTH_STUB=false
-KEYCLOAK_URL=https://auth.busypage.ru
-KEYCLOAK_REALM=home
-KEYCLOAK_CLIENT_ID=tasktrack
-
-# Database
-DATABASE_URL=postgresql+asyncpg://tasktrack:CHANGE_ME@postgres:5432/tasktrack
-POSTGRES_PASSWORD=CHANGE_ME
-
-# CORS
+POSTGRES_PASSWORD=<пароль>                      # DATABASE_URL собирается в docker-compose.prod.yml
 CORS_ORIGINS=https://tasktrack.busypage.ru
-
-# MCP агенты: выпускайте ключи служебных учётных записей
-# (scripts/service_account.py, ADR-017). MCP_AGENTS — устаревший способ:
-# MCP_AGENTS=pm-secret:uuid1,exec-secret:uuid2
+# KEYCLOAK_URL / KEYCLOAK_REALM / KEYCLOAK_CLIENT_ID — только если отличаются от значений по умолчанию
+# APP_ENV=production задан в образе; AUTH_STUB и MCP_AGENT_USER_ID не задавать
 ```
 
 ---

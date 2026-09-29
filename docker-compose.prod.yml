@@ -1,7 +1,6 @@
 services:
   app:
-    # PaaS-деплоер собирает образ из исходников (`up --build`) и лишь помечает его этим
-    # именем; готовый образ из ghcr тянет только устаревший deploy/install.sh.
+    # PaaS-деплоер собирает образ из исходников (`up --build`) и лишь помечает его этим именем.
     image: ghcr.io/diffspb/tasktrack:latest
     environment:
       DATABASE_URL: postgresql+asyncpg://tasktrack:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/tasktrack
