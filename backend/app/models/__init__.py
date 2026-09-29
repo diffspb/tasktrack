@@ -13,6 +13,7 @@ from app.models.notification import Notification, NotificationEntityType, Notifi
 from app.models.gantt import GanttChart, GanttChartTask
 from app.models.api_key import ApiKey
 from app.models.audit import AuditEvent
+from app.models.idempotency import IdempotencyKey
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -29,4 +30,5 @@ __all__ = [
     "GanttChart", "GanttChartTask",
     "ApiKey",
     "AuditEvent",
+    "IdempotencyKey",
 ]

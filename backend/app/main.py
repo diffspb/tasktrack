@@ -10,7 +10,9 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import router
 from app.core.config import settings, validate_runtime
 from app.core.db import run_migrations
+from app.api.idempotency import IdempotencyResponseMiddleware, replay_handler
 from app.core.middleware import ChangeReasonMiddleware
+from app.services.idempotency_service import IdempotentReplay
 from app.core.scheduler import scheduler
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -38,6 +40,8 @@ app.add_middleware(
 )
 
 app.add_middleware(ChangeReasonMiddleware)
+app.add_middleware(IdempotencyResponseMiddleware)
+app.add_exception_handler(IdempotentReplay, replay_handler)
 
 app.include_router(router)
 

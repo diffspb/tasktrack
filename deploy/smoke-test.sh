@@ -5,6 +5,7 @@
 #   3. резервная копия → потеря данных → восстановление возвращает данные;
 #   4. обновление с предыдущей схемы: откат ревизии, рестарт — снова head;
 #   5. ключ служебной учётной записи из CLI работает в REST, после отзыва — 401;
+#      повтор команды по Idempotency-Key не выполняет её дважды, журнал событий пишется;
 #   6. образ не запускается с AUTH_STUB=true (APP_ENV=production).
 #
 #   TASKTRACK_IMAGE=tasktrack:smoke bash deploy/smoke-test.sh
@@ -66,6 +67,19 @@ TOKEN="$(echo "$OUT" | tail -1)"
 KEY_ID="$(echo "$OUT" | sed -n 's/^key id=\([^ ]*\).*/\1/p')"
 code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "http://localhost:$PORT/api/v1/users/me")"
 [ "$code" = "200" ] || fail "ключ не принят: $code"
+api() { curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$@"; }
+json() { python3 -c "import sys, json; print(json.load(sys.stdin)$1)"; }
+
+step "5a. повтор команды по Idempotency-Key"
+$TASKTRACK_COMPOSE exec -T app python -c \
+    "import asyncio; from app.core.bootstrap import ensure_system_data; asyncio.run(ensure_system_data())"
+PID="$(api -d '{"name":"Smoke","key":"SMOKE"}' "http://localhost:$PORT/api/v1/projects" | json '["id"]')"
+FIRST="$(api -H "Idempotency-Key: smoke-1" -d '{"title":"once"}' "http://localhost:$PORT/api/v1/projects/$PID/tasks")"
+SECOND="$(api -H "Idempotency-Key: smoke-1" -d '{"title":"once"}' "http://localhost:$PORT/api/v1/projects/$PID/tasks")"
+[ "$FIRST" = "$SECOND" ] || fail "повтор вернул другой ответ"
+[ "$(api "http://localhost:$PORT/api/v1/projects/$PID/tasks" | json '.__len__()')" = "1" ] || fail "команда выполнена дважды"
+[ "$(api "http://localhost:$PORT/api/v1/projects/$PID/audit-log" | json '["items"].__len__()')" -ge 2 ] || fail "журнал событий пуст"
+
 sa revoke --key-id "$KEY_ID" >/dev/null
 code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "http://localhost:$PORT/api/v1/users/me")"
 [ "$code" = "401" ] || fail "отозванный ключ принят: $code"
