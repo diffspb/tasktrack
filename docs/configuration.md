@@ -135,6 +135,59 @@ MCP_AGENTS=pm-secret-abc:550e8400-e29b-41d4-a716-446655440000,exec-secret-xyz:6b
 
 ---
 
+## Развёртывание через PaaS-деплоер
+
+Рабочая установка разворачивается деплоером из `/home/sanek/projects/codex/paas` (контракт — его `docs/platform-contract.md`, базовая инфраструктура VPS — `/home/sanek/projects/claudecode/simple`). Деплоер клонирует репозиторий, собирает образ из исходников и запускает `docker compose -p prod-tasktrack --env-file <project.env> -f docker-compose.yml -f docker-compose.prod.yml -f <override> up -d --build --force-recreate`. Traefik-метки генерирует он же — в compose-файлах репозитория их нет.
+
+**Регистрация проекта** (один раз):
+
+```bash
+deployer projects add prod tasktrack --git-url git@github.com:diffspb/tasktrack.git --default-ref main \
+    --compose-file docker-compose.yml --compose-file docker-compose.prod.yml
+deployer components add prod tasktrack app --mode compose --compose-service app --port 8000
+deployer endpoints add prod tasktrack web app --port 8000 --subdomain tasktrack \
+    --auth none --middleware secure-headers@file --health-path /api/v1/health
+deployer projects env-set prod tasktrack POSTGRES_PASSWORD=<пароль>
+deployer projects env-set prod tasktrack CORS_ORIGINS=https://tasktrack.busypage.ru
+deployer deploy prod tasktrack --ref main
+```
+
+`--auth none` обязателен: приложение само проверяет вход (Keycloak в браузере, ключи API у агентов); SSO-прокси перед ним сломал бы REST- и MCP-клиентов с `Authorization: Bearer`. `deployer.yml` в корне репозитория описывает то же самое в формате импорта деплоера.
+
+**Переменные окружения** хранит деплоер (`deployer projects env-set prod tasktrack KEY=value`); они попадают и в подстановку `${…}` compose-файлов, и в окружение контейнера `app`. Файл `.env.prod` в этом способе не используется.
+
+| Переменная | Обязательна | Значение для рабочей установки |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Да | Пароль БД; без него compose не запустится |
+| `CORS_ORIGINS` | Да | `https://tasktrack.busypage.ru` |
+| `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` | Нет | По умолчанию `https://auth.busypage.ru`, `home`, `tasktrack` |
+| `APP_ENV` | — | Не задавать: `production` уже задан в образе |
+| `AUTH_STUB`, `MCP_AGENT_USER_ID` | — | Не задавать: при `APP_ENV=production` приложение с ними не стартует |
+
+Keycloak-настройки фронтенда (`VITE_KEYCLOAK_*`) вшиваются при сборке образа; значения по умолчанию в `Dockerfile` соответствуют рабочей установке.
+
+**Эксплуатация на сервере** (имя compose-проекта `prod-tasktrack`, compose-файлы не нужны):
+
+```bash
+# резервная копия и восстановление (скрипты — в deploy/ исходников)
+TASKTRACK_PROJECT=prod-tasktrack bash deploy/backup.sh /var/backups/tasktrack
+TASKTRACK_PROJECT=prod-tasktrack bash deploy/restore.sh /var/backups/tasktrack/<файл>.dump
+
+# служебные учётные записи и ключи агентов (ADR-017)
+docker compose -p prod-tasktrack exec app python scripts/service_account.py --help
+
+# первичное наполнение справочников (типы задач, типы связей) на пустой БД —
+# или кнопкой инициализации в системных настройках под суперпользователем
+docker compose -p prod-tasktrack exec app python -c \
+    "import asyncio; from app.core.bootstrap import ensure_system_data; asyncio.run(ensure_system_data())"
+```
+
+Перед выкладкой новой версии образ можно проверить локально: `bash deploy/smoke-test.sh` (см. `10-nfr.md`).
+
+`deploy/install.sh` — **устаревший** способ (тянет образ из ghcr, который никто не публикует, и не передаёт `.env.prod` в контейнер); оставлен до удаления.
+
+---
+
 ## Полные примеры env-файлов
 
 ### `.env.dev` (локальная разработка)
