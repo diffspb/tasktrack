@@ -71,8 +71,9 @@ api() { curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 json() { python3 -c "import sys, json; print(json.load(sys.stdin)$1)"; }
 
 step "5a. повтор команды по Idempotency-Key"
-$TASKTRACK_COMPOSE exec -T app python -c \
-    "import asyncio; from app.core.bootstrap import ensure_system_data; asyncio.run(ensure_system_data())"
+# справочники и системные процессы создаются при старте приложения (ensure_system_data в lifespan)
+[ "$(psql "SELECT count(*) FROM task_types WHERE key IN ('execution','research','migration')")" = "3" ] \
+    || fail "системные процессы не созданы при старте"
 code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{"name":"No","key":"NOPE"}' "http://localhost:$PORT/api/v1/projects")"
 [ "$code" = "403" ] || fail "проект создан не администратором: $code"
