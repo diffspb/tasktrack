@@ -58,6 +58,8 @@
 
 **Решение для v1:** ⚠️ Email — только для событий Decision Process (задача перешла в `awaiting_decision`, Solution отправлен на доработку, Decision вынесен). Все остальные уведомления — только in-app. Ответы по email в задачу — v2.
 
+> Устарело: email убран полностью ([ADR-003](./decisions/ADR-003-notifications.md), [09-mvp.md](./09-mvp.md) N), Decision Process отменён [ADR-016](./decisions/ADR-016-responsible-review-model.md).
+
 ---
 
 ## Идемпотентность операций через API

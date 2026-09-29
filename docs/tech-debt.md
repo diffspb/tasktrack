@@ -10,11 +10,7 @@
 ## Отложено на post-MVP (после исследовательского запуска)
 
 **APScheduler стартует без задач.**
-`scheduler.start()` в lifespan — мёртвый код. Структуру не убираем; задачи (напоминания decision-maker'у через 3 дня в `awaiting_decision`) — после реализации полноценного Decision Process (зависит от восстановления Assignment+Solution).
-
-**Мульти-исполнители и Assignment.** MVP-упрощение (коммит `40caac4`): таблица `Assignment` удалена, задача имеет один `assignee_id`. Восстановить: таблицу `Assignment (task_id, user_id, role, current_status_id, workflow_id, resolution_id)`, поле `Task.global_status`, логику пересчёта `global_status` при изменении Assignment'ов. Это основная дифференцирующая фича продукта; откладывается до стабилизации базового флоу. **Под вопросом:** [ADR-016](./decisions/ADR-016-responsible-review-model.md) (на рассмотрении) предлагает не восстанавливать `Assignment` — при его принятии пункт снимается.
-
-**Decision Process (Solution / TaskDecision).** Таблицы `Solution` и `TaskDecision` не реализованы. В MVP: суррогат через `Comment` с `labels=["solution"]` и `meta.solution_comment_id`. Восстановить: полноценные таблицы, API `submit_solution / make_decision / request_revision`, state machine `draft → submitted → accepted / revision_requested`. Зависит от восстановления Assignment. **Под вопросом:** по [ADR-016](./decisions/ADR-016-responsible-review-model.md) заменяется предложениями результата и отдельной проверкой (FR-003, TT-14/15).
+`scheduler.start()` в lifespan — мёртвый код (напоминания decision-maker'у отпали вместе с Decision Process, ADR-016). Кандидаты на задачи: очистка `idempotency_keys` старше 24 ч (ADR-019), напоминания об ожидающей проверке (FR-003, TT-15). Если ни одна не понадобится — убрать планировщик.
 
 **Transition: несколько ролей.** Сейчас `Transition.required_role` — одиночная строка (один required_role или NULL). Документация описывала `allowed_roles[]` (массив). Изменить на массив, когда понадобится разрешать переход нескольким разным ролям одновременно.
 

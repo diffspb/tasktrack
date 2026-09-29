@@ -2,6 +2,8 @@
 
 Документ для команды разработки. Описывает конкретную структуру проекта, ключевые решения и первые шаги.
 
+> Документ писался под исходную модель с Decision Process: модули `decision.py`, `decision_service.py`, `SolutionForm` и примеры с `Assignment` в коде отсутствуют — механика отменена [ADR-016](./decisions/ADR-016-responsible-review-model.md). Актуальный код — `backend/app/`, модель данных — [12-data-model.md](./12-data-model.md).
+
 Стек зафиксирован в [ADR-002](./decisions/ADR-002-tech-stack.md). Инфраструктура готова: Traefik v3 + Keycloak 24 + Netdata + Dozzle на `busypage.ru`. Паттерн новых приложений описан в `infra/simple/scripts/new-app.sh`.
 
 ---

@@ -47,13 +47,14 @@
 | `put_on_hold(task_id, reason)` | Пауза + причина | `transition_task_status` + `add_comment` |
 | `submit_completion(task_id, summary?)` | Перевести в «сделано» / «на проверке» + итоговый комментарий | `transition_task_status` + `add_comment` |
 
-### Decision Process
+### Результат и проверка
+
+> Раздел переписан 2026-09-29: Decision Process отменён [ADR-016](../decisions/ADR-016-responsible-review-model.md); инструменты `submit_solution` / `record_decision` заменены. Контракт — вместе с TT-14/15 и TT-18 [FR-003](./FR-003-portfolio-execution.md).
 
 | Инструмент | Что делает | Заменяет |
 |---|---|---|
-| `submit_solution(task_id, summary)` | Подать Solution — переводит Assignment в финальный статус | `transition_task_status` (assignment) |
-| `record_decision(task_id, outcome, rationale)` | Decision-maker фиксирует Decision | `transition_task_status` + `add_comment` |
-| `request_revision(task_id, assignee_email, comment)` | Вернуть задачу исполнителю на доработку | `transition_task_status` + `add_comment` |
+| `submit_result(task_id, links, criteria, checks, limitations)` | Подать предложение результата | комментарий с меткой `solution` |
+| `review_result(proposal_id, verdict, criteria, rationale)` | Проверяющий фиксирует проверку: принято / на доработку / отклонено | `transition_task_status` + `add_comment` |
 
 ### Управление задачами (PM / lead)
 

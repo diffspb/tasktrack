@@ -105,7 +105,7 @@
 
 ## Этап 6. Decision Process backend (S2/S3 ядро)
 
-> ⚠️ **Сдан под тегом `impl-phase-6`, затем откатан** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)): модели `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision` и роутеры `solutions.py` / `decisions.py` удалены. Ниже — исходный состав этапа, он же ориентир для восстановления (`tech-debt.md`).
+> ⚠️ **Сдан под тегом `impl-phase-6`, затем откатан** MVP-упрощением (`40caac4`, 2026-05-02, [ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md)): модели `Assignment`, `Solution`, `DecisionCriteria`, `TaskDecision` и роутеры `solutions.py` / `decisions.py` удалены. Восстанавливаться не будет — механика отменена [ADR-016](./decisions/ADR-016-responsible-review-model.md); ниже — исходный состав этапа как история. Её место занимает пакет C [FR-003](./feature-requests/FR-003-portfolio-execution.md).
 
 **Цель:** Мульти-исполнительские задачи работают через API.
 
@@ -120,7 +120,7 @@
 
 ## Этап 7. Decision Process UI (S2/S3 complete) ★
 
-> ⚠️ **Сдан под тегом `s23-complete`, затем откатан** вслед за этапом 6. Каталог `frontend/src/features/decision-process/` сейчас пуст.
+> ⛔ **Сдан под тегом `s23-complete`, затем откатан** вслед за этапом 6 и отменён ADR-016. Каталог `frontend/src/features/decision-process/` пуст.
 
 **Цель:** S2 и S3 полностью в браузере.
 

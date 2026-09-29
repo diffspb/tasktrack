@@ -50,6 +50,8 @@ stateDiagram-v2
 
 ### Состояния Solution
 
+> ⛔ **Отменено [ADR-016](./decisions/ADR-016-responsible-review-model.md)** (2026-09-29). Раздел описывает исходную модель с несколькими исполнителями; не реализуется.
+
 ```mermaid
 stateDiagram-v2
     [*] --> draft : Исполнитель (lead)\nначал работу над Solution
@@ -93,6 +95,8 @@ stateDiagram-v2
 ---
 
 ## 3.2. Sequence-диаграмма: Сценарий S2 — Decision Process
+
+> ⛔ **Отменено [ADR-016](./decisions/ADR-016-responsible-review-model.md)** (2026-09-29). Раздел описывает исходную модель с несколькими исполнителями; не реализуется. Сценарий S2 в [09-mvp.md](./09-mvp.md) теперь — предложение результата и проверка.
 
 Акторы: Manager (менеджер), Assignee1 (lead-исполнитель 1), Assignee2 (lead-исполнитель 2), DecisionMaker (decision-maker), System (бэкенд + уведомления).
 

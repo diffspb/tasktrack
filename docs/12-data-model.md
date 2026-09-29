@@ -321,7 +321,7 @@ erDiagram
 
 ### Один исполнитель (MVP-упрощение)
 
-`Task.assignee_id` — FK → `users.id`, nullable. В MVP — один исполнитель на задачу. Полная реализация мульти-исполнителей (таблица `Assignment` с независимыми воркфлоу) — см. `docs/tech-debt.md`.
+`Task.assignee_id` — FK → `users.id`, nullable. Один исполнитель на задачу — окончательно ([ADR-016](./decisions/ADR-016-responsible-review-model.md)); таблица `Assignment` не восстанавливается.
 
 ### parent_task_id: иерархия задач
 
@@ -358,7 +358,7 @@ erDiagram
 
 ### Comment.labels
 
-`Comment.labels: string[]` — PostgreSQL ARRAY(String). Используется для внутренней классификации комментариев. Текущее значение: `["solution"]` — суррогат для MVP-реализации Decision Process (см. `docs/07-decision-process.md` раздел «MVP-упрощение»).
+`Comment.labels: string[]` — PostgreSQL ARRAY(String). Используется для внутренней классификации комментариев. Текущее значение: `["solution"]` — суррогат результата подзадачи до реализации предложения результата (FR-003, TT-14); Decision Process отменён ADR-016.
 
 ### Comment soft-delete
 
@@ -394,7 +394,7 @@ Append-only таблица значимых изменений ([ADR-018](./deci
 
 ### meta (JSONB)
 
-`Task.meta: jsonb` — произвольные метаданные задачи. В текущей реализации используется для хранения `solution_comment_id` (MVP-суррогат Decision Process).
+`Task.meta: jsonb` — произвольные метаданные задачи. В текущей реализации используется для хранения `solution_comment_id` (суррогат результата до TT-14).
 
 ---
 
@@ -468,14 +468,12 @@ Append-only таблица значимых изменений ([ADR-018](./deci
 
 ## Сущности v2 (не реализованы в MVP)
 
-Следующие таблицы описаны в продуктовых требованиях, но отсутствуют в текущем коде. Реализуются после MVP-запуска по приоритету из `docs/tech-debt.md`:
+Следующие таблицы описаны в продуктовых требованиях, но отсутствуют в текущем коде. `Assignment`, `Solution`, `TaskDecision`, `DecisionCriteria` из этого списка убраны — отменены [ADR-016](./decisions/ADR-016-responsible-review-model.md). Реализуются после MVP-запуска по приоритету из `docs/tech-debt.md`:
 
 | Таблица | Зачем |
 |---------|-------|
-| `Assignment` | Мульти-исполнители с независимыми воркфлоу (ключевая фича) |
-| `Solution` | Поданное решение исполнителя (Decision Process) |
-| `TaskDecision` | Итоговое решение decision-maker'а |
-| `DecisionCriteria` | Критерии оценки Solution'ов |
+| `ResultProposal` | Предложение результата (FR-003, TT-14) — новая главная сущность |
+| `Review` | Проверка результата (FR-003, TT-15) |
 | `Label` / `TaskLabel` | Метки задач |
 | `Attachment` | Вложения файлов |
 | `Watcher` | Подписчики задачи |
