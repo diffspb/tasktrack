@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProjects } from '@/features/projects/api'
 import type { Task } from '@/features/tasks/api'
+import { useReviewQueue } from '@/features/results/api'
 
 function useMyTasks() {
   return useQuery<Task[]>({
@@ -24,6 +25,7 @@ export function Dashboard() {
   )
 
   const { data: tasks = [], isLoading } = useMyTasks()
+  const { data: reviewQueue = [] } = useReviewQueue()
 
   if (isLoading) {
     return (
@@ -52,6 +54,8 @@ export function Dashboard() {
           {active.length} task{active.length === 1 ? '' : 's'} touch you across all projects.
         </p>
       </div>
+
+      {reviewQueue.length > 0 && <ReviewQueueCard items={reviewQueue} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {widgets.map(w => (
@@ -115,6 +119,34 @@ function DashboardCard({
           })}
         </ul>
       )}
+    </section>
+  )
+}
+
+/** Results waiting for the current user's review (ux-debt 4, ADR-021). */
+function ReviewQueueCard({ items }: { items: import('@/features/results/api').ReviewQueueItem[] }) {
+  const navigate = useNavigate()
+  return (
+    <section className="rounded-lg border-2 border-orange-200 dark:border-orange-900/40 bg-background overflow-hidden"
+      data-testid="review-queue">
+      <header className="flex items-baseline justify-between border-b px-4 py-2.5">
+        <h2 className="text-sm font-semibold">Awaiting my review</h2>
+        <span className="text-xs text-muted-foreground">{items.length}</span>
+      </header>
+      <ul className="divide-y max-h-64 overflow-y-auto">
+        {items.map(p => (
+          <li key={p.id}>
+            <button
+              onClick={() => navigate(`/tasks/${p.task.key}`)}
+              className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-muted/40 transition-colors"
+            >
+              <span className="font-mono text-[10px] text-muted-foreground w-20 shrink-0">{p.task.key}</span>
+              <span className="text-sm flex-1 truncate">{p.task.title}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">v{p.version}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

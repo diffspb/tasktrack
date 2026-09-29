@@ -1,4 +1,4 @@
-import { Bug, BookOpen, Layers, Scale, CheckSquare2 } from 'lucide-react'
+import { ArrowRightLeft, Bug, BookOpen, CheckSquare2, FlaskConical, Layers, PlayCircle, Scale } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -8,6 +8,10 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   epic:     Layers,
   decision: Scale,
   task:     CheckSquare2,
+  // process types (ADR-023)
+  execution: PlayCircle,
+  research:  FlaskConical,
+  migration: ArrowRightLeft,
 }
 
 export const TYPE_COLORS: Record<string, string> = {
@@ -16,6 +20,9 @@ export const TYPE_COLORS: Record<string, string> = {
   epic:     '#f59e0b',
   decision: '#8b5cf6',
   task:     '#6366f1',
+  execution: '#0ea5e9',
+  research:  '#a855f7',
+  migration: '#14b8a6',
 }
 
 interface Props {

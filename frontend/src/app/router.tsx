@@ -18,6 +18,8 @@ import { GlobalSettingsLayout } from '@/features/admin/GlobalSettingsLayout'
 import { LinkTypesSettingsPage } from '@/features/admin/LinkTypesSettingsPage'
 import { SystemSettingsPage } from '@/features/admin/SystemSettingsPage'
 import { UsersSettingsPage } from '@/features/admin/UsersSettingsPage'
+import { ServiceAccountsSettingsPage } from '@/features/admin/ServiceAccountsSettingsPage'
+import { ControlPage } from '@/features/results/ControlPage'
 
 export const router = createBrowserRouter([
   { path: '/auth/callback', element: <AuthCallback /> },
@@ -30,6 +32,7 @@ export const router = createBrowserRouter([
       { path: 'projects/:projectKey/views/:viewId',    element: <ViewPage /> },
       { path: 'projects/:projectKey/board',            element: <ViewRedirect type="kanban" /> },
       { path: 'projects/:projectKey/backlog',          element: <ViewRedirect type="backlog" /> },
+      { path: 'projects/:projectKey/control',          element: <ControlPage /> },
       {
         path: 'projects/:projectKey/settings',
         element: <ProjectSettings />,
@@ -56,6 +59,7 @@ export const router = createBrowserRouter([
           { path: 'system',     element: <SystemSettingsPage /> },
           { path: 'users',      element: <UsersSettingsPage /> },
           { path: 'link-types', element: <LinkTypesSettingsPage /> },
+          { path: 'service-accounts', element: <ServiceAccountsSettingsPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/dashboard" replace /> },

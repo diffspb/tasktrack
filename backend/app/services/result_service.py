@@ -216,7 +216,7 @@ async def review_queue(
     stmt = (
         select(ResultProposal)
         .join(Task, Task.id == ResultProposal.task_id)
-        .options(selectinload(ResultProposal.reviews))
+        .options(selectinload(ResultProposal.reviews), selectinload(ResultProposal.task))
         .where(
             ResultProposal.status == ProposalStatus.submitted,
             ResultProposal.author_id != user.id,

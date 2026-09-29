@@ -4,6 +4,7 @@ import { useProjectByKey } from './api'
 import { Trash2, UserPlus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { useUpdateMember } from '@/features/results/api'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/shared/api/client'
@@ -60,6 +61,7 @@ export function TeamSettingsPage() {
   const { data: membersData, isLoading } = useProjectMembers(projectId)
   const addMember = useAddMember(projectId ?? '')
   const removeMember = useRemoveMember(projectId ?? '')
+  const updateMember = useUpdateMember(projectId ?? '')
 
   const [selectedUser, setSelectedUser] = useState<UserOption | null>(null)
   const [newRole, setNewRole] = useState<Role>('member')
@@ -110,6 +112,19 @@ export function TeamSettingsPage() {
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{m.user.email}</p>
                 </div>
+                <label
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                  title="Reviewer profile: may review result proposals (not their own, not tasks they are assigned to)"
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={`Reviewer ${m.user.display_name}`}
+                    checked={m.is_reviewer}
+                    disabled={!canManage || updateMember.isPending}
+                    onChange={e => updateMember.mutate({ userId: m.user.id, is_reviewer: e.target.checked })}
+                  />
+                  reviewer
+                </label>
                 <span className={`rounded px-2 py-0.5 text-[11px] font-medium capitalize ${roleCls}`}>
                   {m.role}
                 </span>

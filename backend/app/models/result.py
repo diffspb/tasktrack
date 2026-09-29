@@ -59,6 +59,8 @@ class ResultProposal(Base, UUIDMixin, TimestampMixin):
     reviews: Mapped[list["Review"]] = relationship(
         "Review", back_populates="proposal", order_by="Review.created_at"
     )
+    # Load explicitly (selectinload) — used by the review queue only.
+    task: Mapped["Task"] = relationship("Task", lazy="raise")  # noqa: F821
 
 
 class Review(Base, UUIDMixin, TimestampMixin):

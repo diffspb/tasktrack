@@ -6,28 +6,40 @@ export const STUB_USER_KEY = 'tt_stub_user'
 const ERROR_MESSAGES: Record<string, string> = {
   // task / assignment
   TASK_NOT_FOUND:                  'Задача не найдена',
-  ASSIGNMENT_NOT_FOUND:            'Назначение не найдено',
   VERSION_CONFLICT:                'Данные изменились — обновите страницу',
   VERSION_REQUIRED:                'Не передан параметр version',
   WORKFLOW_TRANSITION_NOT_ALLOWED: 'Этот переход статуса недопустим',
   WORKFLOW_NO_DEFAULT_STATUS:      'В воркфлоу нет статуса по умолчанию',
   TASK_BLOCKED_BY_SUBTASKS:        'Задача заблокирована: не все подзадачи завершены',
-  // decision process
-  SOLUTION_NOT_FOUND:              'Решение не найдено',
-  SOLUTION_ALREADY_SUBMITTED:      'Решение уже отправлено',
-  SOLUTION_ALREADY_EXISTS:         'Решение уже создано',
-  SOLUTION_IN_REVISION:            'Решение находится на доработке',
-  SOLUTION_NOT_SUBMITTED:          'Решение ещё не отправлено',
-  SOLUTION_LOCKED:                 'Решение заблокировано для редактирования',
-  MULTI_ACCEPT_NOT_ALLOWED:        'Нельзя принять несколько решений для этой задачи',
-  ACCEPTED_SOLUTIONS_REQUIRED:     'Необходимо выбрать хотя бы одно решение',
-  INVALID_SOLUTION_IDS:            'Неверные идентификаторы решений',
-  DECISION_ALREADY_MADE:           'Итоговое решение уже принято',
-  DECISION_NOT_FOUND:              'Решение decision-maker\'а не найдено',
-  TASK_NOT_AWAITING_DECISION:      'Задача не ожидает решения',
-  TASK_NOT_DECIDED:                'Задача ещё не имеет решения',
-  CANNOT_MODIFY_DECIDED_TASK:      'Нельзя изменить задачу с принятым решением',
-  CRITERIA_LOCKED:                 'Критерии решения заблокированы',
+  // result and review (ADR-021)
+  NOT_ASSIGNEE:                    'Действие доступно только исполнителю задачи',
+  UNKNOWN_CRITERION:               'Указан критерий, которого нет в задании',
+  PROPOSAL_NOT_FOUND:              'Предложение результата не найдено',
+  PROPOSAL_NOT_REVIEWABLE:         'Эта версия уже проверена или заменена',
+  PROPOSAL_NOT_SUPERSEDABLE:       'Эту версию нельзя заменить',
+  PROPOSAL_NOT_WITHDRAWABLE:       'Отозвать можно только непроверенную версию',
+  SELF_REVIEW:                     'Нельзя проверять собственный результат или задачу, где вы исполнитель',
+  NOT_REVIEWER:                    'Нужен профиль проверяющего в проекте',
+  NOT_DESIGNATED_REVIEWER:         'Задачу проверяет назначенный проверяющий',
+  CRITERIA_NOT_MET:                'Для принятия все обязательные критерии должны быть выполнены',
+  RESULT_NOT_REVIEWED:             'Нельзя закрыть задачу без проверки результата',
+  RESULT_NOT_ACCEPTED:             'Поставка возможна только после принятия результата',
+  DELIVERY_NOT_PROPOSED:           'Сначала предложите поставку',
+  // assignment (work package)
+  WORK_PACKAGE_INCOMPLETE:         'Задание неполное: заполните цель, результат, критерии и специализацию',
+  WORK_PACKAGE_UNCHANGED:          'Задание не изменилось с последней версии',
+  WORK_PACKAGE_NOT_FOUND:          'Версия задания не найдена',
+  // work sessions
+  SESSION_ACTIVE:                  'Задача уже в работе в другой сессии',
+  SESSION_NOT_ACTIVE:              'Сессия не активна или принадлежит другому',
+  SESSION_NOT_FOUND:               'Сессия не найдена',
+  // processes
+  META_INVALID:                    'Поля задачи не соответствуют схеме её типа',
+  TRANSITION_FIELDS_REQUIRED:      'Для этого перехода заполните обязательные поля',
+  // idempotency
+  IDEMPOTENCY_KEY_REUSED:          'Ключ повтора уже использован для другого запроса',
+  IDEMPOTENCY_IN_PROGRESS:         'Запрос ещё выполняется — повторите позже',
+  IDEMPOTENCY_OUTCOME_UNKNOWN:     'Команда выполнена, но ответ потерян — обновите данные',
   // project / workflow
   PROJECT_NOT_FOUND:               'Проект не найден',
   DUPLICATE_PROJECT_KEY:           'Проект с таким ключом уже существует',
@@ -43,8 +55,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   STATUS_WORKFLOW_MISMATCH:        'Статус принадлежит другому воркфлоу',
   TRANSITION_NOT_FOUND:            'Переход не найден',
   TRANSITION_ROLE_REQUIRED:        'Для этого перехода нужна более высокая роль в проекте',
-  // comments
-  SOLUTION_NOT_ASSIGNEE:           'Solution может подать только исполнитель задачи',
   // generic
   PERMISSION_DENIED:               'Нет прав для этого действия',
 }

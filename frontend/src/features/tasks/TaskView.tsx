@@ -13,6 +13,10 @@ import { CommentSection } from './CommentSection'
 import { CreateTaskModal } from './CreateTaskModal'
 import { LinkTaskDialog } from './LinkTaskDialog'
 import { TaskTypeIcon, TYPE_COLORS } from './TaskTypeIcon'
+import { ResultSection } from '@/features/results/ResultSection'
+import { SessionPanel } from '@/features/results/SessionPanel'
+import { TaskHistory } from '@/features/results/TaskHistory'
+import { WorkPackagePanel } from '@/features/results/WorkPackagePanel'
 
 const PRIORITY_CONFIG: Record<string, {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,6 +76,10 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const transitions         = taskWorkflow?.transitions ?? []
   const currentStatus       = statuses.find(s => s.id === task.current_status_id)
   const userById            = new Map(members?.items.map(m => [m.user.id, m.user]) ?? [])
+  const memberList          = members?.items ?? []
+  const me                  = memberList.find(m => m.user.id === currentUserId)
+  const isManager           = me?.role === 'admin' || me?.role === 'manager'
+  const nameOf              = (id: string) => userById.get(id)?.display_name ?? id.slice(0, 8)
 
   const [confirmingTransition, setConfirmingTransition] = useState<string | null>(null)
   const [transitionError,      setTransitionError]      = useState<string | null>(null)
@@ -130,12 +138,13 @@ export function TaskView({ task, mode, currentUserId }: Props) {
     try {
       await transition.mutateAsync({ taskId: task.id, status_id: statusId })
     } catch (err) {
-      const code = (err as AxiosError<{ detail: { code: string } }>)?.response?.data?.detail?.code
-      setTransitionError(
-        code === 'TASK_BLOCKED_BY_SUBTASKS'
-          ? 'Task is blocked: subtasks are not resolved yet.'
-          : 'Transition not allowed.',
-      )
+      const detail = (err as AxiosError<{ detail: { code: string; missing?: string[] } }>)?.response?.data?.detail
+      const messages: Record<string, string> = {
+        TASK_BLOCKED_BY_SUBTASKS: 'Blocked: every subtask needs a submitted result first.',
+        RESULT_NOT_REVIEWED: 'This task type closes only after its result is reviewed.',
+        TRANSITION_FIELDS_REQUIRED: `Fill in first: ${detail?.missing?.join(', ') ?? ''}.`,
+      }
+      setTransitionError((detail?.code && messages[detail.code]) || 'Transition not allowed.')
     }
   }
 
@@ -450,11 +459,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
       {activeTab === 'comments' && (
         <CommentSection taskId={task.id} currentUserId={currentUserId} userById={userById} />
       )}
-      {activeTab === 'history' && (
-        <p className="text-sm text-muted-foreground italic py-6 text-center">
-          History coming soon.
-        </p>
-      )}
+      {activeTab === 'history' && <TaskHistory taskId={task.id} nameOf={nameOf} />}
     </div>
   )
 
@@ -512,8 +517,36 @@ export function TaskView({ task, mode, currentUserId }: Props) {
             </select>
           )}
         </div>
+        <div className="space-y-1.5">
+          <p className="text-[11px] text-muted-foreground">Reviewer</p>
+          {isManager ? (
+            <select
+              aria-label="Reviewer"
+              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs"
+              value={task.reviewer_id ?? ''}
+              onChange={e => updateTask.mutateAsync({ reviewer_id: e.target.value || null, version: task.version })}
+            >
+              <option value="">— Any reviewer —</option>
+              {memberList.filter(m => m.is_reviewer && m.user.id !== task.assignee_id).map(m => (
+                <option key={m.user.id} value={m.user.id}>{m.user.display_name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {task.reviewer_id ? nameOf(task.reviewer_id) : 'Any reviewer'}
+            </span>
+          )}
+        </div>
       </div>
     </div>
+  )
+
+  const workPackageBlock = (
+    <WorkPackagePanel task={task} canEdit={task.reporter_id === currentUserId || isManager} />
+  )
+  const resultBlock = <ResultSection task={task} currentUserId={currentUserId} members={memberList} />
+  const sessionBlock = (
+    <SessionPanel task={task} currentUserId={currentUserId} isManager={isManager} nameOf={nameOf} />
   )
 
   const fmtDate = (s: string) =>
@@ -650,6 +683,8 @@ export function TaskView({ task, mode, currentUserId }: Props) {
             <div className="min-w-0 space-y-6">
               {detailsBlock}
               {descriptionBlock}
+              {workPackageBlock}
+              {resultBlock}
               {childTasksBlock}
               {relationsBlock}
               {activityBlock}
@@ -657,6 +692,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
             </div>
             <div className="space-y-4">
               {peopleBlock}
+              {sessionBlock}
               {datesBlock}
             </div>
           </div>
@@ -675,6 +711,9 @@ export function TaskView({ task, mode, currentUserId }: Props) {
         {confirmBackwardBlock}
         {detailsBlock}
         {descriptionBlock}
+        {workPackageBlock}
+        {resultBlock}
+        {sessionBlock}
         {childTasksBlock}
         {relationsBlock}
         {peopleBlock}

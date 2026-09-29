@@ -9,7 +9,7 @@ from app.models.user import User
 from app.schemas.project import ProjectMemberResponse
 from app.schemas.result import (
     DeliveryCreate, MemberUpdate, ProposalCreate, ProposalResponse,
-    RecipientAcceptanceCreate, ReviewCreate, ReviewResponse,
+    RecipientAcceptanceCreate, ReviewCreate, ReviewQueueItem, ReviewResponse,
 )
 from app.schemas.task import TaskResponse
 from app.services import result_service
@@ -64,7 +64,7 @@ async def review_proposal(
     return await result_service.review_proposal(session, proposal_id, data, user)
 
 
-@router.get("/review-queue", response_model=list[ProposalResponse])
+@router.get("/review-queue", response_model=list[ReviewQueueItem])
 async def review_queue(
     project_id: uuid.UUID | None = None,
     session: AsyncSession = Depends(get_session),

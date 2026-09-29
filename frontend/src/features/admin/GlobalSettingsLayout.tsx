@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Link2, Users, Settings2 } from 'lucide-react'
+import { Bot, Link2, Users, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { label: 'System',     path: 'system',     icon: Settings2 },
   { label: 'Users',      path: 'users',      icon: Users },
   { label: 'Link types', path: 'link-types', icon: Link2 },
+  { label: 'Service accounts', path: 'service-accounts', icon: Bot },
 ]
 
 export function GlobalSettingsLayout() {

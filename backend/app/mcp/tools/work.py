@@ -12,7 +12,9 @@ from mcp.server.fastmcp.server import Context
 
 from app.mcp.utils import McpSession, idempotent, parse_uuid, svc_call
 from app.schemas.audit import AuditPage
-from app.schemas.result import ProposalCreate, ProposalResponse, ReviewCreate, ReviewResponse
+from app.schemas.result import (
+    ProposalCreate, ProposalResponse, ReviewCreate, ReviewQueueItem, ReviewResponse,
+)
 from app.schemas.session import (
     CheckpointCreate, CheckpointResponse, SessionComplete, SessionCreate, SessionRelease, SessionResponse,
 )
@@ -158,7 +160,7 @@ async def list_review_queue(ctx: Context, project_id: str | None = None) -> str:
     async with McpSession(ctx) as (session, user):
         pid = parse_uuid(project_id, "project_id") if project_id else None
         proposals = await result_service.review_queue(session, user, project_id=pid)
-        return json.dumps([ProposalResponse.model_validate(p).model_dump(mode="json") for p in proposals],
+        return json.dumps([ReviewQueueItem.model_validate(p).model_dump(mode="json") for p in proposals],
                           ensure_ascii=False)
 
 

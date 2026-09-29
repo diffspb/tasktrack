@@ -55,14 +55,25 @@ export interface Task {
   due_date: string | null
   duration_days: number | null
   version: number
+  work_package_version: number | null
+  reviewer_id: string | null
+  /** Derived from result proposals (ADR-021). */
+  result_state: ResultState
+  delivery: Record<string, string | null> | null
+  recipient_acceptance: Record<string, string | null> | null
   deleted_at: string | null
   created_at: string
   updated_at: string
 }
 
+export type ResultState =
+  | 'none' | 'proposed' | 'changes_requested' | 'accepted' | 'rejected' | 'historical'
+
 export interface ProjectMember {
   user: { id: string; display_name: string; email: string }
   role: 'admin' | 'manager' | 'member' | 'viewer'
+  /** Reviewer profile (ADR-021): may review result proposals in the project. */
+  is_reviewer: boolean
 }
 
 // --- Queries ---
@@ -185,6 +196,7 @@ export interface UpdateTaskInput {
   start_date?: string | null
   due_date?: string | null
   meta?: Record<string, unknown>
+  reviewer_id?: string | null
   version: number
 }
 

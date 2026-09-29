@@ -91,6 +91,19 @@ class ProposalResponse(BaseModel):
     reviews: list[ReviewResponse] = []
 
 
+class _QueueTask(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    key: str
+    title: str
+    project_id: uuid.UUID
+
+
+class ReviewQueueItem(ProposalResponse):
+    task: _QueueTask
+
+
 class DeliveryCreate(BaseModel):
     target: str = Field(min_length=1, max_length=500)  # recipient: project, office process…
     ref: str | None = Field(default=None, max_length=500)

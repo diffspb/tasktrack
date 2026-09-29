@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight, GanttChartSquare, LogOut } from 'lucide-react'
+import { Zap, LayoutDashboard, Kanban, List, Network, Settings, ChevronRight, GanttChartSquare, LogOut, ClipboardCheck } from 'lucide-react'
 import { NavLink, useMatch } from 'react-router-dom'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -207,6 +207,18 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   )
                 })}
+
+                {/* Manager's control view (FR-003 TT-22) */}
+                <SidebarMenuItem>
+                  <NavLink to={`/projects/${projectKey}/control`}>
+                    {({ isActive }) => (
+                      <SidebarMenuButton isActive={isActive}>
+                        <ClipboardCheck />
+                        <span>Control</span>
+                      </SidebarMenuButton>
+                    )}
+                  </NavLink>
+                </SidebarMenuItem>
 
                 {/* Settings with sub-items */}
                 <SidebarMenuItem>

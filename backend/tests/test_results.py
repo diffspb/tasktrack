@@ -347,3 +347,14 @@ async def test_proposal_and_review_are_audited(client, world):
     kinds = [(e["entity_type"], e["action"]) for e in history]
     assert ("result_proposal", "created") in kinds
     assert ("review", "created") in kinds
+
+
+async def test_review_queue_lists_task(client, world):
+    p = await _submit(client, world)
+    act_as(world["reviewer"])
+    queue = (await client.get("/api/v1/review-queue")).json()
+    assert [q["id"] for q in queue] == [p["id"]]
+    assert queue[0]["task"]["key"] == world["task"]["key"]
+    act_as(world["member"])  # no reviewer profile
+    assert (await client.get("/api/v1/review-queue")).json() == []
+
