@@ -198,7 +198,7 @@ async def test_transition_not_allowed(
 async def test_transition_forbidden_for_non_assignee(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    """stub_user cannot transition a task assigned to someone else."""
+    """A member cannot transition a task assigned to someone else."""
     ctx = await _setup_project_and_workflow(db_session, stub_user)
 
     other = User(id=uuid.uuid4(), email="other@t.com", display_name="O",
@@ -213,9 +213,13 @@ async def test_transition_forbidden_for_non_assignee(
     await db_session.flush()
 
     r = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
-        "title": "Other's task", "assignee_id": str(other.id),
+        "title": "Stub's task", "assignee_id": str(stub_user.id),
     })
     task_id = r.json()["id"]
+
+    from app.api.deps import get_current_user
+    from app.main import app
+    app.dependency_overrides[get_current_user] = lambda: other
 
     r = await client.post(f"/api/v1/tasks/{task_id}/transition", json={
         "status_id": ctx["inprog_id"],

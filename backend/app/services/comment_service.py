@@ -10,7 +10,7 @@ from app.models.comment import Comment
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.comment import CommentCreate, CommentUpdate
-from app.services.permissions import require_project_access
+from app.services.permissions import require_project_access, require_writer
 
 
 async def list_comments(
@@ -36,7 +36,11 @@ async def create_comment(
     session: AsyncSession, task_id: uuid.UUID, data: CommentCreate, user: User
 ) -> Comment:
     task = await _get_task_or_404(session, task_id)
-    await require_project_access(session, task.project_id, user)
+    await require_writer(session, task.project_id, user)
+
+    # Solution surrogate (ADR-014): only the task's assignee may submit it.
+    if "solution" in data.labels and task.assignee_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "SOLUTION_NOT_ASSIGNEE"})
 
     if data.parent_comment_id:
         parent = await session.get(Comment, data.parent_comment_id)
@@ -76,6 +80,8 @@ async def update_comment(
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
     if comment.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "COMMENT_NOT_FOUND"})
+    task = await _get_task_or_404(session, comment.task_id)
+    await require_writer(session, task.project_id, user)
 
     comment.content = data.content
     comment.edited_at = datetime.now(UTC)
@@ -89,7 +95,7 @@ async def delete_comment(
 ) -> None:
     comment = await _get_comment_or_404(session, comment_id)
     task = await _get_task_or_404(session, comment.task_id)
-    await require_project_access(session, task.project_id, user)
+    await require_writer(session, task.project_id, user)
 
     is_author = comment.author_id == user.id
     from app.models.project import ProjectMember, ProjectMemberRole

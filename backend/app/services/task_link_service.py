@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.schemas.task import TaskLinkCreate
+from app.services.permissions import require_writer
 from app.services.task_service import get_task
 
 
@@ -35,7 +36,8 @@ async def get_task_links(session: AsyncSession, task_id: uuid.UUID, user: User) 
 async def create_task_link(
     session: AsyncSession, task_id: uuid.UUID, data: TaskLinkCreate, user: User
 ) -> TaskLink:
-    await get_task(session, task_id, user)  # access check on source
+    source = await get_task(session, task_id, user)
+    await require_writer(session, source.project_id, user)
     await get_task(session, data.target_task_id, user)  # access check on target
 
     # Prevent duplicate links in the same direction
@@ -72,7 +74,8 @@ async def create_task_link(
 async def delete_task_link(
     session: AsyncSession, task_id: uuid.UUID, link_id: uuid.UUID, user: User
 ) -> None:
-    await get_task(session, task_id, user)  # access check
+    task = await get_task(session, task_id, user)
+    await require_writer(session, task.project_id, user)
 
     link = await session.scalar(
         select(TaskLink).where(

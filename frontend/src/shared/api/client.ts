@@ -42,6 +42,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   STATUS_NOT_IN_WORKFLOW:          'Статус не принадлежит этому воркфлоу',
   STATUS_WORKFLOW_MISMATCH:        'Статус принадлежит другому воркфлоу',
   TRANSITION_NOT_FOUND:            'Переход не найден',
+  TRANSITION_ROLE_REQUIRED:        'Для этого перехода нужна более высокая роль в проекте',
+  // comments
+  SOLUTION_NOT_ASSIGNEE:           'Solution может подать только исполнитель задачи',
   // generic
   PERMISSION_DENIED:               'Нет прав для этого действия',
 }

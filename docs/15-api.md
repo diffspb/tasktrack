@@ -2207,6 +2207,7 @@ Soft-deleted задачи не включаются в результаты по
 |-----|------|---------|
 | `INVALID_STATUS_TRANSITION` | 400 | Переход между статусами недопустим воркфлоу |
 | `WORKFLOW_TRANSITION_NOT_ALLOWED` | 403 | Нет права на данный переход (роль не включена в `required_role`) |
+| `TRANSITION_ROLE_REQUIRED` | 403 | Роль в проекте ниже `Transition.required_role`. Значение трактуется как минимальная роль (`viewer` < `member` < `manager` < `admin`); неизвестное значение — отказ. `details.required_role` — требуемая роль. _Реализовано (FR-003, TT-01)._ |
 | `NO_DEFAULT_WORKFLOW` | 400 | У проекта нет дефолтного воркфлоу (и нет конфигурации для типа задачи) |
 
 ### FR-001: Воркфлоу по типу и колонки борды (400/404/409)
@@ -2227,6 +2228,7 @@ Soft-deleted задачи не включаются в результаты по
 | `SOLUTION_IN_REVISION` | 400 | Попытка отозвать Solution в статусе `revision_requested` — нужно доработать и подать повторно |
 | `TASK_ALREADY_AWAITING_DECISION` | 400 | Задача уже в статусе `awaiting_decision`; Solution принят, но переход задачи не повторяется |
 | `CANNOT_MODIFY_DECIDED_TASK` | 400 | Изменение задачи после вынесения Decision недоступно |
+| `SOLUTION_NOT_ASSIGNEE` | 403 | Комментарий с меткой `solution` (суррогат Solution, ADR-014) может создать только исполнитель задачи. _Реализовано (FR-003, TT-01)._ |
 
 ### Assignment (400)
 

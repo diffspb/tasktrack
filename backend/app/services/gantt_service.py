@@ -9,7 +9,7 @@ from app.models.gantt import GanttChart, GanttChartTask
 from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.schemas.gantt import GanttChartCreate, GanttChartUpdate
-from app.services.permissions import require_project_access
+from app.services.permissions import require_project_access, visible_project_ids
 
 
 async def list_gantt_charts(session: AsyncSession) -> list[GanttChart]:
@@ -23,6 +23,16 @@ async def get_gantt_chart(session: AsyncSession, gantt_id: uuid.UUID) -> GanttCh
     gantt = await session.get(GanttChart, gantt_id)
     if not gantt:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "GANTT_NOT_FOUND"})
+    return gantt
+
+
+async def _get_own_gantt_chart(
+    session: AsyncSession, gantt_id: uuid.UUID, user: User
+) -> GanttChart:
+    """Charts are visible to everyone (ADR-012); only the owner or a superuser changes one."""
+    gantt = await get_gantt_chart(session, gantt_id)
+    if gantt.owner_id != user.id and not user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
     return gantt
 
 
@@ -46,9 +56,9 @@ async def create_gantt_chart(
 
 
 async def update_gantt_chart(
-    session: AsyncSession, gantt_id: uuid.UUID, data: GanttChartUpdate
+    session: AsyncSession, gantt_id: uuid.UUID, data: GanttChartUpdate, user: User
 ) -> GanttChart:
-    gantt = await get_gantt_chart(session, gantt_id)
+    gantt = await _get_own_gantt_chart(session, gantt_id, user)
     if data.name is not None:
         gantt.name = data.name
     if data.description is not None:
@@ -62,8 +72,8 @@ async def update_gantt_chart(
     return gantt
 
 
-async def delete_gantt_chart(session: AsyncSession, gantt_id: uuid.UUID) -> None:
-    gantt = await get_gantt_chart(session, gantt_id)
+async def delete_gantt_chart(session: AsyncSession, gantt_id: uuid.UUID, user: User) -> None:
+    gantt = await _get_own_gantt_chart(session, gantt_id, user)
     await session.delete(gantt)
     await session.commit()
 
@@ -71,7 +81,7 @@ async def delete_gantt_chart(session: AsyncSession, gantt_id: uuid.UUID) -> None
 async def add_task_to_gantt(
     session: AsyncSession, gantt_id: uuid.UUID, task_id: uuid.UUID, user: User
 ) -> None:
-    await get_gantt_chart(session, gantt_id)
+    await _get_own_gantt_chart(session, gantt_id, user)
 
     task = await session.get(Task, task_id)
     if not task or task.deleted_at is not None:
@@ -102,9 +112,9 @@ async def add_task_to_gantt(
 
 
 async def remove_task_from_gantt(
-    session: AsyncSession, gantt_id: uuid.UUID, task_id: uuid.UUID
+    session: AsyncSession, gantt_id: uuid.UUID, task_id: uuid.UUID, user: User
 ) -> None:
-    await get_gantt_chart(session, gantt_id)
+    await _get_own_gantt_chart(session, gantt_id, user)
     entry = await session.scalar(
         select(GanttChartTask).where(
             GanttChartTask.gantt_id == gantt_id,
@@ -118,9 +128,10 @@ async def remove_task_from_gantt(
 
 
 async def get_gantt_tasks(
-    session: AsyncSession, gantt_id: uuid.UUID
+    session: AsyncSession, gantt_id: uuid.UUID, user: User
 ) -> list[Task]:
-    """Return root tasks in the gantt + all their descendants (recursive CTE)."""
+    """Return root tasks in the gantt + all their descendants (recursive CTE),
+    limited to projects the user can see."""
     await get_gantt_chart(session, gantt_id)
 
     # Recursive CTE: root tasks from gantt_chart_tasks + all descendants
@@ -155,7 +166,7 @@ async def get_gantt_tasks(
     task_list = list((await session.scalars(
         select(Task)
         .options(selectinload(Task.task_type))
-        .where(Task.id.in_(task_ids))
+        .where(Task.id.in_(task_ids), Task.project_id.in_(visible_project_ids(user)))
     )).all())
     # Root tasks sorted by their position in gantt_chart_tasks; subtasks by created_at
     task_list.sort(key=lambda t: (pos_map.get(t.id, 999_999), t.created_at))
@@ -163,9 +174,9 @@ async def get_gantt_tasks(
 
 
 async def reorder_gantt_tasks(
-    session: AsyncSession, gantt_id: uuid.UUID, task_ids: list[uuid.UUID]
+    session: AsyncSession, gantt_id: uuid.UUID, task_ids: list[uuid.UUID], user: User
 ) -> None:
-    await get_gantt_chart(session, gantt_id)
+    await _get_own_gantt_chart(session, gantt_id, user)
     for idx, task_id in enumerate(task_ids):
         entry = await session.scalar(
             select(GanttChartTask).where(
@@ -179,9 +190,10 @@ async def reorder_gantt_tasks(
 
 
 async def get_gantt_links(
-    session: AsyncSession, gantt_id: uuid.UUID
+    session: AsyncSession, gantt_id: uuid.UUID, user: User
 ) -> list[TaskLink]:
-    """Return all TaskLinks where both source and target are in the gantt's task tree."""
+    """Return all TaskLinks where both source and target are in the gantt's task tree
+    and in projects the user can see."""
     await get_gantt_chart(session, gantt_id)
 
     cte_sql = text("""
@@ -203,6 +215,12 @@ async def get_gantt_links(
     ids_result = await session.execute(cte_sql, {"gantt_id": str(gantt_id)})
     task_ids = [row[0] for row in ids_result]
 
+    if not task_ids:
+        return []
+
+    task_ids = list((await session.scalars(
+        select(Task.id).where(Task.id.in_(task_ids), Task.project_id.in_(visible_project_ids(user)))
+    )).all())
     if not task_ids:
         return []
 

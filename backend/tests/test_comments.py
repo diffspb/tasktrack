@@ -17,7 +17,7 @@ async def _setup(session: AsyncSession, user: User) -> dict:
         session, ProjectCreate(name="Comment Test", key=uuid.uuid4().hex[:8].upper()), user
     )
     t = await task_service.create_task(
-        session, p.id, TaskCreate(title="Commented Task"), user
+        session, p.id, TaskCreate(title="Commented Task", assignee_id=user.id), user
     )
     return {"project_id": str(p.id), "task_id": str(t.id)}
 

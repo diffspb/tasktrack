@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.project import Project, ProjectMember
+from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import Task, TaskPriority
 from app.models.task_type import TaskType
 from app.models.user import User
@@ -13,14 +13,14 @@ from app.models.workflow import Status, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.core.events import event_bus, make_task_event
 from app.services import notification_service
-from app.services.permissions import require_project_access
-from app.services.workflow_service import get_workflow_for_task_type, validate_transition
+from app.services.permissions import has_role, require_project_access, require_writer
+from app.services.workflow_service import get_transition, get_workflow_for_task_type
 
 
 async def create_task(
     session: AsyncSession, project_id: uuid.UUID, data: TaskCreate, user: User
 ) -> Task:
-    await require_project_access(session, project_id, user)
+    await require_writer(session, project_id, user)
 
     project = await session.get(Project, project_id)
 
@@ -213,6 +213,7 @@ async def update_task(
     session: AsyncSession, task_id: uuid.UUID, data: TaskUpdate, user: User
 ) -> Task:
     task = await get_task(session, task_id, user)
+    await require_writer(session, task.project_id, user)
 
     if data.version != task.version:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VERSION_CONFLICT"})
@@ -244,6 +245,7 @@ async def delete_task(
 ) -> None:
     from datetime import UTC, datetime
     task = await get_task(session, task_id, user)
+    await require_writer(session, task.project_id, user)
     project_id = str(task.project_id)
     task_id_str = str(task.id)
     task.deleted_at = datetime.now(UTC)
@@ -258,16 +260,20 @@ async def transition_status(
     user: User,
 ) -> Task:
     task = await get_task(session, task_id, user)
+    member = await require_writer(session, task.project_id, user)
 
-    if task.assignee_id != user.id:
+    # Assignee moves their own task; manager/admin may move anyone's.
+    if task.assignee_id != user.id and not has_role(member, ProjectMemberRole.manager):
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
-    if not await validate_transition(
+    transition = await get_transition(
         session, task.workflow_id, task.current_status_id, data.status_id
-    ):
+    )
+    if transition is None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"}
         )
+    _check_transition_role(transition.required_role, member)
 
     # Decision-type task: blocked until all subtasks have solution_comment_id in meta.
     if task.task_type and task.task_type.key == "decision":
@@ -306,6 +312,21 @@ async def _resolve_task_type(
             {"code": "TASK_TYPE_NOT_FOUND", "key": key},
         )
     return task_type
+
+
+def _check_transition_role(required_role: str | None, member: ProjectMember) -> None:
+    """Transition.required_role is the minimum project role; unknown values deny (fail closed)."""
+    if not required_role:
+        return
+    try:
+        minimum = ProjectMemberRole(required_role)
+    except ValueError:
+        minimum = None
+    if minimum is None or not has_role(member, minimum):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            {"code": "TRANSITION_ROLE_REQUIRED", "required_role": required_role},
+        )
 
 
 async def _check_decision_task_unblocked(

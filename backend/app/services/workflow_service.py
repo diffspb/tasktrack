@@ -246,20 +246,28 @@ async def delete_transition(
     await session.commit()
 
 
-async def validate_transition(
+async def get_transition(
     session: AsyncSession,
     workflow_id: uuid.UUID,
     from_status_id: uuid.UUID,
     to_status_id: uuid.UUID,
-) -> bool:
-    result = await session.scalar(
+) -> Transition | None:
+    return await session.scalar(
         select(Transition).where(
             Transition.workflow_id == workflow_id,
             Transition.from_status_id == from_status_id,
             Transition.to_status_id == to_status_id,
         )
     )
-    return result is not None
+
+
+async def validate_transition(
+    session: AsyncSession,
+    workflow_id: uuid.UUID,
+    from_status_id: uuid.UUID,
+    to_status_id: uuid.UUID,
+) -> bool:
+    return await get_transition(session, workflow_id, from_status_id, to_status_id) is not None
 
 
 # --- Workflow for task type selection ---

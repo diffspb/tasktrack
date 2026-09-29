@@ -43,36 +43,36 @@ async def update_gantt_chart(
     gantt_id: uuid.UUID,
     data: GanttChartUpdate,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    return await gantt_service.update_gantt_chart(session, gantt_id, data)
+    return await gantt_service.update_gantt_chart(session, gantt_id, data, user)
 
 
 @router.delete("/gantt/{gantt_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_gantt_chart(
     gantt_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    await gantt_service.delete_gantt_chart(session, gantt_id)
+    await gantt_service.delete_gantt_chart(session, gantt_id, user)
 
 
 @router.get("/gantt/{gantt_id}/tasks", response_model=list[TaskResponse])
 async def get_gantt_tasks(
     gantt_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    return await gantt_service.get_gantt_tasks(session, gantt_id)
+    return await gantt_service.get_gantt_tasks(session, gantt_id, user)
 
 
 @router.get("/gantt/{gantt_id}/links", response_model=list[TaskLinkResponse])
 async def get_gantt_links(
     gantt_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    return await gantt_service.get_gantt_links(session, gantt_id)
+    return await gantt_service.get_gantt_links(session, gantt_id, user)
 
 
 @router.patch("/gantt/{gantt_id}/tasks/reorder", status_code=status.HTTP_204_NO_CONTENT)
@@ -80,9 +80,9 @@ async def reorder_gantt_tasks(
     gantt_id: uuid.UUID,
     data: GanttTaskReorder,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    await gantt_service.reorder_gantt_tasks(session, gantt_id, data.task_ids)
+    await gantt_service.reorder_gantt_tasks(session, gantt_id, data.task_ids, user)
 
 
 @router.post("/gantt/{gantt_id}/tasks", status_code=status.HTTP_204_NO_CONTENT)
@@ -100,6 +100,6 @@ async def remove_task_from_gantt(
     gantt_id: uuid.UUID,
     task_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    await gantt_service.remove_task_from_gantt(session, gantt_id, task_id)
+    await gantt_service.remove_task_from_gantt(session, gantt_id, task_id, user)
