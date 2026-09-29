@@ -6,7 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
-SYSTEM_KEYS = ("task", "bug", "story", "epic", "decision")
+# Process types (ADR-023): their system workflow *is* the process, so it is used by
+# default instead of the project's default workflow.
+PROCESS_KEYS = ("execution", "research", "migration")
+SYSTEM_KEYS = ("task", "bug", "story", "epic", "decision", *PROCESS_KEYS)
 
 
 class TaskType(Base, UUIDMixin, TimestampMixin):

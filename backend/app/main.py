@@ -22,6 +22,8 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     validate_runtime(settings)
     await run_migrations()
+    from app.core.bootstrap import ensure_system_data
+    await ensure_system_data()  # idempotent: reference data and process types
     scheduler.start()
     from app.mcp.auth import resolve_all_agents
     await resolve_all_agents()

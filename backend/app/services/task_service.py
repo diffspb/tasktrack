@@ -14,6 +14,7 @@ from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.core.events import event_bus, make_task_event
 from app.services import audit_service, notification_service
 from app.services.audit_service import TASK_FIELDS
+from app.services.meta_schema import missing_fields, validate_meta
 from app.services.permissions import has_role, require_project_access, require_writer
 from app.services.workflow_service import get_transition, get_workflow_for_task_type
 
@@ -26,6 +27,7 @@ async def create_task(
     project = await session.get(Project, project_id)
 
     task_type = await _resolve_task_type(session, data.task_type_key, project_id)
+    validate_meta(task_type.meta_schema, data.meta)
 
     workflow_id = data.workflow_id
     if workflow_id is None:
@@ -233,7 +235,9 @@ async def update_task(
     if 'start_date'   in fs: task.start_date   = data.start_date
     if 'due_date'     in fs: task.due_date      = data.due_date
     if 'duration_days' in fs: task.duration_days = data.duration_days
-    if 'meta'         in fs and data.meta is not None: task.meta = {**task.meta, **data.meta}
+    if 'meta'         in fs and data.meta is not None:
+        task.meta = {**task.meta, **data.meta}
+        validate_meta(task.task_type.meta_schema if task.task_type else None, task.meta)
     if 'reviewer_id'  in fs and data.reviewer_id != task.reviewer_id:
         from app.services.result_service import validate_designated_reviewer
         await validate_designated_reviewer(session, task, data.reviewer_id, user)
@@ -288,6 +292,11 @@ async def transition_status(
             status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"}
         )
     _check_transition_role(transition.required_role, member)
+    missing = missing_fields(transition.required_fields or [], task.meta)
+    if missing:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, {"code": "TRANSITION_FIELDS_REQUIRED", "missing": missing}
+        )
     await _check_review_before_final(session, task, data.status_id)
 
     # Decision-type task: blocked until every subtask has presented a result.

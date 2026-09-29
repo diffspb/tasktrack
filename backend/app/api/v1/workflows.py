@@ -12,6 +12,7 @@ from app.schemas.workflow import (
     StatusUpdate,
     TransitionCreate,
     TransitionResponse,
+    TransitionUpdate,
     WorkflowCreate,
     WorkflowResponse,
     WorkflowUpdate,
@@ -131,6 +132,17 @@ async def create_transition(
     user: User = Depends(get_current_user),
 ):
     return await workflow_service.create_transition(session, workflow_id, data, user)
+
+
+@router.patch("/transitions/{transition_id}", response_model=TransitionResponse, tags=["transitions"])
+async def update_transition(
+    transition_id: uuid.UUID,
+    data: TransitionUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Change the minimum role or the required meta fields of a transition (ADR-023)."""
+    return await workflow_service.update_transition(session, transition_id, data, user)
 
 
 @router.delete("/transitions/{transition_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["transitions"])

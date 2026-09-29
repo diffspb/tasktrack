@@ -17,9 +17,97 @@ async def ensure_system_data() -> None:
         changed = False
         changed |= await _ensure_link_types(session)
         changed |= await _ensure_system_workflows(session)
+        changed |= await ensure_process_types(session)
         if changed:
             await session.commit()
             logger.info("System bootstrap complete.")
+
+
+# Process types (ADR-023, FR-003 TT-13). Each: workflow statuses (name, category),
+# transitions (from, to, required meta fields), meta JSON Schema; all require review.
+_I, _M, _F = "initial", "intermediate", "final"
+PROCESS_TYPES: dict[str, dict] = {
+    "execution": {
+        "name": "Исполнение", "icon": "play-circle", "color": "#0ea5e9",
+        "statuses": [("To Do", _I), ("In Progress", _M), ("On Review", _M), ("Done", _F)],
+        "transitions": [
+            ("To Do", "In Progress", []), ("In Progress", "On Review", []),
+            ("On Review", "In Progress", []), ("On Review", "Done", []),
+        ],
+        "meta_schema": None,
+    },
+    "research": {
+        "name": "Исследование", "icon": "flask-conical", "color": "#a855f7",
+        "statuses": [("Open", _I), ("Investigating", _M), ("Concluded", _F)],
+        "transitions": [
+            ("Open", "Investigating", []), ("Investigating", "Open", []),
+            ("Investigating", "Concluded", ["conclusion", "findings"]),
+        ],
+        # "do_not_apply" is a legitimate outcome, not a failure to implement.
+        "meta_schema": {
+            "type": "object",
+            "properties": {
+                "conclusion": {"enum": ["apply", "do_not_apply", "inconclusive"]},
+                "findings": {"type": "string"},
+            },
+        },
+    },
+    "migration": {
+        "name": "Миграция", "icon": "arrow-right-left", "color": "#14b8a6",
+        "statuses": [("Planned", _I), ("Migrating", _M), ("Verified", _F)],
+        "transitions": [
+            ("Planned", "Migrating", ["source_system", "source_ref"]),
+            ("Migrating", "Planned", []),
+            ("Migrating", "Verified", ["source_ref"]),
+        ],
+        "meta_schema": {
+            "type": "object",
+            "properties": {
+                "source_system": {"type": "string"},
+                "source_ref": {"type": "string"},
+                "target_ref": {"type": "string"},
+            },
+        },
+    },
+}
+
+
+async def ensure_process_types(session: AsyncSession) -> bool:
+    """Create missing process task types with their workflows. Idempotent per key."""
+    from app.models.task_type import TaskType
+    from app.models.workflow import Status, StatusCategory, Transition, Workflow
+
+    existing = set((await session.scalars(
+        select(TaskType.key).where(TaskType.is_system.is_(True), TaskType.project_id.is_(None))
+    )).all())
+    changed = False
+    for key, spec in PROCESS_TYPES.items():
+        if key in existing:
+            continue
+        logger.info("Bootstrapping process type %s", key)
+        wf = Workflow(name=spec["name"], is_default=False)
+        session.add(wf)
+        await session.flush()
+        statuses = {}
+        for position, (name, category) in enumerate(spec["statuses"]):
+            statuses[name] = Status(
+                workflow_id=wf.id, name=name, category=StatusCategory(category),
+                is_default=position == 0, position=position,
+            )
+        session.add_all(statuses.values())
+        await session.flush()
+        session.add_all([
+            Transition(workflow_id=wf.id, from_status_id=statuses[a].id, to_status_id=statuses[b].id,
+                       required_fields=list(fields))
+            for a, b, fields in spec["transitions"]
+        ])
+        session.add(TaskType(
+            key=key, name=spec["name"], is_system=True, icon=spec["icon"], color=spec["color"],
+            default_workflow_id=wf.id, meta_schema=spec["meta_schema"], requires_review=True,
+        ))
+        await session.flush()
+        changed = True
+    return changed
 
 
 async def _ensure_link_types(session: AsyncSession) -> bool:

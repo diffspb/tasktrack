@@ -18,6 +18,7 @@ from app.schemas.workflow import (
     StatusCreate,
     StatusUpdate,
     TransitionCreate,
+    TransitionUpdate,
     ViewCreate,
     ViewUpdate,
     WorkflowCreate,
@@ -227,8 +228,27 @@ async def create_transition(
         from_status_id=data.from_status_id,
         to_status_id=data.to_status_id,
         required_role=data.required_role,
+        required_fields=list(data.required_fields),
     )
     session.add(t)
+    await session.commit()
+    await session.refresh(t)
+    return t
+
+
+async def update_transition(
+    session: AsyncSession, transition_id: uuid.UUID, data: TransitionUpdate, user: User
+) -> Transition:
+    t = await session.get(Transition, transition_id)
+    if not t:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "TRANSITION_NOT_FOUND"})
+    wf = await _get_workflow_or_404(session, t.workflow_id)
+    await require_manager(session, wf.project_id, user)
+    fs = data.model_fields_set
+    if "required_role" in fs:
+        t.required_role = data.required_role
+    if "required_fields" in fs and data.required_fields is not None:
+        t.required_fields = list(data.required_fields)
     await session.commit()
     await session.refresh(t)
     return t
@@ -275,11 +295,12 @@ async def validate_transition(
 async def get_workflow_for_task_type(
     session: AsyncSession, project_id: uuid.UUID, task_type_id: uuid.UUID
 ) -> Workflow:
-    """Fallback chain: ProjectTaskTypeConfig → project is_default workflow.
+    """Fallback chain: ProjectTaskTypeConfig → process type's own workflow → project default.
 
-    System workflows (project_id=NULL) are only used when explicitly configured via
-    ProjectTaskTypeConfig. Without explicit config, falls back to the project's default
-    workflow so statuses remain visible on the board.
+    System workflows (project_id=NULL) are otherwise used only when explicitly configured via
+    ProjectTaskTypeConfig, so statuses remain visible on the board. Process types
+    (execution, research, migration — ADR-023) are the exception: their workflow is the
+    process itself (required fields, final statuses), so it applies by default.
     """
     config = await session.scalar(
         select(ProjectTaskTypeConfig).where(
@@ -289,6 +310,11 @@ async def get_workflow_for_task_type(
     )
     if config:
         return await _get_workflow_or_404(session, config.workflow_id)
+
+    from app.models.task_type import PROCESS_KEYS, TaskType
+    task_type = await session.get(TaskType, task_type_id)
+    if task_type and task_type.is_system and task_type.key in PROCESS_KEYS and task_type.default_workflow_id:
+        return await _get_workflow_or_404(session, task_type.default_workflow_id)
 
     wf = await session.scalar(
         select(Workflow).where(

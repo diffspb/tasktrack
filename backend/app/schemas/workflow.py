@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.models.workflow import StatusCategory, ViewType
 
@@ -105,10 +106,19 @@ class MigrateStatus(BaseModel):
     target_status_id: uuid.UUID
 
 
+_FIELD = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")]
+
+
 class TransitionCreate(BaseModel):
     from_status_id: uuid.UUID
     to_status_id: uuid.UUID
     required_role: str | None = None
+    required_fields: list[_FIELD] = Field(default_factory=list, max_length=50)
+
+
+class TransitionUpdate(BaseModel):
+    required_role: str | None = None
+    required_fields: list[_FIELD] | None = Field(default=None, max_length=50)
 
 
 class StatusResponse(BaseModel):
@@ -133,6 +143,7 @@ class TransitionResponse(BaseModel):
     from_status_id: uuid.UUID
     to_status_id: uuid.UUID
     required_role: str | None
+    required_fields: list[str] = []
     created_at: datetime
     updated_at: datetime
 

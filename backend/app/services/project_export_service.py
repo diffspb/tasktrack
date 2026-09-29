@@ -77,6 +77,7 @@ async def export_project(
                     "from_status": status_name_map[t.from_status_id],
                     "to_status": status_name_map[t.to_status_id],
                     "required_role": t.required_role,
+                    "required_fields": list(t.required_fields or []),
                 }
                 for t in wf.transitions
             ],
@@ -313,6 +314,7 @@ async def import_project(
                     from_status_id=src.id,
                     to_status_id=dst.id,
                     required_role=t_data.get("required_role"),
+                    required_fields=t_data.get("required_fields") or [],
                 ))
 
         workflow_map[wf_data["name"]] = (wf, status_by_name)

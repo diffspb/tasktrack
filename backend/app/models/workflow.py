@@ -2,6 +2,7 @@ import enum
 import uuid
 
 from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -86,6 +87,10 @@ class Transition(Base, UUIDMixin, TimestampMixin):
         ForeignKey("statuses.id", ondelete="CASCADE"), nullable=False
     )
     required_role: Mapped[str | None] = mapped_column(String(50))
+    # Task.meta keys that must be non-empty to enter to_status via this transition (ADR-023).
+    required_fields: Mapped[list] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
 
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="transitions")
     from_status: Mapped["Status"] = relationship("Status", foreign_keys=[from_status_id])
