@@ -725,27 +725,9 @@ Soft-delete задачи.
 ### Статусы, история, комментарии
 
 #### GET /tasks/{task_id}/history
-История изменений задачи.
+История изменений задачи: сама задача, её комментарии и связи. _Реализовано (FR-003, TT-06, [ADR-018](./decisions/ADR-018-audit-log-event-journal.md)); формат — общий для журнала событий, см. «Журнал событий и аудит» ниже._
 
-**Query-параметры:** `?limit=50&offset=0`
-
-**Ответ 200:**
-```json
-{
-  "total": 15,
-  "items": [
-    {
-      "id": "uuid",
-      "user": { "id": "uuid", "display_name": "Анна" },
-      "action": "status_changed",
-      "field_name": "personal_status",
-      "old_value": "To Do",
-      "new_value": "In Progress",
-      "created_at": "2026-04-26T09:30:00Z"
-    }
-  ]
-}
-```
+**Query-параметры:** `?after=<cursor>&limit=100` (limit 1–500)
 
 ---
 
@@ -2099,6 +2081,46 @@ Callback после авторизации через Google. Обрабатыв
 Соглашения: `get_task` / `get_task_by_key` возвращают связи задачи в поле `links`; перед `update_task` нужно получить актуальный `version` через `get_task` (оптимистичная блокировка та же, что в REST).
 
 Не покрыто через MCP, хотя есть в REST: `delete_task`, `delete_comment`, уведомления, лента событий проекта, Гант, колонки борды — см. `tech-debt.md`. Управление проектами, участниками и CUD воркфлоу остаётся только в UI/REST по дизайну. Предложение переработать набор в action-oriented стиль — [FR-002](./feature-requests/FR-002-mcp-action-api.md).
+
+---
+
+## Журнал событий и аудит
+
+[ADR-018](./decisions/ADR-018-audit-log-event-journal.md), FR-003 TT-06. Значимые изменения записываются в `audit_events` в той же транзакции, что и само изменение. Причину изменения клиент передаёт заголовком `X-Change-Reason` (UTF-8 в percent-encoding, до 500 символов) в любом изменяющем запросе.
+
+| Метод и путь | Доступ | Что возвращает |
+|---|---|---|
+| `GET /projects/{project_id}/audit-log?after=&limit=` | Все, кто видит проект | События проекта |
+| `GET /tasks/{task_id}/history?after=&limit=` | Все, кто видит задачу | События задачи, её комментариев и связей |
+| `GET /admin/audit-log?after=&limit=` | Суперпользователь | Системные события (служебные учётные записи, ключи API) |
+
+**Ответ 200:**
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "cursor": "7581.42",
+      "occurred_at": "2026-09-29T10:00:00Z",
+      "actor_id": "uuid",
+      "project_id": "uuid",
+      "task_id": "uuid",
+      "entity_type": "task",
+      "entity_id": "uuid",
+      "action": "updated",
+      "reason": "уточнено название",
+      "before": { "title": "Старое", "version": 1 },
+      "after":  { "title": "Новое",  "version": 2 }
+    }
+  ],
+  "next_cursor": "7581.42"
+}
+```
+
+- `entity_type`: `task`, `comment`, `task_link`, `project`, `project_member`, `service_account`, `api_key`. `action`: `created`, `updated`, `deleted`, `status_changed`, `archived`, `revoked`.
+- Для правок `before`/`after` содержат только изменённые поля; для создания — полный снимок в `after`, для удаления — в `before`.
+- **Восстановление:** сохранить `next_cursor`, передавать его в `after`. Пустая страница возвращает тот же `next_cursor`. Чтение с одним курсором повторяемо; потребитель дедуплицирует по `id`. События не теряются при фиксации транзакций не по порядку (курсор `(xid, id)` с горизонтом завершённых транзакций).
+- `400 INVALID_CURSOR` — курсор не в формате `"<xid>.<id>"`.
 
 ---
 

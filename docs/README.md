@@ -89,6 +89,7 @@
 | [decisions/ADR-015](./decisions/ADR-015-resolution-removal.md) | Удаление Resolution из модели |
 | [decisions/ADR-016](./decisions/ADR-016-responsible-review-model.md) | **На рассмотрении:** один ответственный + предложения результата + независимая проверка вместо мульти-исполнителей (FR-003) |
 | [decisions/ADR-017](./decisions/ADR-017-service-accounts-api-keys.md) | Служебные учётные записи и ключи API для REST и MCP вместо `MCP_AGENTS` (FR-003, TT-05) |
+| [decisions/ADR-018](./decisions/ADR-018-audit-log-event-journal.md) | Аудит-лог и журнал событий: запись в транзакции изменения, курсор `(xid, id)` без пропусков (FR-003, TT-06) |
 
 ### Открытые хвосты
 

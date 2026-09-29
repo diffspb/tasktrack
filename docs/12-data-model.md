@@ -22,6 +22,21 @@ erDiagram
         timestamp updated_at
     }
 
+    AuditEvent {
+        bigint id PK
+        bigint xid
+        timestamp occurred_at
+        uuid actor_id
+        uuid project_id
+        uuid task_id
+        string entity_type
+        uuid entity_id
+        string action
+        text reason
+        jsonb before
+        jsonb after
+    }
+
     ApiKey {
         uuid id PK
         uuid user_id FK
@@ -349,6 +364,10 @@ erDiagram
 ### Служебные учётные записи и ApiKey
 
 `User.is_service = true` — учётная запись агента или интеграции ([ADR-017](./decisions/ADR-017-service-accounts-api-keys.md)): `keycloak_id = "service:<uuid>"`, входа через Keycloak нет. Аутентифицируется ключом `ApiKey`: хранится SHA-256 токена (`key_hash`, уникален) и первые 10 символов (`prefix`) для опознания. Ключ недействителен при `revoked_at`, истёкшем `expires_at` или неактивной учётной записи; проверка по БД на каждом запросе. `ON DELETE CASCADE` от пользователя.
+
+### AuditEvent: журнал событий
+
+Append-only таблица значимых изменений ([ADR-018](./decisions/ADR-018-audit-log-event-journal.md)), пишется в транзакции изменения. Внешних ключей нет намеренно — запись переживает строки, которые описывает (поэтому `AuditEvent` не связан с другими сущностями на диаграмме). `xid` — id транзакции-писателя (`pg_current_xact_id()`), вместе с `id` образует курсор чтения; отдаются события только завершённых транзакций (`xid < pg_snapshot_xmin`). Индексы `(project_id, xid, id)` и `(task_id, xid, id)`.
 
 ### Нумерация задач (Project.task_seq)
 
