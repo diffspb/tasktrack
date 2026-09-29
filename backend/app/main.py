@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import router
 from app.core.config import settings, validate_runtime
 from app.core.db import run_migrations
+from app.core.middleware import ChangeReasonMiddleware
 from app.core.scheduler import scheduler
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -35,6 +36,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(ChangeReasonMiddleware)
 
 app.include_router(router)
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    admin, comments, dev, gantt, health, link_types, notifications, projects, search,
+    admin, audit, comments, dev, gantt, health, link_types, notifications, projects, search,
     tasks, users, views, workflows,
 )
 
@@ -18,4 +18,5 @@ router.include_router(notifications.router)
 router.include_router(search.router)
 router.include_router(link_types.router)
 router.include_router(gantt.router)
+router.include_router(audit.router)
 router.include_router(dev.router)

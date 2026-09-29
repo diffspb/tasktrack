@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.api_key import ApiKey
 from app.models.user import User
+from app.services import audit_service
 
 TOKEN_PREFIX = "tt_"
 _DISPLAY_PREFIX_LEN = 10  # "tt_" + 7 characters of the secret
@@ -32,7 +33,7 @@ def hash_token(token: str) -> str:
 
 
 async def create_service_account(
-    session: AsyncSession, email: str, display_name: str
+    session: AsyncSession, email: str, display_name: str, *, actor_id: uuid.UUID | None = None
 ) -> User:
     if await session.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "EMAIL_TAKEN"})
@@ -44,6 +45,8 @@ async def create_service_account(
         is_active=True, is_service=True,
     )
     session.add(user)
+    await _audit(session, actor_id, "service_account", user.id, "created",
+                 after={"email": email, "display_name": display_name})
     await session.commit()
     return user
 
@@ -64,9 +67,12 @@ async def get_service_account(session: AsyncSession, user_id: uuid.UUID) -> User
 
 
 async def set_service_account_active(
-    session: AsyncSession, user_id: uuid.UUID, is_active: bool
+    session: AsyncSession, user_id: uuid.UUID, is_active: bool, *, actor_id: uuid.UUID | None = None
 ) -> User:
     user = await get_service_account(session, user_id)
+    if user.is_active != is_active:
+        await _audit(session, actor_id, "service_account", user.id, "updated",
+                     before={"is_active": user.is_active}, after={"is_active": is_active})
     user.is_active = is_active
     await session.commit()
     return user
@@ -84,6 +90,8 @@ async def issue_key(
     await get_service_account(session, user_id)
     key, token = _new_key(user_id, name, expires_at, created_by)
     session.add(key)
+    await session.flush()
+    await _audit(session, created_by, "api_key", key.id, "created", after=_key_snapshot(key))
     await session.commit()
     return key, token
 
@@ -95,10 +103,13 @@ async def list_keys(session: AsyncSession, user_id: uuid.UUID) -> list[ApiKey]:
     )).all())
 
 
-async def revoke_key(session: AsyncSession, key_id: uuid.UUID) -> ApiKey:
+async def revoke_key(
+    session: AsyncSession, key_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+) -> ApiKey:
     key = await _get_key(session, key_id)
     if key.revoked_at is None:
         key.revoked_at = datetime.now(UTC)
+        await _audit(session, actor_id, "api_key", key.id, "revoked", before=_key_snapshot(key))
         await session.commit()
     return key
 
@@ -113,6 +124,10 @@ async def rotate_key(
     old.revoked_at = datetime.now(UTC)
     new, token = _new_key(old.user_id, old.name, old.expires_at, created_by)
     session.add(new)
+    await session.flush()
+    await _audit(session, created_by, "api_key", old.id, "revoked",
+                 before=_key_snapshot(old), after={"replaced_by": str(new.id)})
+    await _audit(session, created_by, "api_key", new.id, "created", after=_key_snapshot(new))
     await session.commit()
     return new, token
 
@@ -133,6 +148,21 @@ async def authenticate(session: AsyncSession, token: str) -> User | None:
         key.last_used_at = now
         await session.commit()
     return user
+
+
+def _key_snapshot(key: ApiKey) -> dict:
+    # The token is never stored; the hash is not logged either.
+    return audit_service.snapshot(key, ("user_id", "name", "prefix", "expires_at"))
+
+
+async def _audit(
+    session: AsyncSession, actor_id: uuid.UUID | None, entity_type: str,
+    entity_id: uuid.UUID, action: str, before: dict | None = None, after: dict | None = None,
+) -> None:
+    await audit_service.record(
+        session, actor_id=actor_id, project_id=None,
+        entity_type=entity_type, entity_id=entity_id, action=action, before=before, after=after,
+    )
 
 
 def _new_key(

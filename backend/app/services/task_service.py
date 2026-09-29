@@ -12,7 +12,8 @@ from app.models.user import User
 from app.models.workflow import Status, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.core.events import event_bus, make_task_event
-from app.services import notification_service
+from app.services import audit_service, notification_service
+from app.services.audit_service import TASK_FIELDS
 from app.services.permissions import has_role, require_project_access, require_writer
 from app.services.workflow_service import get_transition, get_workflow_for_task_type
 
@@ -66,6 +67,7 @@ async def create_task(
     )
     session.add(task)
     await session.flush()
+    await _audit(session, task, user, "created", after=audit_service.snapshot(task, TASK_FIELDS))
 
     if data.assignee_id and data.assignee_id != user.id:
         await notification_service.notify_task_assigned(session, task)
@@ -221,6 +223,7 @@ async def update_task(
     _check_version(task, data.version)
 
     old_assignee = task.assignee_id
+    before = audit_service.snapshot(task, TASK_FIELDS)
 
     fs = data.model_fields_set
     if 'title'        in fs and data.title is not None: task.title = data.title
@@ -232,6 +235,8 @@ async def update_task(
     if 'duration_days' in fs: task.duration_days = data.duration_days
     if 'meta'         in fs and data.meta is not None: task.meta = {**task.meta, **data.meta}
     task.version += 1
+    await _audit(session, task, user, "updated",
+                 *audit_service.diff(before, audit_service.snapshot(task, TASK_FIELDS)))
 
     if data.assignee_id and data.assignee_id != old_assignee and data.assignee_id != user.id:
         await notification_service.notify_task_assigned(session, task)
@@ -246,11 +251,12 @@ async def delete_task(
     session: AsyncSession, task_id: uuid.UUID, user: User
 ) -> None:
     from datetime import UTC, datetime
-    task = await get_task(session, task_id, user)
+    task = await get_task(session, task_id, user, for_update=True)
     await require_writer(session, task.project_id, user)
     project_id = str(task.project_id)
     task_id_str = str(task.id)
     task.deleted_at = datetime.now(UTC)
+    await _audit(session, task, user, "deleted", before=audit_service.snapshot(task, TASK_FIELDS))
     await session.commit()
     event_bus.publish(project_id, {"type": "task.deleted", "project_id": project_id, "task_id": task_id_str})
 
@@ -283,8 +289,11 @@ async def transition_status(
     if task.task_type and task.task_type.key == "decision":
         await _check_decision_task_unblocked(session, task)
 
+    before = audit_service.snapshot(task, TASK_FIELDS)
     task.current_status_id = data.status_id
     task.version += 1
+    await _audit(session, task, user, "status_changed",
+                 *audit_service.diff(before, audit_service.snapshot(task, TASK_FIELDS)))
 
     await session.commit()
     loaded = await _load_task(session, task.id)
@@ -293,6 +302,16 @@ async def transition_status(
 
 
 # --- Internal helpers ---
+
+async def _audit(
+    session: AsyncSession, task: Task, user: User, action: str,
+    before: dict | None = None, after: dict | None = None,
+) -> None:
+    await audit_service.record(
+        session, actor_id=user.id, project_id=task.project_id, task_id=task.id,
+        entity_type="task", entity_id=task.id, action=action, before=before, after=after,
+    )
+
 
 async def _load_task(
     session: AsyncSession, task_id: uuid.UUID, *, for_update: bool = False

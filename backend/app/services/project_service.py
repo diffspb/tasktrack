@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.models.project import Project, ProjectMember, ProjectMemberRole, ProjectVisibility
 from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectMemberAdd, ProjectUpdate
+from app.services import audit_service
 
 
 async def create_project(session: AsyncSession, data: ProjectCreate, owner: User) -> Project:
@@ -26,6 +27,9 @@ async def create_project(session: AsyncSession, data: ProjectCreate, owner: User
         session.add(project)
         await session.flush()
         session.add(ProjectMember(project_id=project.id, user_id=owner.id, role=ProjectMemberRole.admin))
+        await _audit(session, project.id, "project", project.id, owner, "created",
+                     after={**audit_service.snapshot(project, ("key", *_PROJECT_FIELDS)),
+                            "owner_id": str(owner.id)})
 
         # Auto-create a default workflow with standard statuses
         wf = Workflow(project_id=project.id, name="Basic", is_default=True)
@@ -115,6 +119,7 @@ async def update_project(
     if data.version != project.version:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "VERSION_CONFLICT"})
 
+    before = audit_service.snapshot(project, _PROJECT_FIELDS)
     if data.name is not None:
         project.name = data.name
     if data.description is not None:
@@ -122,6 +127,8 @@ async def update_project(
     if data.visibility is not None:
         project.visibility = data.visibility
     project.version += 1
+    await _audit(session, project.id, "project", project.id, user, "updated",
+                 *audit_service.diff(before, audit_service.snapshot(project, _PROJECT_FIELDS)))
 
     await session.commit()
     return await _load_project(session, project.id)
@@ -137,6 +144,8 @@ async def archive_project(
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
     project.is_archived = True
+    await _audit(session, project.id, "project", project.id, user, "archived",
+                 before={"is_archived": False}, after={"is_archived": True})
     await session.commit()
     return await _load_project(session, project.id)
 
@@ -155,6 +164,8 @@ async def add_member(
 
     new_member = ProjectMember(project_id=project_id, user_id=data.user_id, role=data.role)
     session.add(new_member)
+    await _audit(session, project_id, "project_member", data.user_id, user, "created",
+                 after=audit_service.snapshot(new_member, _MEMBER_FIELDS))
     await session.commit()
     await session.refresh(new_member)
     return new_member
@@ -186,8 +197,24 @@ async def remove_member(
     if not target:
         raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "PROJECT_MEMBER_NOT_FOUND"})
 
+    await _audit(session, project_id, "project_member", user_id, user, "deleted",
+                 before=audit_service.snapshot(target, _MEMBER_FIELDS))
     await session.delete(target)
     await session.commit()
+
+
+_PROJECT_FIELDS = ("name", "description", "visibility", "version")
+_MEMBER_FIELDS = ("user_id", "role")
+
+
+async def _audit(
+    session: AsyncSession, project_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
+    user: User, action: str, before: dict | None = None, after: dict | None = None,
+) -> None:
+    await audit_service.record(
+        session, actor_id=user.id, project_id=project_id,
+        entity_type=entity_type, entity_id=entity_id, action=action, before=before, after=after,
+    )
 
 
 async def _load_project(session: AsyncSession, project_id: uuid.UUID) -> Project | None:

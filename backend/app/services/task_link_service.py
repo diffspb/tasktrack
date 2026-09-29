@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.schemas.task import TaskLinkCreate
+from app.services import audit_service
 from app.services.permissions import require_writer
 from app.services.task_service import get_task
 
@@ -58,6 +59,8 @@ async def create_task_link(
         created_by=user.id,
     )
     session.add(link)
+    await session.flush()
+    await _audit(session, source, link, user, "created", after=_link_snapshot(link))
     await session.commit()
 
     return await session.scalar(
@@ -89,5 +92,20 @@ async def delete_task_link(
     if not link:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Link not found")
 
+    await _audit(session, task, link, user, "deleted", before=_link_snapshot(link))
     await session.delete(link)
     await session.commit()
+
+
+def _link_snapshot(link: TaskLink) -> dict:
+    return audit_service.snapshot(link, ("source_task_id", "target_task_id", "link_type_id"))
+
+
+async def _audit(
+    session: AsyncSession, task: Task, link: TaskLink, user: User, action: str,
+    before: dict | None = None, after: dict | None = None,
+) -> None:
+    await audit_service.record(
+        session, actor_id=user.id, project_id=task.project_id, task_id=task.id,
+        entity_type="task_link", entity_id=link.id, action=action, before=before, after=after,
+    )

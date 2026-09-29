@@ -59,9 +59,11 @@ def _issued(key, token: str) -> ApiKeyIssued:
 async def create_service_account(
     data: ServiceAccountCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(_require_superuser),
+    admin: User = Depends(_require_superuser),
 ):
-    return await api_key_service.create_service_account(session, data.email, data.display_name)
+    return await api_key_service.create_service_account(
+        session, data.email, data.display_name, actor_id=admin.id
+    )
 
 
 @router.get("/service-accounts", response_model=list[ServiceAccountResponse])
@@ -77,9 +79,11 @@ async def update_service_account(
     user_id: uuid.UUID,
     data: ServiceAccountUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(_require_superuser),
+    admin: User = Depends(_require_superuser),
 ):
-    return await api_key_service.set_service_account_active(session, user_id, data.is_active)
+    return await api_key_service.set_service_account_active(
+        session, user_id, data.is_active, actor_id=admin.id
+    )
 
 
 @router.post(
@@ -111,9 +115,9 @@ async def list_api_keys(
 async def revoke_api_key(
     key_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(_require_superuser),
+    admin: User = Depends(_require_superuser),
 ):
-    await api_key_service.revoke_key(session, key_id)
+    await api_key_service.revoke_key(session, key_id, actor_id=admin.id)
 
 
 @router.post(

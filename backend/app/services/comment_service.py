@@ -10,6 +10,8 @@ from app.models.comment import Comment
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.comment import CommentCreate, CommentUpdate
+from app.services import audit_service
+from app.services.audit_service import COMMENT_FIELDS
 from app.services.permissions import require_project_access, require_writer
 
 
@@ -62,6 +64,8 @@ async def create_comment(
     )
     session.add(comment)
     await session.flush()
+    await _audit(session, task, comment, user, "created",
+                 after=audit_service.snapshot(comment, COMMENT_FIELDS))
 
     if "solution" in data.labels:
         task.meta = {**task.meta, "solution_comment_id": str(comment.id)}
@@ -83,8 +87,11 @@ async def update_comment(
     task = await _get_task_or_404(session, comment.task_id)
     await require_writer(session, task.project_id, user)
 
+    before = audit_service.snapshot(comment, COMMENT_FIELDS)
     comment.content = data.content
     comment.edited_at = datetime.now(UTC)
+    await _audit(session, task, comment, user, "updated",
+                 *audit_service.diff(before, audit_service.snapshot(comment, COMMENT_FIELDS)))
     await session.commit()
     await session.refresh(comment)
     return comment
@@ -110,6 +117,8 @@ async def delete_comment(
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "PERMISSION_DENIED"})
 
     comment.deleted_at = datetime.now(UTC)
+    await _audit(session, task, comment, user, "deleted",
+                 before=audit_service.snapshot(comment, COMMENT_FIELDS))
 
     if task.meta.get("solution_comment_id") == str(comment.id):
         meta = dict(task.meta)
@@ -120,6 +129,16 @@ async def delete_comment(
 
 
 # --- Internal helpers ---
+
+async def _audit(
+    session: AsyncSession, task: Task, comment: Comment, user: User, action: str,
+    before: dict | None = None, after: dict | None = None,
+) -> None:
+    await audit_service.record(
+        session, actor_id=user.id, project_id=task.project_id, task_id=task.id,
+        entity_type="comment", entity_id=comment.id, action=action, before=before, after=after,
+    )
+
 
 async def _get_task_or_404(session: AsyncSession, task_id: uuid.UUID) -> Task:
     task = await session.get(Task, task_id)

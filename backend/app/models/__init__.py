@@ -12,6 +12,7 @@ from app.models.comment import Comment
 from app.models.notification import Notification, NotificationEntityType, NotificationEventType
 from app.models.gantt import GanttChart, GanttChartTask
 from app.models.api_key import ApiKey
+from app.models.audit import AuditEvent
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -27,4 +28,5 @@ __all__ = [
     "Notification", "NotificationEntityType", "NotificationEventType",
     "GanttChart", "GanttChartTask",
     "ApiKey",
+    "AuditEvent",
 ]
