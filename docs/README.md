@@ -86,6 +86,7 @@
 | [decisions/ADR-013](./decisions/ADR-013-gantt-dependency-arrows.md) | Стрелки зависимостей на диаграмме Ганта |
 | [decisions/ADR-014](./decisions/ADR-014-mvp-simplification-assignment.md) | MVP-упрощение: отказ от Assignment и Decision Process |
 | [decisions/ADR-015](./decisions/ADR-015-resolution-removal.md) | Удаление Resolution из модели |
+| [decisions/ADR-016](./decisions/ADR-016-responsible-review-model.md) | **На рассмотрении:** один ответственный + предложения результата + независимая проверка вместо мульти-исполнителей (FR-003) |
 
 ### Открытые хвосты
 
@@ -94,7 +95,7 @@
 | [tech-debt.md](./tech-debt.md) | Бэкенд-долг: что отложено и до какого этапа |
 | [ux-debt.md](./ux-debt.md) | UX-долг фронтенда: открытые проблемы интерфейса |
 | [phase-9-fr001-multi-workflow.md](./phase-9-fr001-multi-workflow.md) | **Этап 9 (post-MVP): FR-001 мульти-воркфлоу** — полный трекинговый документ: стадии, чеклист, открытые вопросы |
-| [feature-requests/](./feature-requests/) | Запросы на фичи: [FR-001](./feature-requests/FR-001-multi-workflow-per-type.md) (реализован, этап 9), [FR-002](./feature-requests/FR-002-mcp-action-api.md) (на рассмотрении) |
+| [feature-requests/](./feature-requests/) | Запросы на фичи: [FR-001](./feature-requests/FR-001-multi-workflow-per-type.md) (реализован, этап 9), [FR-002](./feature-requests/FR-002-mcp-action-api.md) (на рассмотрении), [FR-003](./feature-requests/FR-003-portfolio-execution.md) (на рассмотрении — доработки под работу портфеля, пакеты A–D) |
 | [project-review-2026-05.md](./project-review-2026-05.md) | Ревью проекта от 2026-05-14: документация, архитектура, качество кода, полнота реализации |
 
 ### Исторические файлы (не актуальны как планы)
