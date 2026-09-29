@@ -1,4 +1,4 @@
-.PHONY: install db-start db-stop db-create reset full-reset dev test test-cov mcp-bootstrap migrate makemigration
+.PHONY: install db-start db-stop db-create reset full-reset dev test test-cov mcp-bootstrap migrate makemigration lock
 
 install:
 	pip install -e ".[dev]"
@@ -34,7 +34,7 @@ full-reset:
 dev:
 	uvicorn app.main:app --reload --port 8000
 
-# Тесты используют SQLite in-memory — не нужен PostgreSQL
+# Тесты — PostgreSQL через testcontainers (Docker обязателен)
 test:
 	pytest tests/ -x -v
 
@@ -50,3 +50,7 @@ migrate:
 
 makemigration:
 	alembic revision --autogenerate -m "$(msg)"
+
+# Зафиксировать версии рабочих зависимостей из текущего (протестированного) venv
+lock:
+	python scripts/lock_deps.py

@@ -1,0 +1,24 @@
+# Изолированный стенд для deploy/smoke-test.sh: образ + PostgreSQL, без Traefik.
+services:
+  app:
+    image: ${TASKTRACK_IMAGE:-tasktrack:smoke}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tasktrack:smoke@postgres:5432/tasktrack
+      AUTH_STUB: "false"
+    ports:
+      - "${TASKTRACK_SMOKE_PORT:-18000}:8000"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tasktrack
+      POSTGRES_USER: tasktrack
+      POSTGRES_PASSWORD: smoke
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tasktrack"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
