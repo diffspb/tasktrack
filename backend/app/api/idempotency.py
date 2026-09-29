@@ -33,8 +33,8 @@ async def idempotency_guard(
 
     path = request.url.path + (f"?{request.url.query}" if request.url.query else "")
     req_hash = idempotency_service.request_hash(request.method, path, await request.body())
-    await idempotency_service.reserve(session, user, key, req_hash)
-    request.state.idempotency = (user.id, key)
+    watermark = await idempotency_service.reserve(session, user, key, req_hash)
+    request.state.idempotency = (user.id, key, watermark)
     try:
         yield
     except Exception:
@@ -73,10 +73,11 @@ class IdempotencyResponseMiddleware:
 
         reservation = scope.get("state", {}).get(_STATE)
         if reservation and 200 <= captured.get("status", 0) < 300:
-            user_id, key = reservation
+            user_id, key, watermark = reservation
             async for session in _new_session(scope["app"]):
                 await idempotency_service.complete(
                     session, user_id, key, captured["status"], captured["body"], captured["media_type"],
+                    after_event_id=watermark,
                 )
 
 

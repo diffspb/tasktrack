@@ -78,7 +78,9 @@ async def idempotent(session, user, key: str | None, tool: str, args: dict, call
         return await call()
     body = json.dumps(args, sort_keys=True, default=str).encode()
     try:
-        await idempotency_service.reserve(session, user, key, idempotency_service.request_hash("MCP", tool, body))
+        watermark = await idempotency_service.reserve(
+            session, user, key, idempotency_service.request_hash("MCP", tool, body)
+        )
     except idempotency_service.IdempotentReplay as replay:
         return replay.body
     try:
@@ -89,7 +91,9 @@ async def idempotent(session, user, key: str | None, tool: str, args: dict, call
         except Exception:  # session already failed; its rollback drops the reservation anyway
             pass
         raise
-    await idempotency_service.complete(session, user.id, key, 200, result.encode(), "application/json")
+    await idempotency_service.complete(
+        session, user.id, key, 200, result.encode(), "application/json", after_event_id=watermark
+    )
     return result
 
 

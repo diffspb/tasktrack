@@ -22,7 +22,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, distinct, select, text, update
+from sqlalchemy import delete, distinct, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,8 +57,11 @@ def validate_key(key: str) -> None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "IDEMPOTENCY_KEY_INVALID"})
 
 
-async def reserve(session: AsyncSession, user: User, key: str, req_hash: str) -> None:
-    """Reserve the key for this command, or raise IdempotentReplay / HTTPException."""
+async def reserve(session: AsyncSession, user: User, key: str, req_hash: str) -> int:
+    """Reserve the key for this command, or raise IdempotentReplay / HTTPException.
+
+    Returns the audit watermark: the highest audit event id visible before the command.
+    The command's own events are inserted later and get higher ids."""
     validate_key(key)
     deadline = asyncio.get_running_loop().time() + WAIT_FOR_COMPLETION
     while True:
@@ -69,7 +72,7 @@ async def reserve(session: AsyncSession, user: User, key: str, req_hash: str) ->
             .returning(IdempotencyKey.key)
         )
         if inserted is not None:
-            return
+            return await session.scalar(select(func.coalesce(func.max(AuditEvent.id), 0)))
 
         record = await session.scalar(
             select(IdempotencyKey)
@@ -109,7 +112,7 @@ async def release(session: AsyncSession, user_id: uuid.UUID, key: str) -> None:
 
 async def complete(
     session: AsyncSession, user_id: uuid.UUID, key: str,
-    status_code: int, body: bytes, media_type: str | None,
+    status_code: int, body: bytes, media_type: str | None, after_event_id: int = 0,
 ) -> None:
     record = await session.scalar(
         select(IdempotencyKey).where(IdempotencyKey.user_id == user_id, IdempotencyKey.key == key)
@@ -117,7 +120,10 @@ async def complete(
     if record is None:
         return  # the command did not commit anything: nothing to remember
     rows = (await session.execute(
-        select(distinct(AuditEvent.project_id)).where(AuditEvent.xid == record.xid)
+        # Events of the command's own transaction, written after the reservation.
+        select(distinct(AuditEvent.project_id)).where(
+            AuditEvent.xid == record.xid, AuditEvent.id > after_event_id,
+        )
     )).scalars().all()
     await session.execute(
         update(IdempotencyKey)
