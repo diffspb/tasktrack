@@ -12,4 +12,8 @@ class User(Base, UUIDMixin, TimestampMixin):
     keycloak_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Service account (agent, integration): no Keycloak login, authenticates by ApiKey.
+    is_service: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
     timezone: Mapped[str] = mapped_column(String(50), default="UTC", nullable=False)

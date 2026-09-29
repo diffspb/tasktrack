@@ -14,6 +14,15 @@ async def get_current_user(
     session: AsyncSession = Depends(get_session),
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ):
+    # Service account key (ADR-017): same check for REST and MCP, before any other mode.
+    from app.services import api_key_service
+
+    if credentials and api_key_service.is_api_token(credentials.credentials):
+        user = await api_key_service.authenticate(session, credentials.credentials)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        return user
+
     if settings.auth_stub:
         from app.core.auth_stub import get_or_create_stub_user
 

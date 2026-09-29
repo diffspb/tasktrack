@@ -11,6 +11,7 @@ from app.models.task import Task, TaskLink, TaskPriority
 from app.models.comment import Comment
 from app.models.notification import Notification, NotificationEntityType, NotificationEventType
 from app.models.gantt import GanttChart, GanttChartTask
+from app.models.api_key import ApiKey
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -25,4 +26,5 @@ __all__ = [
     "Comment",
     "Notification", "NotificationEntityType", "NotificationEventType",
     "GanttChart", "GanttChartTask",
+    "ApiKey",
 ]

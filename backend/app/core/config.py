@@ -11,6 +11,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # "production" in the Docker image (Dockerfile sets APP_ENV); see validate_runtime.
+    app_env: str = "dev"
     database_url: str = "postgresql+asyncpg://tasktrack:tasktrack@localhost:5432/tasktrack"
     auth_stub: bool = False
     keycloak_url: str = "https://auth.busypage.ru"
@@ -32,6 +34,22 @@ class Settings(BaseSettings):
                 return json.loads(stripped)
             return [o.strip() for o in stripped.split(",")]
         return v  # type: ignore[return-value]
+
+
+def validate_runtime(s: Settings) -> None:
+    """Refuse to start a production instance with development-only auth bypasses."""
+    if s.app_env != "production":
+        return
+    if s.auth_stub:
+        raise RuntimeError(
+            "AUTH_STUB=true is not allowed when APP_ENV=production: "
+            "every request would be authenticated as a stub user."
+        )
+    if s.mcp_agent_user_id is not None and not s.mcp_agents:
+        raise RuntimeError(
+            "MCP_AGENT_USER_ID without MCP_AGENTS is not allowed when APP_ENV=production: "
+            "the MCP endpoint would accept calls without a key. Use service account keys (ADR-017)."
+        )
 
 
 settings = Settings()

@@ -46,11 +46,14 @@ async def resolve_all_agents() -> None:
             for key, uid in mapping.items():
                 user = await session.get(User, uid)
                 if user is None or not user.is_active:
-                    print(f"[MCP] Warning: agent user {uid} (key={key!r}) not found or inactive — skipped.")
+                    print(f"[MCP] Warning: agent user {uid} not found or inactive — skipped.")
                     continue
                 _agents[key] = user
         if _agents:
-            print(f"[MCP] Loaded {len(_agents)} agent(s): {', '.join(_agents)}")
+            # Never print the keys themselves — they are credentials.
+            emails = ", ".join(sorted(u.email for u in _agents.values()))
+            print(f"[MCP] Loaded {len(_agents)} agent(s) from MCP_AGENTS: {emails}")
+            print("[MCP] MCP_AGENTS is deprecated: issue service account keys instead (ADR-017).")
         else:
             print("[MCP] Warning: no agent users could be loaded. MCP tools will fail until DB is populated.")
     elif settings.mcp_agent_user_id is not None:

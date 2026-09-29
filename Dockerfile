@@ -39,7 +39,9 @@ COPY backend/alembic ./alembic
 COPY backend/scripts ./scripts
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
+# APP_ENV=production forbids AUTH_STUB and keyless MCP (app.core.config.validate_runtime).
 ENV PATH="/venv/bin:$PATH" \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    APP_ENV=production
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
