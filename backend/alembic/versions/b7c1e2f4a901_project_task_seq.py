@@ -17,11 +17,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # IF NOT EXISTS: the initial revision runs metadata.create_all from the current
-    # models, so on an empty database the column already exists at this point.
-    op.execute(sa.text(
-        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS task_seq INTEGER NOT NULL DEFAULT 0"
-    ))
+    op.add_column(
+        'projects',
+        sa.Column('task_seq', sa.Integer(), server_default='0', nullable=False),
+    )
     # Continue numbering from the highest issued key (soft-deleted tasks included:
     # their keys stay taken). Project keys may contain '-', so parse the suffix only.
     op.execute(sa.text("""

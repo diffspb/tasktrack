@@ -11,10 +11,9 @@ import uuid
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.config import settings
 from app.models.project import Project
 from app.models.task import Task
 from app.models.task_type import TaskType
@@ -25,38 +24,11 @@ from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.services import project_service, task_service
 
 
-async def _alembic(url: str, *args: str) -> None:
-    """Run an alembic command against `url` (env.py reads settings.database_url)."""
-    from pathlib import Path
-
-    from alembic import command
-    from alembic.config import Config
-
-    cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
-    original = settings.database_url
-    settings.database_url = url
-    try:
-        await asyncio.to_thread(getattr(command, args[0]), cfg, *args[1:])
-    finally:
-        settings.database_url = original
-
-
 @pytest_asyncio.fixture(scope="module")
-async def committed(postgres_container):
+async def committed(make_database, alembic):
     """Fresh database migrated to head; yields (url, sessionmaker)."""
-    host = postgres_container.get_container_host_ip()
-    port = postgres_container.get_exposed_port(5432)
-    base = (
-        f"postgresql+asyncpg://{postgres_container.username}"
-        f":{postgres_container.password}@{host}:{port}"
-    )
-    dbname = f"concurrency_{uuid.uuid4().hex[:8]}"
-    admin = create_async_engine(f"{base}/{postgres_container.dbname}", isolation_level="AUTOCOMMIT")
-    async with admin.connect() as conn:
-        await conn.execute(text(f"CREATE DATABASE {dbname}"))
-
-    url = f"{base}/{dbname}"
-    await _alembic(url, "upgrade", "head")
+    url = await make_database()
+    await alembic(url, "upgrade", "head")
 
     engine = create_async_engine(url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
@@ -67,9 +39,6 @@ async def committed(postgres_container):
     yield url, Session
 
     await engine.dispose()
-    async with admin.connect() as conn:
-        await conn.execute(text(f"DROP DATABASE {dbname} WITH (FORCE)"))
-    await admin.dispose()
 
 
 async def _seed(Session) -> dict:
@@ -163,7 +132,7 @@ async def test_concurrent_create_gives_unique_keys(committed):
     assert numbers == [2, 3, 4, 5, 6]
 
 
-async def test_task_seq_migration_backfills_existing_projects(committed):
+async def test_task_seq_migration_backfills_existing_projects(committed, alembic):
     """Обновление схемы с данными: счётчик продолжает нумерацию, а не начинает с 1."""
     url, Session = committed
     ctx = await _seed(Session)
@@ -174,8 +143,8 @@ async def test_task_seq_migration_backfills_existing_projects(committed):
         t = await task_service.create_task(s, ctx["project_id"], TaskCreate(title="gone"), ctx["user"])
         await task_service.delete_task(s, t.id, ctx["user"])
 
-    await _alembic(url, "downgrade", "-1")
-    await _alembic(url, "upgrade", "head")
+    await alembic(url, "downgrade", "-1")
+    await alembic(url, "upgrade", "head")
 
     async with Session() as s:
         project = await s.get(Project, ctx["project_id"])

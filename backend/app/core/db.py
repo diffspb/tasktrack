@@ -16,6 +16,10 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# Indexes created by raw DDL below rather than declared on the models;
+# Alembic autogenerate must not try to drop them.
+FTS_MANAGED_INDEXES = frozenset({"ix_tasks_search_vector"})
+
 # Postgres-side machinery for full-text search on Task.search_vector.
 # Configuration: 'russian' (snowball). Trigger keeps the column in sync
 # with title || description on every insert/update.

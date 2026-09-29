@@ -64,6 +64,62 @@ async def async_engine(postgres_container):
 
 
 # ---------------------------------------------------------------------------
+# Fresh databases for tests that need real commits or run Alembic
+# (concurrency, migrations). Created in the same container, dropped afterwards.
+# ---------------------------------------------------------------------------
+
+def _server_url(pg) -> str:
+    host = pg.get_container_host_ip()
+    port = pg.get_exposed_port(5432)
+    return f"postgresql+asyncpg://{pg.username}:{pg.password}@{host}:{port}"
+
+
+async def run_alembic(url: str, command_name: str, *args: str) -> None:
+    """Run an alembic command against `url` in a worker thread (env.py calls asyncio.run)."""
+    import asyncio
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
+    cfg.attributes["database_url"] = url
+    await asyncio.to_thread(getattr(command, command_name), cfg, *args)
+
+
+@pytest.fixture(scope="session")
+def alembic():
+    """`await alembic(url, "upgrade", "head")`."""
+    return run_alembic
+
+
+@pytest_asyncio.fixture(scope="module")
+async def make_database(postgres_container):
+    """Factory: `url = await make_database()` creates an empty database."""
+    import uuid
+
+    from sqlalchemy import text
+
+    base = _server_url(postgres_container)
+    admin = create_async_engine(f"{base}/{postgres_container.dbname}", isolation_level="AUTOCOMMIT")
+    created: list[str] = []
+
+    async def factory() -> str:
+        name = f"t_{uuid.uuid4().hex[:10]}"
+        async with admin.connect() as conn:
+            await conn.execute(text(f"CREATE DATABASE {name}"))
+        created.append(name)
+        return f"{base}/{name}"
+
+    yield factory
+
+    async with admin.connect() as conn:
+        for name in created:
+            await conn.execute(text(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"))
+    await admin.dispose()
+
+
+# ---------------------------------------------------------------------------
 # Function-scoped: each test wraps in a transaction rolled back after.
 # join_transaction_mode="create_savepoint" makes session.commit() issue a
 # SAVEPOINT instead of COMMIT, so the outer rollback undoes everything.
