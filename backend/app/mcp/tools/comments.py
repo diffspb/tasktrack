@@ -3,7 +3,7 @@ import json
 from mcp.server.fastmcp.server import Context
 
 from app.mcp.schemas.comment import comment_out
-from app.mcp.utils import McpSession, parse_uuid, svc_call
+from app.mcp.utils import McpSession, idempotent, parse_uuid, svc_call
 from app.schemas.comment import CommentCreate, CommentUpdate
 from app.services import comment_service
 
@@ -16,8 +16,7 @@ async def list_comments(ctx: Context, task_id: str) -> str:
     Each comment: id, task_id, author_id, content, labels, edited_at,
     deleted_at, created_at, replies.
 
-    Label "solution" marks a subtask solution submission that unblocks
-    a parent decision task.
+    Comments are discussion. A task's result is a result proposal (list_results).
     """
     async with McpSession(ctx) as (session, user):
         tid = parse_uuid(task_id, "task_id")
@@ -35,26 +34,31 @@ async def add_comment(
     content: str,
     labels: list[str] | None = None,
     parent_comment_id: str | None = None,
+    session_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> str:
     """
     Post a comment on a task.
 
-    labels: string tags, e.g. ["solution"] to mark this as a Solution submission
-    on a subtask — sets solution_comment_id in meta and contributes to unblocking
-    a parent decision task.
+    labels: free classification tags. A comment is discussion, never a result —
+    present results with submit_result.
 
     parent_comment_id: UUID of a top-level comment to reply to (max depth 1).
+    session_id: your active work session; idempotency_key: safe retry without a duplicate.
     """
-    async with McpSession(ctx) as (session, user):
-        tid = parse_uuid(task_id, "task_id")
-        parent_id = parse_uuid(parent_comment_id, "parent_comment_id") if parent_comment_id else None
-        data = CommentCreate(
-            content=content,
-            labels=labels or [],
-            parent_comment_id=parent_id,
-        )
-        comment = await comment_service.create_comment(session, tid, data, user)
-        return json.dumps(comment_out(comment))
+    args = {"task_id": task_id, "content": content, "labels": labels, "parent_comment_id": parent_comment_id}
+    async with McpSession(ctx, work_session=session_id) as (session, user):
+        async def call():
+            tid = parse_uuid(task_id, "task_id")
+            parent_id = parse_uuid(parent_comment_id, "parent_comment_id") if parent_comment_id else None
+            data = CommentCreate(
+                content=content,
+                labels=labels or [],
+                parent_comment_id=parent_id,
+            )
+            comment = await comment_service.create_comment(session, tid, data, user)
+            return json.dumps(comment_out(comment))
+        return await idempotent(session, user, idempotency_key, "add_comment", args, call)
 
 
 @svc_call

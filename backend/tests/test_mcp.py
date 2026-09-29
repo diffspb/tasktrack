@@ -31,7 +31,7 @@ def _patch_session(db_session: AsyncSession, user: User):
     from contextlib import ExitStack
 
     class _FakeMcpSession:
-        def __init__(self, ctx):
+        def __init__(self, ctx, **kwargs):
             pass
         async def __aenter__(self):
             return db_session, user

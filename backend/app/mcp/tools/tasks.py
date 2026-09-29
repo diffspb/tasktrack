@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.mcp.schemas.task import task_detail, task_list_item
-from app.mcp.utils import McpSession, parse_uuid, svc_call
+from app.mcp.utils import McpSession, idempotent, parse_uuid, svc_call
 from app.models.task import Task
 from app.models.workflow import Status, Transition, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
@@ -178,13 +178,20 @@ async def create_task(
     assignee_id: str | None = None,
     parent_task_id: str | None = None,
     due_date: str | None = None,
+    meta: dict | None = None,
+    reason: str | None = None,
+    idempotency_key: str | None = None,
 ) -> str:
     """
     Create a new task in the specified project.
 
-    task_type_key: "task" | "bug" | "story" | "epic" | "decision"
+    task_type_key: "task" | "bug" | "story" | "epic" | "decision" |
+                   "execution" | "research" | "migration" (process types require a review
+                   of the result before the final status)
     priority: "low" | "medium" | "high" | "critical"
     due_date: ISO date string, e.g. "2026-06-01"
+    meta: type-specific fields, validated against the type's schema.
+    idempotency_key: pass one to retry safely after a lost response (no duplicate task).
 
     The workflow and initial status are assigned automatically based on
     project task-type configuration. The agent is set as reporter.
@@ -192,23 +199,29 @@ async def create_task(
     Returns the full enriched task response.
     """
     from datetime import date
-    async with McpSession(ctx) as (session, user):
-        pid = parse_uuid(project_id, "project_id")
-        aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
-        par = parse_uuid(parent_task_id, "parent_task_id") if parent_task_id else None
-        dd = date.fromisoformat(due_date) if due_date else None
+    args = {"project_id": project_id, "title": title, "task_type_key": task_type_key,
+            "description": description, "priority": priority, "assignee_id": assignee_id,
+            "parent_task_id": parent_task_id, "due_date": due_date, "meta": meta}
+    async with McpSession(ctx, reason=reason) as (session, user):
+        async def call():
+            pid = parse_uuid(project_id, "project_id")
+            aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
+            par = parse_uuid(parent_task_id, "parent_task_id") if parent_task_id else None
+            dd = date.fromisoformat(due_date) if due_date else None
 
-        data = TaskCreate(
-            title=title,
-            task_type_key=task_type_key,
-            description=description,
-            priority=priority,
-            assignee_id=aid,
-            parent_task_id=par,
-            due_date=dd,
-        )
-        task = await task_service.create_task(session, pid, data, user)
-        return json.dumps(await _enrich_task(session, task, user))
+            data = TaskCreate(
+                title=title,
+                task_type_key=task_type_key,
+                description=description,
+                priority=priority,
+                assignee_id=aid,
+                parent_task_id=par,
+                due_date=dd,
+                meta=meta or {},
+            )
+            task = await task_service.create_task(session, pid, data, user)
+            return json.dumps(await _enrich_task(session, task, user))
+        return await idempotent(session, user, idempotency_key, "create_task", args, call)
 
 
 @svc_call
@@ -222,9 +235,16 @@ async def update_task(
     assignee_id: str | None = None,
     start_date: str | None = None,
     due_date: str | None = None,
+    meta: dict | None = None,
+    session_id: str | None = None,
+    reason: str | None = None,
+    idempotency_key: str | None = None,
 ) -> str:
     """
     Update mutable fields of a task.
+
+    meta: keys to merge into the task's meta (validated against the type's schema).
+    session_id / reason / idempotency_key: see submit_result.
 
     IMPORTANT: version is required for optimistic locking. Always read the
     current task with get_task first and pass back the version you received.
@@ -236,23 +256,29 @@ async def update_task(
     Returns the updated task with the incremented version.
     """
     from datetime import date
-    async with McpSession(ctx) as (session, user):
-        tid = parse_uuid(task_id, "task_id")
-        aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
-        sd = date.fromisoformat(start_date) if start_date else None
-        dd = date.fromisoformat(due_date) if due_date else None
+    args = {"task_id": task_id, "version": version, "title": title, "description": description,
+            "priority": priority, "assignee_id": assignee_id, "start_date": start_date,
+            "due_date": due_date, "meta": meta}
+    async with McpSession(ctx, work_session=session_id, reason=reason) as (session, user):
+        async def call():
+            tid = parse_uuid(task_id, "task_id")
+            aid = parse_uuid(assignee_id, "assignee_id") if assignee_id else None
+            sd = date.fromisoformat(start_date) if start_date else None
+            dd = date.fromisoformat(due_date) if due_date else None
 
-        data = TaskUpdate(
-            version=version,
-            title=title,
-            description=description,
-            priority=priority,
-            assignee_id=aid,
-            start_date=sd,
-            due_date=dd,
-        )
-        task = await task_service.update_task(session, tid, data, user)
-        return json.dumps(await _enrich_task(session, task, user))
+            data = TaskUpdate(
+                version=version,
+                title=title,
+                description=description,
+                priority=priority,
+                assignee_id=aid,
+                start_date=sd,
+                due_date=dd,
+                meta=meta,
+            )
+            task = await task_service.update_task(session, tid, data, user)
+            return json.dumps(await _enrich_task(session, task, user))
+        return await idempotent(session, user, idempotency_key, "update_task", args, call)
 
 
 @svc_call
@@ -260,25 +286,32 @@ async def transition_task_status(
     ctx: Context,
     task_id: str,
     target_status_id: str,
+    session_id: str | None = None,
+    reason: str | None = None,
+    idempotency_key: str | None = None,
 ) -> str:
     """
     Move a task to a different status following workflow transition rules.
 
     The agent must be the task's assignee to perform a transition.
     Only transitions listed in get_task.available_transitions are allowed.
-
-    For decision tasks: transitioning to final is blocked if any subtask
-    lacks a solution comment (check is_decision_task and subtask_ids first).
+    A transition may require meta fields (TRANSITION_FIELDS_REQUIRED lists the missing
+    ones — set them with update_task). Process types (execution, research, migration)
+    reach a final status only after a review verdict (RESULT_NOT_REVIEWED otherwise).
+    Decision tasks are blocked until every subtask has a submitted result.
 
     Returns the updated task.
     """
-    async with McpSession(ctx) as (session, user):
-        tid = parse_uuid(task_id, "task_id")
-        sid = parse_uuid(target_status_id, "target_status_id")
+    args = {"task_id": task_id, "target_status_id": target_status_id}
+    async with McpSession(ctx, work_session=session_id, reason=reason) as (session, user):
+        async def call():
+            tid = parse_uuid(task_id, "task_id")
+            sid = parse_uuid(target_status_id, "target_status_id")
 
-        data = TaskStatusTransition(status_id=sid)
-        task = await task_service.transition_status(session, tid, data, user)
-        return json.dumps(await _enrich_task(session, task, user))
+            data = TaskStatusTransition(status_id=sid)
+            task = await task_service.transition_status(session, tid, data, user)
+            return json.dumps(await _enrich_task(session, task, user))
+        return await idempotent(session, user, idempotency_key, "transition_task_status", args, call)
 
 
 @svc_call

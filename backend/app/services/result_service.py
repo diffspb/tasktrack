@@ -203,6 +203,35 @@ _VERDICT_TEXT = {
 }
 
 
+async def review_queue(
+    session: AsyncSession, user: User, *, project_id: uuid.UUID | None = None
+) -> list[ResultProposal]:
+    """Proposals the user may review now: submitted, in projects where the user has the
+    reviewer profile, not authored by the user, not on the user's own tasks, and not
+    designated to another reviewer. Oldest first."""
+    reviewer_projects = select(ProjectMember.project_id).where(
+        ProjectMember.user_id == user.id, ProjectMember.is_reviewer.is_(True),
+        ProjectMember.role != ProjectMemberRole.viewer,
+    )
+    stmt = (
+        select(ResultProposal)
+        .join(Task, Task.id == ResultProposal.task_id)
+        .options(selectinload(ResultProposal.reviews))
+        .where(
+            ResultProposal.status == ProposalStatus.submitted,
+            ResultProposal.author_id != user.id,
+            Task.deleted_at.is_(None),
+            Task.project_id.in_(reviewer_projects),
+            (Task.assignee_id.is_(None)) | (Task.assignee_id != user.id),
+            (Task.reviewer_id.is_(None)) | (Task.reviewer_id == user.id),
+        )
+        .order_by(ResultProposal.created_at)
+    )
+    if project_id is not None:
+        stmt = stmt.where(Task.project_id == project_id)
+    return list((await session.scalars(stmt)).all())
+
+
 # ── Delivery and recipient acceptance (TT-17) ────────────────────────────────
 
 async def propose_delivery(

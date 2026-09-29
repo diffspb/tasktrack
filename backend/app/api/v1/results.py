@@ -64,6 +64,16 @@ async def review_proposal(
     return await result_service.review_proposal(session, proposal_id, data, user)
 
 
+@router.get("/review-queue", response_model=list[ProposalResponse])
+async def review_queue(
+    project_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Proposals waiting for the caller's review (FR-003 TT-22)."""
+    return await result_service.review_queue(session, user, project_id=project_id)
+
+
 @router.post("/tasks/{task_id}/delivery", response_model=TaskResponse)
 async def propose_delivery(
     task_id: uuid.UUID,
