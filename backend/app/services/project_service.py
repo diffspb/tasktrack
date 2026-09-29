@@ -181,7 +181,7 @@ async def list_members(
         .where(ProjectMember.project_id == project_id)
         .order_by(User.display_name)
     )
-    return [{"role": pm.role, "user": u} for pm, u in rows.all()]
+    return [{"role": pm.role, "is_reviewer": pm.is_reviewer, "user": u} for pm, u in rows.all()]
 
 
 async def remove_member(

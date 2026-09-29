@@ -49,6 +49,20 @@ class Task(Base, UUIDMixin, TimestampMixin):
     duration_days: Mapped[int | None] = mapped_column(Integer)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Assignment (ADR-020): editable draft; issued versions live in work_packages.
+    work_package_draft: Mapped[dict | None] = mapped_column(JSONB)
+    work_package_version: Mapped[int | None] = mapped_column(Integer)
+    # Result and review (ADR-021). result_state is derived from the task's proposals
+    # by result_service and stored for filtering: none | proposed | changes_requested
+    # | accepted | rejected | historical.
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    result_state: Mapped[str] = mapped_column(
+        String(30), default="none", server_default="none", nullable=False
+    )
+    # Delivery proposed to a recipient and the recipient's acceptance, recorded as a
+    # received fact — separate from the local review (FR-003 TT-17).
+    delivery: Mapped[dict | None] = mapped_column(JSONB)
+    recipient_acceptance: Mapped[dict | None] = mapped_column(JSONB)
     # Updated by a Postgres trigger; see app.core.db.create_tables.
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
 

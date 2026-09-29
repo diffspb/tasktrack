@@ -14,11 +14,14 @@ class NotificationEventType(str, enum.Enum):
     decision_made = "decision_made"
     task_closed = "task_closed"
     decision_reminder = "decision_reminder"
+    review_requested = "review_requested"
+    review_completed = "review_completed"
 
 
 class NotificationEntityType(str, enum.Enum):
     task = "task"
     solution = "solution"
+    result_proposal = "result_proposal"
 
 
 class Notification(Base, UUIDMixin, TimestampMixin):

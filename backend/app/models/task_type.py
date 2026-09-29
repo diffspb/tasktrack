@@ -21,6 +21,11 @@ class TaskType(Base, UUIDMixin, TimestampMixin):
     color: Mapped[str | None] = mapped_column(String(20))
     icon: Mapped[str | None] = mapped_column(String(50))
     meta_schema: Mapped[dict | None] = mapped_column(JSONB)
+    # A task of this type reaches a final status only with a review verdict:
+    # accepted result or reasoned rejection (ADR-021).
+    requires_review: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
     default_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("workflows.id", ondelete="SET NULL"), nullable=True
     )

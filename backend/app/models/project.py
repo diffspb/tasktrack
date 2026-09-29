@@ -57,6 +57,11 @@ class ProjectMember(Base):
         default=ProjectMemberRole.member,
         nullable=False,
     )
+    # Reviewer profile (ADR-021): may review result proposals in this project.
+    # Independent of role — being manager or assignee does not grant it.
+    is_reviewer: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

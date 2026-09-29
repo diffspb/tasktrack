@@ -40,10 +40,6 @@ async def create_comment(
     task = await _get_task_or_404(session, task_id)
     await require_writer(session, task.project_id, user)
 
-    # Solution surrogate (ADR-014): only the task's assignee may submit it.
-    if "solution" in data.labels and task.assignee_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "SOLUTION_NOT_ASSIGNEE"})
-
     if data.parent_comment_id:
         parent = await session.get(Comment, data.parent_comment_id)
         if not parent or parent.task_id != task_id:
@@ -66,9 +62,8 @@ async def create_comment(
     await session.flush()
     await _audit(session, task, comment, user, "created",
                  after=audit_service.snapshot(comment, COMMENT_FIELDS))
-
-    if "solution" in data.labels:
-        task.meta = {**task.meta, "solution_comment_id": str(comment.id)}
+    # Labels are plain classification; the result of a task is a ResultProposal (ADR-021),
+    # a comment labelled "solution" no longer counts as one.
 
     await session.commit()
     await session.refresh(comment)
@@ -119,12 +114,6 @@ async def delete_comment(
     comment.deleted_at = datetime.now(UTC)
     await _audit(session, task, comment, user, "deleted",
                  before=audit_service.snapshot(comment, COMMENT_FIELDS))
-
-    if task.meta.get("solution_comment_id") == str(comment.id):
-        meta = dict(task.meta)
-        meta.pop("solution_comment_id", None)
-        task.meta = meta
-
     await session.commit()
 
 

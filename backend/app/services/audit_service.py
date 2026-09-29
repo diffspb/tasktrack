@@ -36,7 +36,7 @@ change_reason: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 TASK_FIELDS = (
     "key", "title", "description", "priority", "task_type_id", "workflow_id",
     "current_status_id", "assignee_id", "reporter_id", "parent_task_id",
-    "start_date", "due_date", "duration_days", "meta", "version",
+    "start_date", "due_date", "duration_days", "meta", "reviewer_id", "version",
 )
 COMMENT_FIELDS = ("content", "labels", "parent_comment_id", "author_id")
 

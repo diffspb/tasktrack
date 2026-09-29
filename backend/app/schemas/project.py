@@ -42,6 +42,7 @@ class ProjectMemberResponse(BaseModel):
     project_id: uuid.UUID
     user_id: uuid.UUID
     role: ProjectMemberRole
+    is_reviewer: bool = False
     created_at: datetime
 
 
@@ -58,6 +59,7 @@ class ProjectMemberWithUser(BaseModel):
 
     user: _UserSummary
     role: ProjectMemberRole
+    is_reviewer: bool = False
 
 
 class ProjectMembersListResponse(BaseModel):

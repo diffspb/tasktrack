@@ -9,7 +9,7 @@ from app.models.project import Project, ProjectMember, ProjectMemberRole
 from app.models.task import Task, TaskPriority
 from app.models.task_type import TaskType
 from app.models.user import User
-from app.models.workflow import Status, Workflow
+from app.models.workflow import Status, StatusCategory, Workflow
 from app.schemas.task import TaskCreate, TaskStatusTransition, TaskUpdate
 from app.core.events import event_bus, make_task_event
 from app.services import audit_service, notification_service
@@ -234,6 +234,10 @@ async def update_task(
     if 'due_date'     in fs: task.due_date      = data.due_date
     if 'duration_days' in fs: task.duration_days = data.duration_days
     if 'meta'         in fs and data.meta is not None: task.meta = {**task.meta, **data.meta}
+    if 'reviewer_id'  in fs and data.reviewer_id != task.reviewer_id:
+        from app.services.result_service import validate_designated_reviewer
+        await validate_designated_reviewer(session, task, data.reviewer_id, user)
+        task.reviewer_id = data.reviewer_id
     task.version += 1
     await _audit(session, task, user, "updated",
                  *audit_service.diff(before, audit_service.snapshot(task, TASK_FIELDS)))
@@ -284,8 +288,9 @@ async def transition_status(
             status.HTTP_400_BAD_REQUEST, {"code": "WORKFLOW_TRANSITION_NOT_ALLOWED"}
         )
     _check_transition_role(transition.required_role, member)
+    await _check_review_before_final(session, task, data.status_id)
 
-    # Decision-type task: blocked until all subtasks have solution_comment_id in meta.
+    # Decision-type task: blocked until every subtask has presented a result.
     if task.task_type and task.task_type.key == "decision":
         await _check_decision_task_unblocked(session, task)
 
@@ -368,18 +373,34 @@ def _check_transition_role(required_role: str | None, member: ProjectMember) -> 
         )
 
 
+async def _check_review_before_final(
+    session: AsyncSession, task: Task, to_status_id: uuid.UUID
+) -> None:
+    """Task types with requires_review reach a final status only after a review verdict:
+    an accepted result or a reasoned rejection (ADR-021)."""
+    if not (task.task_type and task.task_type.requires_review):
+        return
+    target = await session.get(Status, to_status_id)
+    if target is None or target.category != StatusCategory.final:
+        return
+    from app.services.result_service import REVIEWED_STATES
+    if task.result_state not in REVIEWED_STATES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            {"code": "RESULT_NOT_REVIEWED", "result_state": task.result_state},
+        )
+
+
 async def _check_decision_task_unblocked(
     session: AsyncSession, task: Task
 ) -> None:
-    subtasks = list((await session.scalars(
-        select(Task).where(Task.parent_task_id == task.id, Task.deleted_at.is_(None))
-    )).all())
-    if not subtasks:
-        return
-    all_ready = all(
-        bool(st.meta.get("solution_comment_id")) for st in subtasks
+    """Legacy `decision` type (ADR-016): blocked until every subtask has presented a result proposal."""
+    pending = await session.scalar(
+        select(Task.id).where(
+            Task.parent_task_id == task.id, Task.deleted_at.is_(None), Task.result_state == "none",
+        ).limit(1)
     )
-    if not all_ready:
+    if pending is not None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, {"code": "TASK_BLOCKED_BY_SUBTASKS"}
         )

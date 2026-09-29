@@ -152,7 +152,7 @@ async def seed(session: AsyncSession) -> None:
 
     session.add_all([
         ProjectMember(project_id=demo.id, user_id=admin_id,   role=ProjectMemberRole.admin),
-        ProjectMember(project_id=demo.id, user_id=manager_id, role=ProjectMemberRole.manager),
+        ProjectMember(project_id=demo.id, user_id=manager_id, role=ProjectMemberRole.manager, is_reviewer=True),
         ProjectMember(project_id=demo.id, user_id=dev1_id,    role=ProjectMemberRole.member),
     ])
 
@@ -284,27 +284,29 @@ async def seed(session: AsyncSession) -> None:
 
     now = datetime.now(UTC)
 
-    # Solution comments on each subtask
-    sol_admin = Comment(
-        task_id=t10_admin.id, author_id=admin_id,
-        content="Предлагаю Keycloak: realm для приложения, JWKS-валидация на бэке, "
-                "встроенный UI для логина. Минимум кода в приложении, готовый OAuth-флоу. "
-                "Часы внедрения: ~16ч (настройка + интеграция).",
-        labels=["solution"],
-    )
-    sol_dev1 = Comment(
-        task_id=t10_dev1.id, author_id=dev1_id,
-        content="Свой OAuth-провайдер на FastAPI + python-jose. Полный контроль над флоу, "
-                "нет зависимости от внешнего сервиса. Часы внедрения: ~40ч "
-                "(пользователи, токены, сессии, refresh, recovery).",
-        labels=["solution"],
-    )
-    session.add_all([sol_admin, sol_dev1])
+    # Result proposals on each subtask (ADR-021); the manager reviews them
+    from app.models.result import ProposalStatus, ResultProposal
+    session.add_all([
+        ResultProposal(
+            task_id=t10_admin.id, version=1, author_id=admin_id, status=ProposalStatus.submitted,
+            summary="Предлагаю Keycloak: realm для приложения, JWKS-валидация на бэке, "
+                    "встроенный UI для логина. Минимум кода в приложении, готовый OAuth-флоу.",
+            links=[{"kind": "document", "url": "https://www.keycloak.org/documentation", "ref": None}],
+            criteria=[], checks=[{"name": "прототип входа", "result": "passed", "details": None}],
+            limitations="Часы внедрения: ~16ч (настройка + интеграция).", provenance={},
+        ),
+        ResultProposal(
+            task_id=t10_dev1.id, version=1, author_id=dev1_id, status=ProposalStatus.submitted,
+            summary="Свой OAuth-провайдер на FastAPI + python-jose. Полный контроль над флоу, "
+                    "нет зависимости от внешнего сервиса.",
+            links=[], criteria=[], checks=[],
+            limitations="Часы внедрения: ~40ч (пользователи, токены, сессии, refresh, recovery).",
+            provenance={},
+        ),
+    ])
+    t10_admin.result_state = "proposed"
+    t10_dev1.result_state = "proposed"
     await session.flush()
-
-    # Mark solution comments in subtask meta
-    t10_admin.meta = {"solution_comment_id": str(sol_admin.id)}
-    t10_dev1.meta  = {"solution_comment_id": str(sol_dev1.id)}
 
     # Notifications
     session.add_all([

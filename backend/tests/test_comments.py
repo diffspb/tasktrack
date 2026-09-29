@@ -237,35 +237,21 @@ async def test_reply_to_nonexistent_parent_blocked(
     assert r.json()["detail"]["code"] == "PARENT_COMMENT_NOT_FOUND"
 
 
-# ── Solution label ────────────────────────────────────────────────────────────
+# ── Labels ────────────────────────────────────────────────────────────────────
 
-async def test_solution_label_sets_task_meta(
+async def test_solution_label_is_plain_label(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    """Comment with label 'solution' sets task.meta.solution_comment_id."""
+    """ADR-021: a comment labelled 'solution' is only a comment — it is not a result
+    and does not touch the task (the result is a ResultProposal)."""
     ctx = await _setup(db_session, stub_user)
     tid = ctx["task_id"]
 
-    c = (await client.post(f"/api/v1/tasks/{tid}/comments", json={
+    r = await client.post(f"/api/v1/tasks/{tid}/comments", json={
         "content": "Here is my solution", "labels": ["solution"],
-    })).json()
+    })
+    assert r.status_code == 201 and r.json()["labels"] == ["solution"]
 
-    task_r = await client.get(f"/api/v1/tasks/{tid}")
-    assert task_r.json()["meta"].get("solution_comment_id") == c["id"]
-
-
-async def test_delete_solution_comment_clears_task_meta(
-    client: AsyncClient, db_session: AsyncSession, stub_user: User
-):
-    """Deleting the solution comment removes solution_comment_id from task meta."""
-    ctx = await _setup(db_session, stub_user)
-    tid = ctx["task_id"]
-
-    c = (await client.post(f"/api/v1/tasks/{tid}/comments", json={
-        "content": "Solution", "labels": ["solution"],
-    })).json()
-
-    await client.delete(f"/api/v1/comments/{c['id']}")
-
-    task_r = await client.get(f"/api/v1/tasks/{tid}")
-    assert "solution_comment_id" not in task_r.json()["meta"]
+    task = (await client.get(f"/api/v1/tasks/{tid}")).json()
+    assert "solution_comment_id" not in task["meta"]
+    assert task["result_state"] == "none"

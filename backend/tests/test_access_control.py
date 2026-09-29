@@ -216,28 +216,30 @@ async def test_transition_required_role(
         assert r.json()["detail"]["code"] == "TRANSITION_ROLE_REQUIRED"
 
 
-# ── Суррогат Solution ────────────────────────────────────────────────────────
+# ── Предложение результата ───────────────────────────────────────────────────
 
-async def test_solution_label_only_by_assignee(
+async def test_result_proposal_only_by_assignee_with_write_role(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
+    """Результат подаёт исполнитель; назначение не даёт прав сверх роли (viewer не подаёт)."""
     ctx = await _setup(db_session, stub_user)
     assignee = await _make_user(db_session)
     stranger = await _make_user(db_session)
-    await _add_member(db_session, ctx["project_id"], assignee, ProjectMemberRole.member)
+    await _add_member(db_session, ctx["project_id"], assignee, ProjectMemberRole.viewer)
     await _add_member(db_session, ctx["project_id"], stranger, ProjectMemberRole.member)
     ctx["task"].assignee_id = assignee.id
     await db_session.flush()
-    url = f"/api/v1/tasks/{ctx['task'].id}/comments"
+    url = f"/api/v1/tasks/{ctx['task'].id}/proposals"
 
     _act_as(stranger)
-    r = await client.post(url, json={"content": "мой вариант", "labels": ["solution"]})
+    r = await client.post(url, json={"summary": "мой вариант"})
     assert r.status_code == 403
-    assert r.json()["detail"]["code"] == "SOLUTION_NOT_ASSIGNEE"
+    assert r.json()["detail"]["code"] == "NOT_ASSIGNEE"
 
     _act_as(assignee)
-    r = await client.post(url, json={"content": "мой вариант", "labels": ["solution"]})
-    assert r.status_code == 201
+    r = await client.post(url, json={"summary": "мой вариант"})
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "PERMISSION_DENIED"
 
 
 # ── Гант ─────────────────────────────────────────────────────────────────────

@@ -14,6 +14,8 @@ from app.models.gantt import GanttChart, GanttChartTask
 from app.models.api_key import ApiKey
 from app.models.audit import AuditEvent
 from app.models.idempotency import IdempotencyKey
+from app.models.work_package import WorkPackage
+from app.models.result import ProposalStatus, ResultProposal, Review, ReviewVerdict
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -31,4 +33,6 @@ __all__ = [
     "ApiKey",
     "AuditEvent",
     "IdempotencyKey",
+    "WorkPackage",
+    "ProposalStatus", "ResultProposal", "Review", "ReviewVerdict",
 ]

@@ -13,6 +13,8 @@ dependencies = [
     "apscheduler>=3.10",
     "fastmcp>=2.0,<3",
     "alembic>=1.14",
+    "jsonschema>=4.20",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

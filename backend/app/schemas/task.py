@@ -41,6 +41,8 @@ class TaskUpdate(BaseModel):
     due_date: date | None = None
     duration_days: int | None = None
     meta: dict | None = None
+    # Designated reviewer (ADR-021): manager only, must have the reviewer profile.
+    reviewer_id: uuid.UUID | None = None
     version: int
 
 
@@ -96,6 +98,11 @@ class TaskResponse(BaseModel):
     due_date: date | None
     duration_days: int | None
     version: int
+    work_package_version: int | None = None
+    reviewer_id: uuid.UUID | None = None
+    result_state: str = "none"
+    delivery: dict | None = None
+    recipient_acceptance: dict | None = None
     deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime

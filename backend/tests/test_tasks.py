@@ -249,7 +249,7 @@ async def test_create_subtask(
 async def test_decision_task_blocked_until_subtasks_ready(
     client: AsyncClient, db_session: AsyncSession, stub_user: User
 ):
-    """Decision task transition is blocked if subtasks lack solution_comment_id."""
+    """Decision task transition is blocked while a subtask has no result proposal."""
     ctx = await _setup_project_and_workflow(db_session, stub_user)
 
     parent = await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
@@ -258,7 +258,7 @@ async def test_decision_task_blocked_until_subtasks_ready(
     })
     parent_id = parent.json()["id"]
 
-    # Add a subtask without solution comment
+    # Add a subtask without a result proposal
     await client.post(f"/api/v1/projects/{ctx['project_id']}/tasks", json={
         "title": "Sub", "parent_task_id": parent_id,
     })
