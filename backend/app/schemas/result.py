@@ -111,12 +111,18 @@ class DeliveryCreate(BaseModel):
 
 
 class RecipientAcceptanceCreate(BaseModel):
-    """A fact received from the recipient (e.g. an office decision), not a TaskTrack verdict."""
+    """A fact received from the recipient (e.g. an office decision), not a TaskTrack verdict.
+    It is bound to an exact delivery (the current one if delivery_id is omitted)."""
     accepted_by: str = Field(min_length=1, max_length=500)
     accepted_at: datetime
     source: str = Field(min_length=1, max_length=100)
     ref: str | None = Field(default=None, max_length=500)
     note: str | None = Field(default=None, max_length=5000)
+    delivery_id: uuid.UUID | None = None
+    recipient: str | None = Field(default=None, max_length=500)   # default: the delivery target
+    usage_scope: str | None = Field(default=None, max_length=500)
+    authority: str | None = Field(default=None, max_length=500)
+    fact_revision_id: uuid.UUID | None = None   # an imported recipient_acceptance fact, if any
 
 
 class MemberUpdate(BaseModel):

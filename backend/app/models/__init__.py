@@ -17,6 +17,13 @@ from app.models.idempotency import IdempotencyKey
 from app.models.work_package import WorkPackage
 from app.models.result import ProposalStatus, ResultProposal, Review, ReviewVerdict
 from app.models.session import SessionCheckpoint, TaskSession
+from app.models.external import (
+    ExternalEvent, ExternalIdentityAlias, ExternalObject, ExternalProvider, ExternalRevision, ExternalSnapshot,
+)
+from app.models.portfolio import (
+    Delivery, ImpactAssessment, ProjectPortfolioLink, RecipientAcceptance, TaskBasis, TaskBlocker,
+    WorkProposal, WorkProposalVersion,
+)
 
 __all__ = [
     "Base", "UUIDMixin", "TimestampMixin",
@@ -37,4 +44,8 @@ __all__ = [
     "WorkPackage",
     "ProposalStatus", "ResultProposal", "Review", "ReviewVerdict",
     "SessionCheckpoint", "TaskSession",
+    "ExternalEvent", "ExternalIdentityAlias", "ExternalObject", "ExternalProvider", "ExternalRevision",
+    "ExternalSnapshot",
+    "Delivery", "ImpactAssessment", "ProjectPortfolioLink", "RecipientAcceptance", "TaskBasis", "TaskBlocker",
+    "WorkProposal", "WorkProposalVersion",
 ]

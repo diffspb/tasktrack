@@ -1,4 +1,4 @@
-"""Result proposals, reviews, delivery and the reviewer profile (ADR-021, FR-003 TT-14–17)."""
+"""Result proposals, reviews, delivery and the reviewer profile (ADR-021, ADR-024, FR-003 TT-14–17, TT-21)."""
 import uuid
 
 from fastapi import APIRouter, Depends, status
@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
 from app.models.user import User
+from app.schemas.external import AcceptanceWithdraw, DeliveriesView, RecipientAcceptanceResponse
 from app.schemas.project import ProjectMemberResponse
 from app.schemas.result import (
     DeliveryCreate, MemberUpdate, ProposalCreate, ProposalResponse,
@@ -92,6 +93,26 @@ async def record_recipient_acceptance(
     user: User = Depends(get_current_user),
 ):
     return await result_service.record_recipient_acceptance(session, task_id, data, user)
+
+
+@router.get("/tasks/{task_id}/deliveries", response_model=DeliveriesView)
+async def list_deliveries(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Deliveries with their bound acceptances; manual records without a binding are historical."""
+    return await result_service.list_deliveries(session, task_id, user)
+
+
+@router.post("/recipient-acceptances/{acceptance_id}/withdraw", response_model=RecipientAcceptanceResponse)
+async def withdraw_recipient_acceptance(
+    acceptance_id: uuid.UUID,
+    data: AcceptanceWithdraw,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return await result_service.withdraw_recipient_acceptance(session, acceptance_id, data.reason, user)
 
 
 @router.patch("/projects/{project_id}/members/{user_id}", response_model=ProjectMemberResponse)

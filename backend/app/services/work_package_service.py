@@ -46,6 +46,16 @@ def missing_fields(content: dict) -> list[str]:
     return missing
 
 
+async def with_bases(session: AsyncSession, task: Task, content: dict) -> dict:
+    """Issued content pins the task's bases (ADR-024, TT-10); tasks without bases keep the
+    previous content shape, so existing versions stay valid."""
+    from app.services.portfolio_service import pinned_bases
+
+    content = {k: v for k, v in content.items() if k != "bases"}
+    bases = await pinned_bases(session, task.id)
+    return {**content, "bases": bases} if bases else content
+
+
 async def get_state(session: AsyncSession, task_id: uuid.UUID, user: User) -> dict:
     task = await get_task(session, task_id, user)
     current = await current_package(session, task)
@@ -53,7 +63,8 @@ async def get_state(session: AsyncSession, task_id: uuid.UUID, user: User) -> di
     if current is None:
         state = "draft" if draft else "none"
     else:
-        state = "issued" if draft is None or normalize(draft) == current.content else "draft_changed"
+        expected = await with_bases(session, task, normalize(draft) if draft is not None else current.content)
+        state = "issued" if expected == current.content else "draft_changed"
     return {"state": state, "draft": draft, "current": current}
 
 
@@ -84,6 +95,7 @@ async def issue(session: AsyncSession, task_id: uuid.UUID, user: User) -> WorkPa
     if missing:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             {"code": "WORK_PACKAGE_INCOMPLETE", "missing": missing})
+    content = await with_bases(session, task, content)
     current = await current_package(session, task)
     if current is not None and current.content == content:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "WORK_PACKAGE_UNCHANGED"})

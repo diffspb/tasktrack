@@ -257,6 +257,7 @@ export function useTaskHistory(taskId: string, enabled = true) {
 export type WaitingReason =
   | 'no_work_package' | 'work_package_changed' | 'no_assignee' | 'blocked' | 'awaiting_review'
   | 'changes_requested' | 'session_stale' | 'awaiting_recipient' | 'unverified_result'
+  | 'impact_pending' | 'blocker_registered' | 'not_ready'
 
 export interface ControlItem {
   id: string

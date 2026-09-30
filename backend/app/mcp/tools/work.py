@@ -18,7 +18,10 @@ from app.schemas.result import (
 from app.schemas.session import (
     CheckpointCreate, CheckpointResponse, SessionComplete, SessionCreate, SessionRelease, SessionResponse,
 )
-from app.services import audit_service, result_service, session_service, task_service, work_package_service
+from app.schemas.external import Readiness
+from app.services import (
+    audit_service, portfolio_service, result_service, session_service, task_service, work_package_service,
+)
 
 
 def _dump(model_cls, obj) -> str:
@@ -40,6 +43,20 @@ async def get_work_package(ctx: Context, task_id: str) -> str:
         if state["current"] is None:
             return json.dumps({"state": state["state"]})
         return json.dumps(await work_package_service.export(session, state["current"].id, user), ensure_ascii=False)
+
+
+@svc_call
+async def get_readiness(ctx: Context, task_id: str) -> str:
+    """
+    Whether a new execution may start (contract v1.0, TT-11). mode "standalone" — the
+    project has no portfolio link, only the local process applies. In "portfolio" mode
+    five conditions are checked: package, inputs, normative, grant, blockers; each lists
+    reasons (code, message) and the facts with their date. claim_task and leaving the
+    initial status fail with TASK_NOT_READY while ready is false — wait, do not work around.
+    """
+    async with McpSession(ctx) as (session, user):
+        result = await portfolio_service.task_readiness(session, parse_uuid(task_id, "task_id"), user)
+        return _dump(Readiness, result)
 
 
 @svc_call

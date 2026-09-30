@@ -13,6 +13,7 @@ const REASON_TONE: Record<string, 'warning' | 'danger' | 'info' | 'muted'> = {
   no_work_package: 'warning', work_package_changed: 'warning', no_assignee: 'warning',
   blocked: 'danger', session_stale: 'danger', awaiting_review: 'info', changes_requested: 'warning',
   awaiting_recipient: 'info', unverified_result: 'muted',
+  impact_pending: 'warning', blocker_registered: 'danger', not_ready: 'warning',
 }
 
 /** Manager's view of open work and why it waits (FR-003 TT-22). */
