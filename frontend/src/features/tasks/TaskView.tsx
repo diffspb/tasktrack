@@ -2,6 +2,7 @@ import { useDisplayWorkflows, useProjectMembers, type Status, type Task } from '
 import { ResultSection } from '@/features/results/ResultSection'
 import { SessionPanel } from '@/features/results/SessionPanel'
 import { WorkPackagePanel } from '@/features/results/WorkPackagePanel'
+import { ReadinessPanel } from '@/features/portfolio/ReadinessPanel'
 import { ActivityBlock } from './task-view/ActivityBlock'
 import { ChildTasks } from './task-view/ChildTasks'
 import { DatesBlock } from './task-view/DatesBlock'
@@ -57,6 +58,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const description = <DescriptionEditor task={task} />
   const workPackage = <WorkPackagePanel task={task} canEdit={task.reporter_id === currentUserId || isManager} />
   const result = <ResultSection task={task} currentUserId={currentUserId} members={memberList} />
+  const readiness = <ReadinessPanel taskId={task.id} isManager={isManager} />
   const session = <SessionPanel task={task} currentUserId={currentUserId} isManager={isManager} nameOf={nameOf} />
   const children = <ChildTasks task={task} statuses={allStatuses} />
   const relations = <RelationsBlock task={task} />
@@ -83,6 +85,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
           </div>
           <div className="space-y-4">
             {people}
+            {readiness}
             {session}
             {dates}
           </div>
@@ -99,6 +102,7 @@ export function TaskView({ task, mode, currentUserId }: Props) {
       {description}
       {workPackage}
       {result}
+      {readiness}
       {session}
       {children}
       {relations}
