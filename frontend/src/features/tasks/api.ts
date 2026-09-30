@@ -125,6 +125,16 @@ export function useProjectWorkflows(projectId: string) {
   })
 }
 
+/** Project workflows plus the system (process) workflows its tasks and boards use —
+ *  for showing statuses and transitions, not for editing (ADR-023). */
+export function useDisplayWorkflows(projectId: string | null | undefined) {
+  return useQuery<Workflow[]>({
+    queryKey: ['workflows', projectId, 'with-system'],
+    queryFn: () => api.get(`/projects/${projectId}/workflows`, { params: { include_used_system: true } }).then(r => r.data),
+    enabled: !!projectId,
+  })
+}
+
 export function useProjectMembers(projectId: string | null | undefined) {
   return useQuery<{ items: ProjectMember[] }>({
     queryKey: ['project-members', projectId],
@@ -184,6 +194,9 @@ export function useCreateTask(projectId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['child-tasks', projectId] })
+      // a process task may add its workflow and put its statuses on the boards
+      qc.invalidateQueries({ queryKey: ['workflows', projectId] })
+      qc.invalidateQueries({ queryKey: ['board-columns'] })
     },
   })
 }

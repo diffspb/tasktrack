@@ -91,8 +91,8 @@ beforeEach(() => {
   vi.spyOn(workflowApi, 'useBoardColumns').mockReturnValue(
     { data: { items: MOCK_BOARD_COLUMNS }, isLoading: false, isError: false } as unknown as ReturnType<typeof workflowApi.useBoardColumns>,
   )
-  vi.spyOn(api, 'useProjectWorkflows').mockReturnValue(
-    { data: MOCK_WORKFLOW, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectWorkflows>,
+  vi.spyOn(api, 'useDisplayWorkflows').mockReturnValue(
+    { data: MOCK_WORKFLOW, isLoading: false, isError: false } as unknown as ReturnType<typeof api.useDisplayWorkflows>,
   )
   vi.spyOn(api, 'useProjectTasks').mockReturnValue(
     { data: makeTasks(), isLoading: false, isError: false } as unknown as ReturnType<typeof api.useProjectTasks>,
@@ -119,8 +119,8 @@ describe('TaskBoard', () => {
   })
 
   it('shows loading skeleton while fetching', () => {
-    vi.spyOn(api, 'useProjectWorkflows').mockReturnValue(
-      { data: undefined, isLoading: true, isError: false } as unknown as ReturnType<typeof api.useProjectWorkflows>,
+    vi.spyOn(api, 'useDisplayWorkflows').mockReturnValue(
+      { data: undefined, isLoading: true, isError: false } as unknown as ReturnType<typeof api.useDisplayWorkflows>,
     )
     vi.spyOn(api, 'useProjectTasks').mockReturnValue(
       { data: undefined, isLoading: true, isError: false } as unknown as ReturnType<typeof api.useProjectTasks>,

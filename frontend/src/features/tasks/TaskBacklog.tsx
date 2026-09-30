@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks, useProjectWorkflows, useProjectMembers, type Task,
+  useProjectTasks, useDisplayWorkflows, useProjectMembers, type Task,
 } from './api'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
@@ -44,7 +44,7 @@ export function TaskBacklog({ viewId: _viewId, projectId }: TaskBacklogProps) {
     }
   })
 
-  const { data: workflows } = useProjectWorkflows(projectId ?? '')
+  const { data: workflows } = useDisplayWorkflows(projectId)
   const { data: tasks, isLoading } = useProjectTasks(projectId ?? '')
 
   const { data: members } = useProjectMembers(projectId ?? '')

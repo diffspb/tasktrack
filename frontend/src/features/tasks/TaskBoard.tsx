@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import {
-  useProjectTasks, useProjectWorkflows, useProjectMembers,
+  useProjectTasks, useDisplayWorkflows, useProjectMembers,
   useTransitionStatus, type Task,
 } from './api'
 import { useBoardColumns, type BoardColumn } from '@/features/projects/workflowApi'
@@ -77,7 +77,7 @@ export function TaskBoard({ viewId, projectId }: TaskBoardProps) {
   })
 
   const { data: boardColumnsData, isLoading: bcLoading } = useBoardColumns(viewId)
-  const { data: workflows, isLoading: wfLoading } = useProjectWorkflows(projectId ?? '')
+  const { data: workflows, isLoading: wfLoading } = useDisplayWorkflows(projectId)
   const { data: tasks, isLoading: tasksLoading } = useProjectTasks(projectId ?? '')
 
   const { data: membersData } = useProjectMembers(projectId)

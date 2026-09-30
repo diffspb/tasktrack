@@ -6,7 +6,7 @@ import { TaskTypeIcon } from './TaskTypeIcon'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { useProjectTasks, useProjectWorkflows, useProjectMembers, type Task } from './api'
+import { useProjectTasks, useDisplayWorkflows, useProjectMembers, type Task } from './api'
 import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -92,7 +92,7 @@ export function EpicTreeView({ viewId: _viewId, projectId }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
 
   const { data: tasks = [], isLoading: tasksLoading } = useProjectTasks(projectId)
-  const { data: workflows = [], isLoading: wfLoading } = useProjectWorkflows(projectId)
+  const { data: workflows = [], isLoading: wfLoading } = useDisplayWorkflows(projectId)
   const { data: members } = useProjectMembers(projectId)
 
   // SSE live updates

@@ -16,15 +16,16 @@ import { cn } from '@/lib/utils'
 import {
   useBoardColumns, useCreateBoardColumn, useUpdateBoardColumn, useDeleteBoardColumn,
   useAddStatusToColumn, useRemoveStatusFromColumn,
-  useProjectWorkflows,
   type BoardColumn,
 } from './workflowApi'
+import { useDisplayWorkflows } from '@/features/tasks/api'
 
 interface Props { viewId: string; projectId: string }
 
 export function BoardColumnEditor({ viewId, projectId }: Props) {
   const { data: boardData, isLoading: bcLoading } = useBoardColumns(viewId)
-  const { data: workflows = [], isLoading: wfLoading } = useProjectWorkflows(projectId)
+  // include process workflows so their statuses can be moved between columns (ADR-023)
+  const { data: workflows = [], isLoading: wfLoading } = useDisplayWorkflows(projectId)
   const createCol = useCreateBoardColumn(viewId)
   const updateCol = useUpdateBoardColumn(viewId)
   const deleteCol = useDeleteBoardColumn(viewId)

@@ -65,13 +65,30 @@ async def create_workflow(
 
 
 async def list_workflows(
-    session: AsyncSession, project_id: uuid.UUID, user: User
+    session: AsyncSession, project_id: uuid.UUID, user: User, *, include_used_system: bool = False
 ) -> list[Workflow]:
+    """The project's workflows; with include_used_system also the system (process) workflows
+    its tasks run on or its boards show — needed to display statuses, not to edit them."""
     await require_project_access(session, project_id, user)
+    condition = Workflow.project_id == project_id
+    if include_used_system:
+        from app.models.task import Task
+        used_by_tasks = select(Task.workflow_id).where(Task.project_id == project_id, Task.deleted_at.is_(None))
+        on_boards = (
+            select(Status.workflow_id)
+            .join(BoardColumnStatus, BoardColumnStatus.status_id == Status.id)
+            .join(BoardColumn, BoardColumn.id == BoardColumnStatus.board_column_id)
+            .join(View, View.id == BoardColumn.view_id)
+            .where(View.project_id == project_id)
+        )
+        condition = condition | (
+            Workflow.project_id.is_(None) & (Workflow.id.in_(used_by_tasks) | Workflow.id.in_(on_boards))
+        )
     result = await session.scalars(
         select(Workflow)
         .options(selectinload(Workflow.statuses), selectinload(Workflow.transitions))
-        .where(Workflow.project_id == project_id)
+        .where(condition)
+        .order_by(Workflow.project_id.nulls_last(), Workflow.created_at)
     )
     return list(result.all())
 
@@ -368,6 +385,46 @@ async def get_workflow_for_task_type(
         return wf
 
     raise HTTPException(status.HTTP_400_BAD_REQUEST, {"code": "NO_DEFAULT_WORKFLOW"})
+
+
+async def map_workflow_to_boards(session: AsyncSession, project_id: uuid.UUID, workflow_id: uuid.UUID) -> None:
+    """Put a system (process) workflow's statuses on the project's Kanban boards (ADR-023).
+
+    For every kanban view with columns: statuses not yet on that board go by category —
+    initial → first column, final → last, intermediate → middle columns in order (the
+    first column if there are only two). Already mapped statuses are left where a
+    manager put them. Caller commits.
+    """
+    statuses = list((await session.scalars(
+        select(Status).where(Status.workflow_id == workflow_id).order_by(Status.position)
+    )).all())
+    views = (await session.scalars(
+        select(View).where(View.project_id == project_id, View.type == ViewType.kanban)
+    )).all()
+    for view in views:
+        columns = list((await session.scalars(
+            select(BoardColumn).where(BoardColumn.view_id == view.id).order_by(BoardColumn.position)
+        )).all())
+        if not columns:
+            continue
+        mapped = set((await session.scalars(
+            select(BoardColumnStatus.status_id).where(
+                BoardColumnStatus.board_column_id.in_([c.id for c in columns])
+            )
+        )).all())
+        middle = columns[1:-1] or columns[:1]
+        intermediate = 0
+        for st in statuses:
+            if st.category == StatusCategory.initial:
+                column = columns[0]
+            elif st.category == StatusCategory.final:
+                column = columns[-1]
+            else:
+                column = middle[min(intermediate, len(middle) - 1)]
+                intermediate += 1
+            if st.id not in mapped:
+                session.add(BoardColumnStatus(board_column_id=column.id, status_id=st.id))
+    await session.flush()
 
 
 # --- Task type configs ---

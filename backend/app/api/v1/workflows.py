@@ -40,10 +40,15 @@ async def create_workflow(
 @router.get("/projects/{project_id}/workflows", response_model=list[WorkflowResponse], tags=["workflows"])
 async def list_workflows(
     project_id: uuid.UUID,
+    include_used_system: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    return await workflow_service.list_workflows(session, project_id, user)
+    """include_used_system=true adds system (process) workflows used by the project's
+    tasks or boards — for displaying statuses (ADR-023)."""
+    return await workflow_service.list_workflows(
+        session, project_id, user, include_used_system=include_used_system
+    )
 
 
 @router.get("/workflows/{workflow_id}", response_model=WorkflowResponse, tags=["workflows"])

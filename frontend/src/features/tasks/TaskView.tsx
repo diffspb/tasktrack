@@ -5,7 +5,7 @@ import { ArrowDown, ArrowRight, ArrowUp, ChevronsUp, Plus, X } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
-  useTask, useChildTasks, useProjectWorkflows, useProjectMembers,
+  useTask, useChildTasks, useDisplayWorkflows, useProjectMembers,
   useTransitionStatus, useUpdateTask, useTaskComments, useTaskLinks, useLinkTypes, useDeleteTaskLink,
   type Task, type Status,
 } from './api'
@@ -58,7 +58,7 @@ interface Props {
 }
 
 export function TaskView({ task, mode, currentUserId }: Props) {
-  const { data: workflows }           = useProjectWorkflows(task.project_id)
+  const { data: workflows }           = useDisplayWorkflows(task.project_id)
   const { data: members }             = useProjectMembers(task.project_id)
   const { data: parentTask }          = useTask(task.parent_task_id)
   const { data: childTasks = [] }     = useChildTasks(task.project_id, task.id)
@@ -69,9 +69,8 @@ export function TaskView({ task, mode, currentUserId }: Props) {
   const transition                    = useTransitionStatus(task.project_id)
   const updateTask                    = useUpdateTask(task.id, task.project_id)
 
+  // The task's own workflow — for process types a system one (ADR-023), never the project default.
   const taskWorkflow = workflows?.find(w => w.id === task.workflow_id)
-    ?? workflows?.find(w => w.is_default)
-    ?? workflows?.[0]
   const statuses: Status[] = [...(taskWorkflow?.statuses ?? [])].sort((a, b) => a.position - b.position)
   const transitions         = taskWorkflow?.transitions ?? []
   const currentStatus       = statuses.find(s => s.id === task.current_status_id)

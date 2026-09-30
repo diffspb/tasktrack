@@ -12,7 +12,7 @@ vi.mock('../api', async importOriginal => {
   const q = (data: unknown) => () => ({ data })
   return {
     ...real,
-    useProjectWorkflows: q([{
+    useDisplayWorkflows: q([{
       id: 'wf', name: 'Basic', is_default: true, created_at: '2026-01-01',
       statuses: [
         { id: 's1', name: 'To Do', category: 'initial', is_default: true, position: 0, color: null },
@@ -23,6 +23,14 @@ vi.mock('../api', async importOriginal => {
         { id: 't1', from_status_id: 's1', to_status_id: 's2' },
         { id: 't2', from_status_id: 's1', to_status_id: 's3' },
       ],
+    }, {
+      // system process workflow (ADR-023), returned with include_used_system
+      id: 'sys-research', name: 'Исследование', is_default: false, created_at: '2026-01-01',
+      statuses: [
+        { id: 'r1', name: 'Open', category: 'initial', is_default: true, position: 0, color: null },
+        { id: 'r2', name: 'Investigating', category: 'intermediate', is_default: false, position: 1, color: null },
+      ],
+      transitions: [{ id: 'rt1', from_status_id: 'r1', to_status_id: 'r2' }],
     }]),
     useProjectMembers: q({ items: [
       { user: { id: ME, display_name: 'Me', email: 'me@t' }, role: 'member', is_reviewer: false },
@@ -69,11 +77,11 @@ const task: api.Task = {
   deleted_at: null, created_at: '2026-09-30', updated_at: '2026-09-30',
 }
 
-function wrap() {
+function wrap(t: api.Task = task) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter><TaskView task={task} mode="page" currentUserId={ME} /></MemoryRouter>
+      <MemoryRouter><TaskView task={t} mode="page" currentUserId={ME} /></MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -121,5 +129,11 @@ describe('TaskView', () => {
     wrap()
     fireEvent.click(screen.getByText('History'))
     expect(screen.getByText('No history.')).toBeInTheDocument()
+  })
+
+  it("uses the task's own process workflow, not the project default", () => {
+    wrap({ ...task, workflow_id: 'sys-research', current_status_id: 'r1' })
+    expect(screen.getByRole('button', { name: 'Investigating' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'In Progress' })).not.toBeInTheDocument()
   })
 })

@@ -2137,6 +2137,7 @@ Callback после авторизации через Google. Обрабатыв
 ### Процессы и метаданные
 
 - `TaskType.meta_schema` (JSON Schema) проверяется при создании и изменении `meta`: `422 META_INVALID {errors[{path, message}]}`.
+- `GET /projects/{id}/workflows?include_used_system=true` — вместе с проектными воркфлоу системные, на которых идут задачи проекта или которые стоят на его досках (для отображения статусов; редактировать их нельзя). При создании задачи-процесса статусы её воркфлоу раскладываются по колонкам Kanban-досок проекта по категории, уже сопоставленные не трогаются.
 - `PATCH /transitions/{id}` `{required_role?, required_fields?}` (менеджер). Вход в статус по переходу требует непустых полей `meta` из `required_fields`: `400 TRANSITION_FIELDS_REQUIRED {missing}`.
 - Типы с `requires_review` (`execution`, `research`, `migration`) переходят в финальный статус только при `result_state` `accepted` или `rejected`: `400 RESULT_NOT_REVIEWED`.
 

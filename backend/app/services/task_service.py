@@ -71,6 +71,12 @@ async def create_task(
     await session.flush()
     await _audit(session, task, user, "created", after=audit_service.snapshot(task, TASK_FIELDS))
 
+    # A process type runs on its own system workflow: make its statuses visible on the boards.
+    workflow = await session.get(Workflow, workflow_id)
+    if workflow is not None and workflow.project_id is None:
+        from app.services.workflow_service import map_workflow_to_boards
+        await map_workflow_to_boards(session, project_id, workflow_id)
+
     if data.assignee_id and data.assignee_id != user.id:
         await notification_service.notify_task_assigned(session, task)
 
