@@ -17,7 +17,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.external import ExternalObject, ExternalRevision
 from app.models.notification import NotificationEntityType, NotificationEventType
+from app.models.portfolio import Delivery, RecipientAcceptance
 from app.models.project import ProjectMember, ProjectMemberRole
 from app.models.result import ProposalStatus, ResultProposal, Review, ReviewVerdict
 from app.models.task import Task
@@ -232,11 +234,13 @@ async def review_queue(
     return list((await session.scalars(stmt)).all())
 
 
-# ── Delivery and recipient acceptance (TT-17) ────────────────────────────────
+# ── Delivery and recipient acceptance (TT-17, TT-21) ─────────────────────────
 
 async def propose_delivery(
     session: AsyncSession, task_id: uuid.UUID, data: DeliveryCreate, user: User
 ) -> Task:
+    """A delivery of the exact accepted ResultProposal version and its WorkPackage.
+    Task.delivery stays as the summary of the current delivery."""
     task = await get_task(session, task_id, user, for_update=True)
     member = await require_writer(session, task.project_id, user)
     if task.assignee_id != user.id and not has_role(member, ProjectMemberRole.manager):
@@ -248,35 +252,115 @@ async def propose_delivery(
     )
     if accepted is None:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "RESULT_NOT_ACCEPTED"})
+    delivery = Delivery(task_id=task.id, proposal_id=accepted.id, work_package_id=accepted.work_package_id,
+                        target=data.target, ref=data.ref, note=data.note, proposed_by=user.id)
+    session.add(delivery)
+    await session.flush()
     before = task.delivery
     task.delivery = {
-        "proposal_id": str(accepted.id), "target": data.target, "ref": data.ref, "note": data.note,
+        "delivery_id": str(delivery.id), "proposal_id": str(accepted.id), "proposal_version": accepted.version,
+        "work_package_id": str(accepted.work_package_id) if accepted.work_package_id else None,
+        "target": data.target, "ref": data.ref, "note": data.note,
         "proposed_by": str(user.id), "proposed_at": datetime.now(UTC).isoformat(),
     }
     task.recipient_acceptance = None  # a new delivery awaits its own acceptance
     task.version += 1
-    await _audit(session, task, user, "delivery", task.id, "proposed", before=before, after=task.delivery)
+    await _audit(session, task, user, "delivery", delivery.id, "proposed", before=before, after=task.delivery)
     await session.commit()
     return await get_task(session, task.id, user)
+
+
+async def _current_delivery(session: AsyncSession, task_id: uuid.UUID) -> Delivery | None:
+    return await session.scalar(
+        select(Delivery).where(Delivery.task_id == task_id).order_by(Delivery.created_at.desc()).limit(1)
+    )
 
 
 async def record_recipient_acceptance(
     session: AsyncSession, task_id: uuid.UUID, data: RecipientAcceptanceCreate, user: User
 ) -> Task:
-    """Records the recipient's decision as a received fact; TaskTrack does not accept on their behalf."""
+    """Records the recipient's decision as a received fact; TaskTrack does not accept on their
+    behalf. The acceptance is bound to one exact delivery and never carries over to a newer one."""
     task = await get_task(session, task_id, user, for_update=True)
     await require_manager(session, task.project_id, user)
-    if task.delivery is None:
+    current = await _current_delivery(session, task.id)
+    if data.delivery_id is not None:
+        delivery = await session.get(Delivery, data.delivery_id)
+        if delivery is None or delivery.task_id != task.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "DELIVERY_NOT_FOUND"})
+    else:
+        delivery = current
+    if delivery is None:
         raise HTTPException(status.HTTP_409_CONFLICT, {"code": "DELIVERY_NOT_PROPOSED"})
-    task.recipient_acceptance = {
-        **audit_service.snapshot(data, ("accepted_by", "accepted_at", "source", "ref", "note")),
+    if data.fact_revision_id is not None:
+        fact = await session.get(ExternalRevision, data.fact_revision_id)
+        fact_obj = await session.get(ExternalObject, fact.object_id) if fact else None
+        if fact_obj is None or fact_obj.type != "recipient_acceptance":
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, {"code": "FACT_NOT_RECIPIENT_ACCEPTANCE"})
+    acceptance = RecipientAcceptance(
+        task_id=task.id, delivery_id=delivery.id, proposal_id=delivery.proposal_id,
+        work_package_id=delivery.work_package_id, recipient=data.recipient or delivery.target,
+        usage_scope=data.usage_scope, accepted_by=data.accepted_by, accepted_at=data.accepted_at,
+        authority=data.authority, source=data.source, ref=data.ref, note=data.note,
+        fact_revision_id=data.fact_revision_id, recorded_by=user.id,
+    )
+    session.add(acceptance)
+    await session.flush()
+    after = {
+        **audit_service.snapshot(data, ("accepted_by", "accepted_at", "source", "ref", "note",
+                                        "usage_scope", "authority")),
+        "acceptance_id": str(acceptance.id), "delivery_id": str(delivery.id),
+        "proposal_id": str(delivery.proposal_id), "recipient": acceptance.recipient,
         "recorded_by": str(user.id), "recorded_at": datetime.now(UTC).isoformat(),
     }
-    task.version += 1
-    await _audit(session, task, user, "recipient_acceptance", task.id, "recorded",
-                 after=task.recipient_acceptance)
+    if current is not None and delivery.id == current.id:
+        task.recipient_acceptance = after
+        task.version += 1
+    await _audit(session, task, user, "recipient_acceptance", acceptance.id, "recorded", after=after)
     await session.commit()
     return await get_task(session, task.id, user)
+
+
+async def withdraw_recipient_acceptance(
+    session: AsyncSession, acceptance_id: uuid.UUID, reason: str, user: User
+) -> RecipientAcceptance:
+    """A change or withdrawal of an acceptance is kept separately; the record stays."""
+    acceptance = await session.get(RecipientAcceptance, acceptance_id)
+    if acceptance is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, {"code": "RECIPIENT_ACCEPTANCE_NOT_FOUND"})
+    task = await get_task(session, acceptance.task_id, user, for_update=True)
+    await require_manager(session, task.project_id, user)
+    if acceptance.status == "withdrawn":
+        raise HTTPException(status.HTTP_409_CONFLICT, {"code": "RECIPIENT_ACCEPTANCE_WITHDRAWN"})
+    acceptance.status, acceptance.withdrawn_at, acceptance.withdrawal_reason = "withdrawn", datetime.now(UTC), reason
+    if task.recipient_acceptance and task.recipient_acceptance.get("acceptance_id") == str(acceptance.id):
+        task.recipient_acceptance = None
+        task.version += 1
+    await _audit(session, task, user, "recipient_acceptance", acceptance.id, "withdrawn", after={"reason": reason})
+    await session.commit()
+    return acceptance
+
+
+async def list_deliveries(session: AsyncSession, task_id: uuid.UUID, user: User) -> dict:
+    await get_task(session, task_id, user)
+    deliveries = (await session.scalars(
+        select(Delivery).where(Delivery.task_id == task_id).order_by(Delivery.created_at)
+    )).all()
+    acceptances = (await session.scalars(
+        select(RecipientAcceptance).where(RecipientAcceptance.task_id == task_id)
+        .order_by(RecipientAcceptance.created_at)
+    )).all()
+    current_id = deliveries[-1].id if deliveries else None
+    return {
+        "deliveries": [
+            {**{c: getattr(d, c) for c in ("id", "task_id", "proposal_id", "work_package_id", "target", "ref",
+                                           "note", "proposed_by", "created_at")},
+             "is_current": d.id == current_id,
+             "acceptances": [a for a in acceptances if a.delivery_id == d.id]}
+            for d in deliveries
+        ],
+        "historical": [a for a in acceptances if a.delivery_id is None],
+    }
 
 
 # ── Reviewer profile ─────────────────────────────────────────────────────────

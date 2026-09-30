@@ -131,3 +131,63 @@ async def test_solution_comments_become_historical_proposals(make_database, alem
         assert task.result_state == "historical" and "solution_comment_id" not in task.meta
         assert (await s.get(Comment, live)) is not None  # комментарий остаётся обсуждением
     await engine.dispose()
+
+
+async def test_legacy_delivery_bound_and_acceptance_historical(make_database, alembic):
+    """d8f2a6c4e1b9 (ADR-024): Task.delivery names its proposal → a Delivery row; a manual
+    recipient acceptance has no binding → a historical record, its version is not guessed."""
+    import uuid
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.models.portfolio import Delivery, RecipientAcceptance
+    from app.models.result import ProposalStatus, ResultProposal
+    from app.models.task import Task
+    from app.models.task_type import TaskType
+    from app.models.user import User
+    from app.schemas.project import ProjectCreate
+    from app.schemas.task import TaskCreate
+    from app.services import project_service, task_service
+
+    url = await make_database()
+    await alembic(url, "upgrade", "head")
+    engine = create_async_engine(url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        s.add(TaskType(key="task", name="Задача", is_system=True))
+        user = User(id=uuid.uuid4(), email="d@t.com", display_name="D",
+                    keycloak_id=str(uuid.uuid4()), is_active=True)
+        s.add(user)
+        await s.flush()
+        project = await project_service.create_project(s, ProjectCreate(name="Del", key="DEL"), user)
+        task = await task_service.create_task(s, project.id, TaskCreate(title="T"), user)
+        proposal = ResultProposal(task_id=task.id, version=1, author_id=user.id,
+                                  status=ProposalStatus.accepted, summary="готово")
+        s.add(proposal)
+        await s.commit()
+        task_id, proposal_id = task.id, proposal.id
+
+    await alembic(url, "downgrade", "c1e8a5b2f6d4")
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "UPDATE tasks SET delivery = jsonb_build_object("
+            "  'proposal_id', CAST(:p AS text), 'target', 'office:P-PACK', 'ref', 'OD-1', 'note', NULL,"
+            "  'proposed_by', CAST(:u AS text), 'proposed_at', '2026-09-01T10:00:00+00:00'),"
+            " recipient_acceptance = jsonb_build_object("
+            "  'accepted_by', 'owner', 'accepted_at', '2026-09-02T10:00:00+00:00', 'source', 'email',"
+            "  'ref', NULL, 'note', 'ок', 'recorded_by', CAST(:u AS text),"
+            "  'recorded_at', '2026-09-02T11:00:00+00:00')"
+            " WHERE id = :t"
+        ), {"p": str(proposal_id), "u": str(user.id), "t": task_id})
+    await alembic(url, "upgrade", "head")
+
+    async with Session() as s:
+        [delivery] = (await s.scalars(select(Delivery).where(Delivery.task_id == task_id))).all()
+        assert delivery.proposal_id == proposal_id and delivery.target == "office:P-PACK"
+        [acc] = (await s.scalars(select(RecipientAcceptance).where(RecipientAcceptance.task_id == task_id))).all()
+        assert acc.historical and acc.delivery_id is None and acc.proposal_id is None
+        assert acc.accepted_by == "owner" and acc.note == "ок"
+        task = await s.get(Task, task_id)
+        assert task.delivery["delivery_id"] == str(delivery.id)
+        assert task.recipient_acceptance["accepted_by"] == "owner"   # the summary stays
+    await engine.dispose()

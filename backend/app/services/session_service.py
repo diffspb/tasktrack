@@ -34,6 +34,9 @@ async def claim(session: AsyncSession, task_id: uuid.UUID, data: SessionCreate, 
         active = await active_executor(session, task.id)
         if active is not None:
             raise _session_active(active)
+        # Portfolio mode: a new execution starts only when the task is ready (ADR-024, TT-11).
+        from app.services.portfolio_service import require_ready
+        await require_ready(session, task)
     elif not member.is_reviewer or user.id == task.assignee_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, {"code": "NOT_REVIEWER"})
 

@@ -304,6 +304,7 @@ async def transition_status(
             status.HTTP_400_BAD_REQUEST, {"code": "TRANSITION_FIELDS_REQUIRED", "missing": missing}
         )
     await _check_review_before_final(session, task, data.status_id)
+    await _check_ready_to_start(session, task, data.status_id)
 
     # Decision-type task: blocked until every subtask has presented a result.
     if task.task_type and task.task_type.key == "decision":
@@ -386,6 +387,18 @@ def _check_transition_role(required_role: str | None, member: ProjectMember) -> 
             status.HTTP_403_FORBIDDEN,
             {"code": "TRANSITION_ROLE_REQUIRED", "required_role": required_role},
         )
+
+
+async def _check_ready_to_start(session: AsyncSession, task: Task, target_status_id: uuid.UUID) -> None:
+    """Leaving the initial status is the move to execution (ADR-024, decision 4): in portfolio
+    mode it requires readiness; standalone projects keep their local process."""
+    current = await session.get(Status, task.current_status_id)
+    target = await session.get(Status, target_status_id)
+    if current is None or target is None:
+        return
+    if current.category == StatusCategory.initial and target.category != StatusCategory.initial:
+        from app.services.portfolio_service import require_ready
+        await require_ready(session, task)
 
 
 async def _check_review_before_final(
