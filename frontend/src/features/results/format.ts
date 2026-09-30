@@ -8,6 +8,9 @@ export const WAITING_LABEL: Record<string, string> = {
   session_stale:        'Session silent',
   awaiting_recipient:   'Awaiting recipient',
   unverified_result:    'Unverified result',
+  impact_pending:       'Impact decision pending',
+  blocker_registered:   'Blocker registered',
+  not_ready:            'Not ready to start',
 }
 
 export const fmtDateTime = (s: string) =>

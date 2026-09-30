@@ -826,3 +826,20 @@ async def test_mcp_claim_obeys_the_same_readiness(w: World, db_session: AsyncSes
         assert ready["mode"] == "portfolio" and not ready["ready"]
         with pytest.raises(McpError, match="TASK_NOT_READY"):
             await work.claim_task(ctx, t["id"], machine="console")
+
+
+async def test_control_view_shows_portfolio_reasons(w: World):
+    await w.link()
+    ready = await _ready_task(w)
+    waiting = await w.task("Ждёт входа")
+    await w.fact(w.req, "proj-pack", "verification_plan", "VP-9", revision="1", content={})
+    await w.basis(waiting["id"], ref(w.req, "proj-pack", "verification_plan", "VP-9"), "1", "input")
+    await w.issue(waiting["id"])
+    await w.fact(w.req, "proj-pack", "requirement", "REQ-12", revision="v2", supersedes="v1",
+                 content={"status": "accepted"})
+    await w.client.post(f"{API}/tasks/{waiting['id']}/blockers", json={"reason": "стенд занят"})
+    items = {i["id"]: i for i in (await w.client.get(f"{API}/projects/{w.project.id}/control")).json()["items"]}
+    # Bases pinned in the package do not look like an unissued draft change.
+    assert "work_package_changed" not in items[ready["id"]]["waiting"]
+    assert {"impact_pending", "not_ready"} <= set(items[ready["id"]]["waiting"])
+    assert {"blocker_registered", "not_ready"} <= set(items[waiting["id"]]["waiting"])

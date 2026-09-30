@@ -12,7 +12,10 @@ Waiting reasons:
 - session_stale         — active session without checkpoints for STALE_AFTER
 - awaiting_recipient    — delivery proposed, recipient's acceptance not recorded
 - unverified_result     — only a historical (never reviewed) result exists
-Basis and input freshness (TT-10/11) are added once the external contracts exist.
+Portfolio mode (ADR-024, TT-10/11):
+- impact_pending        — a new revision of a basis waits for the manager's impact decision
+- blocker_registered    — an open registered blocker
+- not_ready             — still in the initial status and readiness conditions are not met
 """
 import uuid
 from collections import Counter
@@ -23,12 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.models.link_type import LinkType
+from app.models.portfolio import ImpactAssessment, TaskBasis, TaskBlocker
 from app.models.session import TaskSession
 from app.models.task import Task, TaskLink
 from app.models.user import User
 from app.models.work_package import WorkPackage
 from app.models.workflow import Status, StatusCategory
-from app.services import work_package_service
+from app.services import portfolio_service, work_package_service
 from app.services.permissions import require_project_access
 
 STALE_AFTER = timedelta(hours=24)
@@ -62,12 +66,30 @@ async def overview(
     ))).all()} if ids else {}
     blockers = await _open_blockers(session, ids)
     now = datetime.now(UTC)
+    with_bases = set((await session.scalars(
+        select(TaskBasis.task_id).where(TaskBasis.task_id.in_(ids)).distinct()
+    )).all()) if ids else set()
+    bases = {tid: await portfolio_service.pinned_bases(session, tid) for tid in with_bases}
+    portfolio = await portfolio_service.get_link(session, project_id) is not None
+    impact = set((await session.scalars(select(ImpactAssessment.task_id).where(
+        ImpactAssessment.task_id.in_(ids), ImpactAssessment.status == "pending",
+    ))).all()) if ids else set()
+    registered = set((await session.scalars(select(TaskBlocker.task_id).where(
+        TaskBlocker.task_id.in_(ids), TaskBlocker.resolved_at.is_(None),
+    ))).all()) if ids else set()
 
     items = []
     for task in tasks:
         package = packages.get(task.id)
         spec = package.content.get("specialization") if package else None
-        waiting = _waiting(task, package, sessions.get(task.id), blockers.get(task.id), now)
+        waiting = _waiting(task, package, sessions.get(task.id), blockers.get(task.id), now, bases.get(task.id))
+        if task.id in impact:
+            waiting.append("impact_pending")
+        if task.id in registered:
+            waiting.append("blocker_registered")
+        if portfolio and status_by_task[task.id].category == StatusCategory.initial \
+                and not (await portfolio_service.readiness(session, task, now=now))["ready"]:
+            waiting.append("not_ready")
         items.append({
             "id": str(task.id), "key": task.key, "title": task.title,
             "task_type": task.task_type.key if task.task_type else None,
@@ -97,12 +119,15 @@ async def overview(
 
 
 def _waiting(task: Task, package: WorkPackage | None, active: TaskSession | None,
-             blocked_by: list[str] | None, now: datetime) -> list[str]:
+             blocked_by: list[str] | None, now: datetime, bases: list[dict] | None = None) -> list[str]:
     reasons = []
     if package is None:
         reasons.append("no_work_package")
-    elif task.work_package_draft and work_package_service.normalize(task.work_package_draft) != package.content:
-        reasons.append("work_package_changed")
+    else:
+        content = work_package_service.normalize(task.work_package_draft) if task.work_package_draft else {
+            k: v for k, v in package.content.items() if k != "bases"}
+        if ({**content, "bases": bases} if bases else content) != package.content:
+            reasons.append("work_package_changed")
     if task.assignee_id is None:
         reasons.append("no_assignee")
     if blocked_by:
