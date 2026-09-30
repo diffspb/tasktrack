@@ -256,6 +256,116 @@ erDiagram
         timestamp created_at
     }
 
+    ExternalProvider {
+        uuid id PK
+        string key UK
+        string kind
+        string acquisition
+        jsonb namespaces
+        jsonb fact_types
+        bool is_training
+        bool active
+    }
+
+    ExternalObject {
+        uuid id PK
+        uuid provider_id FK
+        string namespace
+        string type
+        string ext_id
+        string locator
+        string current_revision
+        string revision_state
+        timestamp state_as_of
+        string status
+    }
+
+    ExternalRevision {
+        uuid id PK
+        uuid object_id FK
+        string revision
+        bytea content
+        string sha256
+        jsonb claims
+        timestamp observed_at
+        string asserted_by
+        uuid registered_by FK
+        string supersedes
+        bool is_revocation
+        bool verified
+    }
+
+    ExternalEvent {
+        uuid id PK
+        uuid provider_id FK
+        string event_id
+        string contract_version
+        string content_sha256
+        jsonb outcome
+    }
+
+    ProjectPortfolioLink {
+        uuid project_id PK
+        uuid office_project_object_id FK
+        string repository_url
+        uuid regulation_object_id FK
+        string regulation_revision
+        string stage
+        bool is_training
+    }
+
+    TaskBasis {
+        uuid id PK
+        uuid task_id FK
+        uuid object_id FK
+        string revision
+        string role
+        string freshness
+    }
+
+    ImpactAssessment {
+        uuid id PK
+        uuid task_id FK
+        uuid basis_id FK
+        string old_revision
+        string new_revision
+        string status
+        string decision
+    }
+
+    WorkProposal {
+        uuid id PK
+        uuid project_id FK
+        string stage
+        string work_kind
+        uuid basis_object_id FK
+        string work_scope_key
+        string status
+        uuid task_id FK
+        int current_version
+    }
+
+    Delivery {
+        uuid id PK
+        uuid task_id FK
+        uuid proposal_id FK
+        uuid work_package_id FK
+        string target
+    }
+
+    RecipientAcceptance {
+        uuid id PK
+        uuid delivery_id FK
+        uuid proposal_id FK
+        uuid work_package_id FK
+        string recipient
+        string usage_scope
+        string accepted_by
+        string authority
+        string status
+        bool historical
+    }
+
     SessionCheckpoint {
         uuid id PK
         uuid session_id FK
@@ -348,6 +458,19 @@ erDiagram
     Task ||--o{ TaskSession : "сессии исполнения"
     TaskSession ||--o{ SessionCheckpoint : "контрольные точки"
     TaskSession ||--o{ ResultProposal : "подано из сессии"
+    ExternalProvider ||--o{ ExternalObject : "идентичность"
+    ExternalObject ||--o{ ExternalRevision : "закреплённые редакции"
+    ExternalProvider ||--o{ ExternalEvent : "события обмена"
+    Project ||--o| ProjectPortfolioLink : "режим портфеля"
+    ExternalObject ||--o| ProjectPortfolioLink : "проект офиса"
+    Task ||--o{ TaskBasis : "основания"
+    ExternalObject ||--o{ TaskBasis : "объект основания"
+    TaskBasis ||--o{ ImpactAssessment : "оценка влияния"
+    Project ||--o{ WorkProposal : "предложения работы"
+    WorkProposal ||--o{ WorkProposalVersion : "версии по редакциям"
+    Task ||--o{ Delivery : "поставки"
+    ResultProposal ||--o{ Delivery : "точная версия"
+    Delivery ||--o{ RecipientAcceptance : "приёмка получателем"
     User ||--o{ Review : "проверяет"
     User ||--o{ TaskLink : "создаёт"
     User ||--o{ GanttChart : "владеет"
@@ -475,9 +598,23 @@ Append-only таблица значимых изменений ([ADR-018](./deci
 - **WorkPackage** — неизменяемая версия задания ([ADR-020](./decisions/ADR-020-work-package.md)); черновик — `Task.work_package_draft`, текущая версия — `Task.work_package_version`. `digest` — SHA-256 канонического JSON `content`; критерии имеют ключи `c1`, `c2`…
 - **ResultProposal** — результат исполнителя ([ADR-021](./decisions/ADR-021-result-proposal-review.md)), неизменяем; `(task_id, version)` уникально; статус `submitted` / `accepted` / `changes_requested` / `rejected` / `withdrawn` / `superseded` / `historical` (перенесённые `solution`-комментарии).
 - **Review** — неизменяемая проверка одной версии с обязательным `rationale`.
-- `Task.result_state` вычисляется из предложений и хранится для фильтров; `Task.reviewer_id` — назначенный проверяющий; `Task.delivery` / `Task.recipient_acceptance` — предложенная поставка и полученный факт приёмки.
+- `Task.result_state` вычисляется из предложений и хранится для фильтров; `Task.reviewer_id` — назначенный проверяющий; `Task.delivery` / `Task.recipient_acceptance` — сводка текущей поставки и её приёмки; записи — `Delivery` / `RecipientAcceptance` (ADR-024).
 - `ProjectMember.is_reviewer` — профиль проверяющего; `TaskType.requires_review` — финальный статус только после вердикта; `Transition.required_fields` — обязательные поля `meta` ([ADR-023](./decisions/ADR-023-process-types.md)).
 - **TaskSession** ([ADR-022](./decisions/ADR-022-task-sessions.md)) — частичный уникальный индекс `uq_task_sessions_active_executor (task_id) WHERE state='active' AND role='executor'`; завершается только явно. `AuditEvent.session_id` — сессия, в которой сделано изменение.
+
+### Внешние системы и режим портфеля (ADR-024)
+
+Контракт с офисом и системой требований v1.0 ([ADR-024](./decisions/ADR-024-external-contract-v1.md)).
+
+- **ExternalProvider** — реестр поставщиков; `key` постоянен (адрес не входит в идентичность), `namespaces` — где поставщик может говорить, `fact_types` — виды, по которым он уполномочен. `is_training` — учебный, неизменен.
+- **ExternalObject** — идентичность `(provider_id, namespace, type, ext_id)` уникальна. `current_revision` / `revision_state` (`unknown`, `unconfirmed`, `current`, `pending_reconciliation`) / `state_as_of`; `status` `active`/`revoked`. **ExternalIdentityAlias** — прежняя идентичность → объект, с причиной.
+- **ExternalRevision** — `(object_id, revision)` уникально; `content` — точные байты, `sha256` — их хеш (NULL для ссылки, известной только из снимка); `claims` — разобранные утверждения; `verified = false` — непроверенное сообщение; `supersedes`/`superseded_by` — явное замещение.
+- **ExternalEvent** — `(provider_id, event_id)` уникально, `content_sha256` — хеш тела команды, `outcome` — итог для повтора. **ExternalSnapshot** — область, полнота, `as_of`, непрозрачный `cursor`, итог.
+- **ProjectPortfolioLink** — одна на проект, `office_project_object_id` уникален в установке; нет строки — самостоятельный проект.
+- **TaskBasis** — `(task_id, object_id, role)` уникально; роли `cause`/`input`/`normative`/`reference`/`grant`; `freshness` `pinned`/`confirm_current`. Выпуск WorkPackage копирует основания в `content.bases`.
+- **TaskBlocker**, **ImpactAssessment** — условие 5 готовности; решение оценки — `continue`/`reissue`/`recheck`/`stop`.
+- **WorkProposal** — ключ `(project_id, stage, work_kind, basis_object_id, work_scope_key)` уникален; **WorkProposalVersion** — `(proposal_id, basis_revision)` уникально.
+- **Delivery** — точная принятая версия `ResultProposal` и её `WorkPackage`; **RecipientAcceptance** — привязка к поставке, получатель, область использования, автор, полномочие, `status` `accepted`/`withdrawn`; `historical = true` — ручная запись до ADR-024 без привязки. `Task.delivery` / `Task.recipient_acceptance` остаются сводкой текущей поставки (с `delivery_id` / `acceptance_id`).
 
 ### Нумерация задач (Project.task_seq)
 

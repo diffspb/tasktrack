@@ -2079,7 +2079,7 @@ Callback после авторизации через Google. Обрабатыв
 | Воркфлоу (read-only) | `list_workflows`, `get_workflow` |
 | Связи задач | `create_task_link`, `delete_task_link` |
 | Пользователи | `search_users` |
-| Рабочий цикл агента (FR-003, TT-18) | `get_work_package`, `claim_task`, `checkpoint`, `finish_session`, `release_session`, `submit_result`, `list_results`, `list_review_queue`, `review_result`, `get_task_history` |
+| Рабочий цикл агента (FR-003, TT-18) | `get_work_package`, `get_readiness`, `claim_task`, `checkpoint`, `finish_session`, `release_session`, `submit_result`, `list_results`, `list_review_queue`, `review_result`, `get_task_history` |
 
 Соглашения: `get_task` / `get_task_by_key` возвращают связи задачи в поле `links`; перед `update_task` нужно получить актуальный `version` через `get_task` (оптимистичная блокировка та же, что в REST).
 
@@ -2116,8 +2116,10 @@ Callback после авторизации через Google. Обрабатыв
 | `POST /proposals/{id}/withdraw` | Автор, пока не проверено | → `withdrawn`; `409 PROPOSAL_NOT_WITHDRAWABLE` |
 | `POST /proposals/{id}/reviews` | Профиль проверяющего; не автор и не исполнитель; назначенный, если задан | `{verdict: accepted\|changes_requested\|rejected, rationale, criteria[{key, verdict: met\|not_met, note?}]}` → `201`. `403 SELF_REVIEW / NOT_REVIEWER / NOT_DESIGNATED_REVIEWER`, `409 PROPOSAL_NOT_REVIEWABLE`, `422 CRITERIA_NOT_MET {criteria}` |
 | `GET /review-queue?project_id=` | Любой | Предложения, ждущие проверки текущего пользователя, с `{task: {id, key, title, project_id}}` |
-| `POST /tasks/{id}/delivery` | Исполнитель или менеджер, после принятия | `{target, ref?, note?}` → задача с `delivery`; `409 RESULT_NOT_ACCEPTED` |
-| `POST /tasks/{id}/recipient-acceptance` | Менеджер | Записать приёмку получателем как полученный факт `{accepted_by, accepted_at, source, ref?, note?}`; `409 DELIVERY_NOT_PROPOSED` |
+| `POST /tasks/{id}/delivery` | Исполнитель или менеджер, после принятия | `{target, ref?, note?}` → задача с `delivery` (`delivery_id`, `proposal_id`, `proposal_version`, `work_package_id` — точная принятая версия); прежняя приёмка сводки сбрасывается; `409 RESULT_NOT_ACCEPTED` |
+| `POST /tasks/{id}/recipient-acceptance` | Менеджер | Записать приёмку получателем как полученный факт `{accepted_by, accepted_at, source, ref?, note?, delivery_id?, recipient?, usage_scope?, authority?, fact_revision_id?}`. Привязывается к точной поставке (по умолчанию текущей); приёмка старой поставки в сводку новой не попадает. `409 DELIVERY_NOT_PROPOSED`, `404 DELIVERY_NOT_FOUND`, `422 FACT_NOT_RECIPIENT_ACCEPTANCE` |
+| `GET /tasks/{id}/deliveries` | Видит задачу | `{deliveries[{…, is_current, acceptances[]}], historical[]}` — `historical` — ручные записи до ADR-024 без привязки |
+| `POST /recipient-acceptances/{id}/withdraw` | Менеджер | `{reason}` → запись со статусом `withdrawn` сохраняется; `409 RECIPIENT_ACCEPTANCE_WITHDRAWN` |
 | `PATCH /projects/{id}/members/{user_id}` | Менеджер | `{role?, is_reviewer?}` — роль и профиль проверяющего |
 
 `PATCH /tasks/{id}` принимает `reviewer_id` (менеджер; только участник с профилем проверяющего, не исполнитель — иначе `400 NOT_REVIEWER / SELF_REVIEW`). `TaskResponse` содержит `reviewer_id`, `result_state` (`none`/`proposed`/`changes_requested`/`accepted`/`rejected`/`historical`), `delivery`, `recipient_acceptance`.
@@ -2141,9 +2143,81 @@ Callback после авторизации через Google. Обрабатыв
 - `PATCH /transitions/{id}` `{required_role?, required_fields?}` (менеджер). Вход в статус по переходу требует непустых полей `meta` из `required_fields`: `400 TRANSITION_FIELDS_REQUIRED {missing}`.
 - Типы с `requires_review` (`execution`, `research`, `migration`) переходят в финальный статус только при `result_state` `accepted` или `rejected`: `400 RESULT_NOT_REVIEWED`.
 
+Захват сессии исполнителем в режиме портфеля требует готовности задачи: `409 TASK_NOT_READY {reasons[{condition, code, message}]}` — см. «Внешние системы и режим портфеля».
+
 ### Представление руководителя
 
-`GET /projects/{id}/control?specialization=&reviewer_id=&reason=` (видит проект) → `{summary: {open_tasks, by_reason, by_specialization}, items[{id, key, title, task_type, status, assignee_id, reviewer_id, specialization, work_package_version, result_state, active_session, blocked_by, waiting[]}]}`. Причины ожидания: `no_work_package`, `work_package_changed`, `no_assignee`, `blocked`, `awaiting_review`, `changes_requested`, `session_stale` (> 24 ч без контрольных точек), `awaiting_recipient`, `unverified_result`.
+`GET /projects/{id}/control?specialization=&reviewer_id=&reason=` (видит проект) → `{summary: {open_tasks, by_reason, by_specialization}, items[{id, key, title, task_type, status, assignee_id, reviewer_id, specialization, work_package_version, result_state, active_session, blocked_by, waiting[]}]}`. Причины ожидания: `no_work_package`, `work_package_changed`, `no_assignee`, `blocked`, `awaiting_review`, `changes_requested`, `session_stale` (> 24 ч без контрольных точек), `awaiting_recipient`, `unverified_result`; в режиме портфеля (ADR-024) — `impact_pending`, `blocker_registered`, `not_ready` (задача в начальном статусе не готова к исполнению). Основания, закреплённые в выпущенном задании, изменением задания не считаются.
+
+---
+
+## Внешние системы и режим портфеля (контракт v1.0)
+
+[ADR-024](./decisions/ADR-024-external-contract-v1.md), FR-003 TT-08, TT-10, TT-11, TT-19–21. Закреплённая копия договора — [`contracts/tasktrack-external-systems-v1.0.md`](./contracts/tasktrack-external-systems-v1.0.md). Первый способ обмена — явный импорт; ручная регистрация и будущий адаптер идут через одни и те же операции.
+
+**Ссылка на внешний объект** — `{provider, namespace, type, id}` (+ `revision`, если это вход, основание или доказательство). `type` — из перечня контракта: `project`, `requirement`, `verification_plan`, `issue`, `risk`, `mitigation`, `decision`, `regulation`, `initiative`, `migration`, `allocation`, `authorization`, `input_acceptance`, `commitment`, `delivery`, `recipient_acceptance`, `evidence`, `office_process`.
+
+### Реестр и импорт
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `GET /external/providers` | Любой | Реестр поставщиков |
+| `POST /external/providers` | Суперпользователь | `{key, name, kind: office\|requirements\|repository\|owner\|other, acquisition: manual\|snapshot\|adapter, namespaces[], fact_types[], is_training}` → `201`; `409 PROVIDER_KEY_TAKEN`. Ключ и признак учебного неизменны |
+| `PATCH /external/providers/{id}` | Суперпользователь | `{name?, acquisition?, namespaces?, fact_types?, active?}` |
+| `POST /external/facts` | Суперпользователь или менеджер проекта `project_id` | Зарегистрировать редакцию/факт: ссылка + `{project_id?, revision?, content? \| content_base64?, media_type?, claims?, locator?, observed_at, asserted_by?, provenance?, supersedes?, confirmed_current?, revoked?, event_id?, contract_version?}` → `{object, revision, replayed, outcome{effect: current_changed\|confirmed\|unchanged\|stale\|pending_reconciliation\|unverified_message}}` |
+| `POST /external/snapshots` | Как выше | `{project_id?, provider, namespace, types[], completeness: full\|partial, as_of, cursor?, items[{type, id, revision?, content?, content_base64?, locator?, revoked?}], event_id?}` → `{id, result{items[], absent_not_deleted[]}, replayed}` |
+| `POST /external/aliases` | Суперпользователь | `{old, current, reason}` — прежняя идентичность продолжает разрешаться в объект; `409 IDENTITY_TAKEN` |
+| `GET /external/objects?provider=&namespace=&type=&id=` | Любой | `{object, revisions[], aliases[]}` |
+| `GET /external/providers/{key}/events?limit=` | Суперпользователь | Журнал событий обмена |
+
+Правила:
+- `content` (объект) закрепляется как канонический JSON и разбирается в `claims`; `content_base64` — точные байты, `claims` передаются отдельно. SHA-256 считается по сохранённым байтам. Без `revision` редакцией становится `sha256:<hex>`.
+- Та же пара (объект, редакция) с другими байтами — `409 INTEGRITY_CONFLICT`. `latest`, `head`, `current`, `main`, `master`, `refs/heads/…` и подобные — `422 REVISION_NOT_PINNED`.
+- Пространство вне `namespaces` поставщика — `403 NAMESPACE_NOT_ALLOWED`. Вид вне `fact_types` сохраняется с `verified: false` (непроверенное сообщение) и не двигает текущую редакцию. Отключённый поставщик — `409 PROVIDER_INACTIVE`.
+- Текущая редакция объекта (`current_revision`, `revision_state: unknown\|unconfirmed\|current\|pending_reconciliation`, `state_as_of`) меняется только при `supersedes` = текущая, `confirmed_current` (не старше `state_as_of`) или из снимка. Первая известная редакция — `unconfirmed`. Неизвестный порядок — `pending_reconciliation`, текущая не меняется. Редакция, которую текущая уже замещает, — `stale`. `revoked: true` при вступлении в силу даёт `status: revoked`.
+- `event_id` уникален в пределах поставщика: повтор с тем же содержимым (хеш тела без `project_id`) возвращает прежний итог с `replayed: true` без мутации; другое содержимое — `409 EVENT_CONFLICT`. Права проверяются и при повторе. `contract_version` — только `tasktrack-external-v1`, иначе `422 CONTRACT_VERSION_UNSUPPORTED`.
+- Снимок делает перечисленные редакции текущими на `as_of` (старый снимок ничего не откатывает). Отсутствие объекта ничего не удаляет; для `full` такие объекты перечисляются в `absent_not_deleted`.
+
+### Связь проекта (TT-08)
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `GET /projects/{id}/portfolio` | Видит проект | Связь или `null` (самостоятельный проект) |
+| `PUT /projects/{id}/portfolio` | Админ проекта или суперпользователь | `{office_project{provider, namespace, id}, repository_url, regulation?{…, revision}, stage?, is_training}` → `{…, recipient}`. `409 OFFICE_PROJECT_ALREADY_LINKED`, `422 REVISION_UNKNOWN / REVISION_NOT_PINNED / NOT_A_REGULATION / TRAINING_PROVIDER_FOR_REAL_PROJECT` |
+| `DELETE /projects/{id}/portfolio` | Как выше | Возврат в самостоятельный режим; основания и история остаются |
+
+`recipient` — как факты адресуют проект: `<provider>/<namespace>/project/<id>`. В `claims.recipient` допускаются также ссылка-объект на проект офиса и `tasktrack:<KEY>`.
+
+### Основания, готовность, оценка влияния (TT-10, TT-11)
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `GET /tasks/{id}/bases` | Видит задачу | `[{id, object, revision, role, meaning, freshness, verified, evidence[]}]`; `evidence` — полученные факты `evidence` о требовании |
+| `POST /tasks/{id}/bases` | Автор задачи или менеджер | `{object, revision, role: cause\|input\|normative\|reference\|grant, meaning?, freshness: pinned\|confirm_current}` → `201`. `422 EXTERNAL_OBJECT_UNKNOWN / REVISION_UNKNOWN / REVISION_NOT_PINNED / BASIS_ROLE_TYPE_MISMATCH` (роль `grant` — только `allocation`/`authorization`), `409 BASIS_EXISTS` |
+| `DELETE /bases/{id}` | Как выше | Выпущенные версии задания не меняются |
+| `GET /tasks/{id}/readiness` | Видит задачу | `{mode: standalone\|portfolio, ready, checked_at, conditions[{key, ok, reasons[{code, message, basis_id, object, revision, as_of}], facts[]}]}` |
+| `GET/POST /tasks/{id}/blockers`, `POST /blockers/{id}/resolve` | Видит задачу / менеджер | Зарегистрированная блокировка `{reason}`, снятие `{resolution}` |
+| `GET /tasks/{id}/impact-assessments` | Видит задачу | Ожидания и решения по новым редакциям оснований |
+| `POST /impact-assessments/{id}/decide` | Менеджер | `{decision: continue\|reissue\|recheck\|stop, rationale, authority?}`; `continue` без `authority` — `422 AUTHORITY_REQUIRED`; `409 IMPACT_ALREADY_DECIDED` |
+
+Выпуск задания (`POST /tasks/{id}/work-package/issue`) закрепляет основания в `content.bases` (только если они есть — прежние версии не меняются); изменение оснований после выпуска даёт `state: draft_changed`.
+
+Условия готовности (ключи `conditions`): `package` (`NO_WORK_PACKAGE`, `WORK_PACKAGE_OUTDATED`, `NO_ASSIGNEE`), `inputs` (`INPUT_NOT_ACCEPTED` — нужен факт `input_acceptance` с `claims{input{…, revision}, recipient, usage, accepted_by, accepted_at, authority}`), `normative` (регламент связи и основания `normative`: `claims.status = accepted`, для `research` — также `candidate` или вид `initiative`; при `claims.stages` — этап проекта в списке), `grant` (`NO_GRANT`, `GRANT_NOT_GRANTED`, `GRANT_INCOMPLETE`, `GRANT_OTHER_RECIPIENT`, `GRANT_EXPIRED`, `GRANT_NOT_YET_VALID`, `GRANT_NO_TERM`, `GRANT_REVOKED`, `GRANT_TRAINING`, `GRANT_UNVERIFIED`, `GRANT_STATE_UNKNOWN`, `PROVIDER_INACTIVE`; `claims{status: granted, recipient, scope, resource, limit, valid_until, valid_from?}`), `blockers` (`BLOCKER`, `IMPACT_PENDING`, `BASIS_REVOKED`, `BASIS_STATE_UNKNOWN`, `BASIS_CHANGED`). Учебный факт засчитывается только учебному проекту; непроверенное сообщение — никогда.
+
+Проверка применяется в режиме портфеля при `POST /tasks/{id}/sessions` (`role: executor`) и при переходе из статуса категории `initial` в другую: `409 TASK_NOT_READY {reasons[{condition, code, message}]}`. MCP: `get_readiness`, `claim_task` — те же правила.
+
+Новая текущая редакция объекта, на который опирается основание `cause`/`input`/`normative`, открывает оценку влияния; активная сессия исполнителя получает контрольную точку. Решение `reissue`/`recheck` переводит основание на новую редакцию (задание требует перевыпуска; `recheck` добавляет блокировку до повторной проверки), `stop` — блокировку.
+
+### Предложения работы (TT-19, TT-20)
+
+| Метод и путь | Доступ | Что делает |
+|---|---|---|
+| `POST /projects/{id}/work-proposals` | Суперпользователь или менеджер проекта | `{provider, stage, work_kind: research\|implementation\|verification\|reverification\|fix\|migration\|impact_assessment, basis{…, revision}, verification_plan?, work_scope_key, result_scope?, expected_output, reason, event_id?}` → `{proposal, created, new_version, replayed}`. Задачу не создаёт |
+| `GET /projects/{id}/work-proposals?status=` | Видит проект | Предложения с версиями |
+| `GET /work-proposals/{id}` | Видит проект | Предложение |
+| `POST /work-proposals/{id}/decide` | Менеджер | `{action: create_task\|link\|merge\|defer\|reject, reason?, task_id?, merge_into_id?, title?, task_type_key?}`; причина обязательна для `merge`/`defer`/`reject`; `409 WORK_PROPOSAL_ALREADY_DECIDED` (кроме `deferred`) |
+
+Ключ — (проект, `stage`, `work_kind`, идентичность основания без редакции, `work_scope_key`). Повтор с той же редакцией ничего не меняет; новая редакция — новая версия того же предложения (`updated_since_decision`, если решение уже принято) и оценка влияния для связанной задачи. `create_task`/`link` добавляют задаче основание `cause`.
 
 ---
 
