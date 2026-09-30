@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { Gantt, ViewMode } from 'gantt-task-react'
@@ -63,7 +63,7 @@ function countPeriods(tasks: GanttTask[], mode: ViewMode): number {
 
 type TaskMeta = Map<string, { depth: number; realTask: Task }>
 
-// ── Custom list components (stable refs, fresh data via useRef) ───────────────
+// ── Custom list components (module-level, data via GanttListContext) ──────────
 
 type ListHeaderProps = { headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string }
 type ListTableProps = {
@@ -73,10 +73,13 @@ type ListTableProps = {
   onExpanderClick: (t: GanttTask) => void
 }
 
-function makeListComponents(
-  dataRef: React.RefObject<{ taskMeta: TaskMeta; selectedTaskId: string | null; onTaskSelect?: (t: Task) => void }>,
-) {
-  const Header = function GanttListHeader({ headerHeight, rowWidth }: ListHeaderProps) {
+// Data for the list columns, which gantt-task-react renders from the component types we pass.
+// Context (not props) because the library controls their props.
+const GanttListContext = createContext<{
+  taskMeta: TaskMeta; selectedTaskId: string | null; onTaskSelect?: (t: Task) => void
+}>({ taskMeta: new Map(), selectedTaskId: null })
+
+function GanttListHeader({ headerHeight, rowWidth }: ListHeaderProps) {
     return (
       <div
         style={{ height: headerHeight, width: rowWidth, minWidth: rowWidth }}
@@ -87,8 +90,8 @@ function makeListComponents(
     )
   }
 
-  const Table = function GanttListTable({ rowHeight, rowWidth, tasks: visible, onExpanderClick }: ListTableProps) {
-    const { taskMeta, selectedTaskId, onTaskSelect } = dataRef.current!
+function GanttListTable({ rowHeight, rowWidth, tasks: visible, onExpanderClick }: ListTableProps) {
+    const { taskMeta, selectedTaskId, onTaskSelect } = useContext(GanttListContext)
     return (
       <div style={{ width: rowWidth, minWidth: rowWidth }}>
         {visible.map(gt => {
@@ -151,8 +154,6 @@ function makeListComponents(
     )
   }
 
-  return { Header, Table }
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -273,11 +274,10 @@ export function GanttChart({ tasks, links = [], viewMode, viewDate, onTaskSelect
     return Math.max(minCol, Math.floor(chartArea / periods))
   }, [wrapperWidth, listWidth, ganttTasks, viewMode])
 
-  // Stable list components (data via ref)
-  const dataRef = useRef({ taskMeta, selectedTaskId: selectedTaskId ?? null, onTaskSelect })
-  dataRef.current = { taskMeta, selectedTaskId: selectedTaskId ?? null, onTaskSelect }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const { Header: CustomListHeader, Table: CustomListTable } = useMemo(() => makeListComponents(dataRef), [])
+  const listData = useMemo(
+    () => ({ taskMeta, selectedTaskId: selectedTaskId ?? null, onTaskSelect }),
+    [taskMeta, selectedTaskId, onTaskSelect],
+  )
 
   if (!tasks.length) {
     return (
@@ -289,6 +289,7 @@ export function GanttChart({ tasks, links = [], viewMode, viewDate, onTaskSelect
 
   return (
     <div ref={wrapperRef} className="rounded-lg border overflow-hidden relative">
+      <GanttListContext value={listData}>
       <Gantt
         tasks={ganttTasks}
         viewMode={viewMode}
@@ -305,8 +306,8 @@ export function GanttChart({ tasks, links = [], viewMode, viewDate, onTaskSelect
         arrowIndent={12}
         fontFamily="inherit"
         fontSize="12px"
-        TaskListHeader={CustomListHeader}
-        TaskListTable={CustomListTable}
+        TaskListHeader={GanttListHeader}
+        TaskListTable={GanttListTable}
         onExpanderClick={task => {
           setCollapsed(prev => {
             const next = new Set(prev)
@@ -316,6 +317,7 @@ export function GanttChart({ tasks, links = [], viewMode, viewDate, onTaskSelect
           })
         }}
       />
+      </GanttListContext>
 
       {/* Drag handle — sits at the list/chart boundary */}
       <div

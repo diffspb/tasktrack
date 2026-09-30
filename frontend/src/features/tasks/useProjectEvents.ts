@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { STUB_USER_KEY } from '@/shared/api/client'
 import type { Task } from './api'
 
@@ -90,8 +90,11 @@ export function useProjectEvents(
   projectId: string | null | undefined,
   onEvent: (evt: TaskEvent) => void,
 ): void {
+  // Latest handler without resubscribing: updated after render, read only in the event callback.
   const onEventRef = useRef(onEvent)
-  onEventRef.current = onEvent
+  useLayoutEffect(() => {
+    onEventRef.current = onEvent
+  })
 
   useEffect(() => {
     if (!projectId) return

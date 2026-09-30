@@ -45,7 +45,3 @@
 Что остаётся непокрытым:
 
 - Фронтенд: у большинства экранов нет тестов (есть у `TaskBoard`, `ProjectList`, `TaskView`, компонентов результата и проверки, `ControlPage`). Нет e2e-проверки полного цикла в браузере.
-
-## Фронтенд: качество кода
-
-**`eslint` находит 21 ошибку в старом коде.** `set-state-in-effect` (`GeneralSettingsPage`, `CreateTaskModal`, `use-mobile`), чтение ref во время рендера (`TaskSearchPopover`, `GanttChart`), `only-export-components` в `components/ui/*` и `AuthProvider`, неиспользуемые параметры. Новый код их не добавляет (проверено на изменённых файлах); починить отдельным проходом, затем включить `eslint` в CI/`make`.

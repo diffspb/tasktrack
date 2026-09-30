@@ -20,8 +20,9 @@ frontend-install:
 frontend:
 	cd frontend && npm run dev
 
+# eslint + проверка типов + тесты — перед каждым коммитом с изменениями фронтенда
 frontend-test:
-	cd frontend && npm test
+	cd frontend && npm run lint && npx tsc -b --noEmit && npm test
 
 frontend-build:
 	cd frontend && npm run build

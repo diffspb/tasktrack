@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useSearchTasks, type Task } from '@/features/tasks/api'
-import { TaskTypeIcon, TYPE_COLORS } from '@/features/tasks/TaskTypeIcon'
+import { TaskTypeIcon } from '@/features/tasks/TaskTypeIcon'
+import { TYPE_COLORS } from '@/features/tasks/taskTypeColors'
 
 const SYSTEM_TYPES = [
   { key: 'task',     label: 'Task' },
@@ -16,14 +17,10 @@ const SYSTEM_TYPES = [
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const update = useCallback((v: T) => {
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => setDebounced(v), delay)
-  }, [delay])
-  // sync raw → debounced
-  const rawRef = useRef(value)
-  if (rawRef.current !== value) { rawRef.current = value; update(value) }
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
   return debounced
 }
 

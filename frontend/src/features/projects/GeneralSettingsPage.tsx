@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Download, Globe, Users, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -61,26 +61,23 @@ function SettingSection({ title, desc, children }: {
 
 export function GeneralSettingsPage() {
   const { projectKey } = useParams<{ projectKey: string }>()
-  const navigate = useNavigate()
   const { data: project } = useProjectByKey(projectKey)
-  const updateProject = useUpdateProject(project?.id)
-  const archiveProject = useArchiveProject(project?.id)
+  if (!project) return null
+  // Keyed by project: the form starts from the loaded values and resets on project switch.
+  return <GeneralSettingsForm key={project.id} project={project} />
+}
 
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [visibility, setVisibility] = useState<Visibility>('restricted')
+function GeneralSettingsForm({ project }: { project: Project }) {
+  const navigate = useNavigate()
+  const updateProject = useUpdateProject(project.id)
+  const archiveProject = useArchiveProject(project.id)
+
+  const [name, setName] = useState(project.name)
+  const [description, setDescription] = useState(project.description ?? '')
+  const [visibility, setVisibility] = useState<Visibility>(project.visibility)
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [saved, setSaved] = useState(false)
   const [exporting, setExporting] = useState(false)
-
-  useEffect(() => {
-    if (!project) return
-    setName(project.name)
-    setDescription(project.description ?? '')
-    setVisibility(project.visibility)
-  }, [project])
-
-  if (!project) return null
 
   const isDirty =
     name !== project.name ||
@@ -88,7 +85,6 @@ export function GeneralSettingsPage() {
     visibility !== project.visibility
 
   async function handleSave() {
-    if (!project) return
     await updateProject.mutateAsync({
       name: name.trim() || undefined,
       description: description.trim() || null,
@@ -100,7 +96,6 @@ export function GeneralSettingsPage() {
   }
 
   async function handleExport() {
-    if (!project) return
     setExporting(true)
     try {
       await downloadProjectExport(project.id, project.key)

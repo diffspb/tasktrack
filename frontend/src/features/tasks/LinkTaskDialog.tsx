@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TaskSearchPopover } from '@/shared/ui/TaskSearchPopover'
 import { useLinkTypes, useCreateTaskLink, type Task } from './api'
-import { TaskTypeIcon, TYPE_COLORS } from './TaskTypeIcon'
+import { TaskTypeIcon } from './TaskTypeIcon'
+import { TYPE_COLORS } from './taskTypeColors'
 
 type Direction = 'outward' | 'inward'
 type ChoiceKey = `${string}:${Direction}`

@@ -127,20 +127,19 @@ export function EpicTreeView({ viewId: _viewId, projectId }: Props) {
     () => new Set(tasks.filter(t => t.task_type?.key === 'epic' && !t.deleted_at).map(t => t.id)),
     [tasks],
   )
-  const [expanded, setExpanded] = useState<Set<string>>(epicIds)
-
-  useMemo(() => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      for (const id of epicIds) next.add(id)
-      return next
-    })
-  }, [epicIds])
+  // Epics start expanded, other parents collapsed; `toggled` holds the user's exceptions,
+  // so epics that appear later are expanded too without syncing state in an effect.
+  const [toggled, setToggled] = useState<Set<string>>(() => new Set())
+  const expanded = useMemo(() => {
+    const result = new Set([...epicIds].filter(id => !toggled.has(id)))
+    for (const id of toggled) if (!epicIds.has(id)) result.add(id)
+    return result
+  }, [epicIds, toggled])
 
   const nodes = useMemo(() => flattenVisible(tasks, expanded), [tasks, expanded])
 
   function toggle(id: string) {
-    setExpanded(prev => {
+    setToggled(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)

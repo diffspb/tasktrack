@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { AxiosError } from 'axios'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -24,9 +24,13 @@ export function CreateTaskModal({ open, projectId, parentTaskId, onClose }: Prop
   const [parentEpicId, setParentEpicId] = useState(parentTaskId ?? '')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (open) setParentEpicId(parentTaskId ?? '')
-  }, [open, parentTaskId])
+  // Reset the parent to the caller's one each time the dialog opens (adjust state on prop change).
+  const [openedWith, setOpenedWith] = useState<string | null>(null)
+  const openKey = open ? parentTaskId ?? '' : null
+  if (openKey !== openedWith) {
+    setOpenedWith(openKey)
+    if (openKey !== null) setParentEpicId(openKey)
+  }
   const create = useCreateTask(projectId)
   const { data: members } = useProjectMembers(projectId)
   const { data: epics = [] } = useProjectEpics(projectId)

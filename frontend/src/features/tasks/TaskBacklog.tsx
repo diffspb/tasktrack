@@ -13,7 +13,8 @@ import {
 } from './api'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
-import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
+import { TaskFilterBar } from './TaskFilter'
+import { DEFAULT_FILTER, applyFilter, type FilterState } from './taskFilter'
 import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 
 interface TaskBacklogProps {
@@ -49,9 +50,9 @@ export function TaskBacklog({ viewId: _viewId, projectId }: TaskBacklogProps) {
 
   const { data: members } = useProjectMembers(projectId ?? '')
 
-  const defaultWorkflow = workflows?.find(w => w.is_default) ?? workflows?.[0]
-  const statuses = defaultWorkflow?.statuses ?? []
-  const transitions = defaultWorkflow?.transitions ?? []
+  // Statuses of every workflow the project's tasks use — process tasks run on their own (ADR-023).
+  const statuses = useMemo(() => (workflows ?? []).flatMap(w => w.statuses), [workflows])
+  const transitions = useMemo(() => (workflows ?? []).flatMap(w => w.transitions), [workflows])
   const statusById = useMemo(() => new Map(statuses.map(s => [s.id, s])), [statuses])
   const taskById = useMemo(() => new Map((tasks ?? []).map(t => [t.id, t])), [tasks])
   const userById = useMemo(

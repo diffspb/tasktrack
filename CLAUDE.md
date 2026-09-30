@@ -143,6 +143,7 @@ cd frontend
 npm install
 npm run dev                    # Vite на :5173 (proxy /api → :8000)
 npm test                       # Vitest
+# из корня: make frontend-test — eslint + tsc + Vitest (обязательно перед коммитом фронтенда)
 ```
 
 ### Фронтенд — стек и структура

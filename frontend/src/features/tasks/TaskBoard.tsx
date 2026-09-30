@@ -15,7 +15,8 @@ import { useBoardColumns, type BoardColumn } from '@/features/projects/workflowA
 import { TaskCard } from './TaskCard'
 import { TaskDetail } from './TaskDetail'
 import { CreateTaskModal } from './CreateTaskModal'
-import { TaskFilterBar, DEFAULT_FILTER, applyFilter, type FilterState } from './TaskFilter'
+import { TaskFilterBar } from './TaskFilter'
+import { DEFAULT_FILTER, applyFilter, type FilterState } from './taskFilter'
 import { useProjectEvents, type TaskEvent } from './useProjectEvents'
 
 function BoardSkeleton() {

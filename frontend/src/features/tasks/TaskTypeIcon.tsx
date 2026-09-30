@@ -1,6 +1,7 @@
 import { ArrowRightLeft, Bug, BookOpen, CheckSquare2, FlaskConical, Layers, PlayCircle, Scale } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TYPE_COLORS } from './taskTypeColors'
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   bug:      Bug,
@@ -14,16 +15,6 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   migration: ArrowRightLeft,
 }
 
-export const TYPE_COLORS: Record<string, string> = {
-  bug:      '#ef4444',
-  story:    '#10b981',
-  epic:     '#f59e0b',
-  decision: '#8b5cf6',
-  task:     '#6366f1',
-  execution: '#0ea5e9',
-  research:  '#a855f7',
-  migration: '#14b8a6',
-}
 
 interface Props {
   typeKey: string
